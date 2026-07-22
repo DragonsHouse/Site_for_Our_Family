@@ -34,7 +34,6 @@ export type {
 } from './family-types';
 
 const USERS_KEY = 'dragon_house_family_users_v1';
-const SESSION_KEY = 'dragon_house_family_session_v1';
 const USERS_SCHEMA_KEY = 'dragon_house_family_users_schema_version';
 const USERS_SCHEMA_VERSION = '2-stable-member-id';
 
@@ -357,83 +356,6 @@ function writeUsers(users: FamilyUser[]) {
   window.localStorage.setItem(USERS_SCHEMA_KEY, USERS_SCHEMA_VERSION);
 }
 
-async function hashPassword(password: string): Promise<string> {
-  const bytes = new TextEncoder().encode(password);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-export async function loginFamilyUser(
-  nickname: string,
-  passwordOrStaticId: string
-): Promise<FamilyUser> {
-  const users = readUsers();
-  const normalizedNickname = nickname.trim().toLowerCase();
-  const user = users.find((item) => item.nickname.toLowerCase() === normalizedNickname);
-  if (!user) {
-    throw new Error('User not found');
-  }
-  if (user.accountStatus === 'inactive') {
-    throw new Error('User is inactive');
-  }
-
-  const password = passwordOrStaticId.trim();
-  const hasPersonalPassword = Boolean(user.passwordHash);
-  const expectedHash = hasPersonalPassword ? await hashPassword(password) : null;
-  const passwordMatches = hasPersonalPassword ? expectedHash === user.passwordHash : false;
-  const staticIdMatches =
-    user.mustChangePassword && !hasPersonalPassword && password === String(user.staticId);
-
-  if (!passwordMatches && !staticIdMatches) {
-    throw new Error('Wrong password or static ID');
-  }
-
-  const now = new Date().toISOString();
-  const nextUser = { ...user, lastActive: now, isOnline: true, status: 'online' as const };
-  writeUsers(users.map((item) => (item.nickname === user.nickname ? nextUser : item)));
-  window.localStorage.setItem(SESSION_KEY, user.id);
-  return nextUser;
-}
-
-export async function changeFamilyUserPassword(
-  nickname: string,
-  newPassword: string
-): Promise<FamilyUser> {
-  if (newPassword.trim().length < 6) {
-    throw new Error('New password must contain at least 6 characters');
-  }
-
-  const users = readUsers();
-  const user = users.find((item) => item.nickname === nickname);
-  if (!user) {
-    throw new Error('User not found');
-  }
-
-  const nextUser: FamilyUser = {
-    ...user,
-    passwordHash: await hashPassword(newPassword.trim()),
-    mustChangePassword: false,
-    lastActive: new Date().toISOString(),
-    isOnline: true,
-    status: 'online'
-  };
-  writeUsers(users.map((item) => (item.nickname === nickname ? nextUser : item)));
-  window.localStorage.setItem(SESSION_KEY, nextUser.id);
-  return nextUser;
-}
-
-export function getCurrentFamilyUser(): FamilyUser | null {
-  const sessionIdentity = window.localStorage.getItem(SESSION_KEY);
-  if (!sessionIdentity) return null;
-  return (
-    readUsers().find((user) => user.id === sessionIdentity) ??
-    readUsers().find((user) => user.nickname === sessionIdentity) ??
-    null
-  );
-}
-
 export function getFamilyUsers(): FamilyUser[] {
   return readUsers();
 }
@@ -455,7 +377,7 @@ export function updateFamilyUserAvatar(nickname: string, avatarDataUrl: string |
   return nextUser;
 }
 
-export function updateFamilyUserAccess(
+function updateFamilyUserAccess(
   nickname: string,
   updates: {
     role: FamilyRole;
@@ -704,10 +626,6 @@ export async function updateFamilyUserProfile(
     promotionUpdatedAt: now
   };
   writeUsers(users.map((item) => (item.nickname === originalNickname ? nextUser : item)));
-  const sessionIdentity = window.localStorage.getItem(SESSION_KEY);
-  if (sessionIdentity === originalNickname || sessionIdentity === nextUser.id) {
-    window.localStorage.setItem(SESSION_KEY, nextUser.id);
-  }
   return nextUser;
 }
 
@@ -727,18 +645,6 @@ export function deactivateFamilyUser(nickname: string): FamilyUser {
   };
   writeUsers(users.map((item) => (item.nickname === nickname ? nextUser : item)));
   return nextUser;
-}
-
-export function logoutFamilyUser(nickname: string) {
-  const users = readUsers();
-  writeUsers(
-    users.map((user) =>
-      user.nickname === nickname
-        ? { ...user, isOnline: false, status: 'offline', lastActive: new Date().toISOString() }
-        : user
-    )
-  );
-  window.localStorage.removeItem(SESSION_KEY);
 }
 
 export function roleLabel(role: FamilyRole) {

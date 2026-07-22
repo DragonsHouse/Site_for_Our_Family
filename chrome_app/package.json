@@ -24,7 +24,7 @@
     "map:sync-assets": "node scripts/sync-map-assets.mjs",
     "map:sync-assets:with-images": "node scripts/sync-map-assets.mjs --include-popup-images",
     "map:build-default-data": "node scripts/build-map-default-data.mjs",
-    "test:auth-source": "node --experimental-strip-types --test tests/family-backend-current-user.test.ts",
+    "test:auth-source": "node --experimental-strip-types --test tests/family-backend-current-user.test.ts tests/family-legacy-auth-cleanup.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
