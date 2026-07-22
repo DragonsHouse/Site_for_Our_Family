@@ -1,10 +1,14 @@
+import { createHash } from 'node:crypto';
 import type { DiscordGuildMemberReader } from './guild-member-reader.js';
 import type { DiscordRoleMappingRepository } from './role-mapping-repository.js';
 import type { FamilyMemberRepository } from '../members/member-repository.js';
+import type { AppConfig } from '../config/env.js';
+import { createLogger, type AppLogger } from '../logging/logger.js';
 import type {
   DiscordMemberSyncChange,
   DiscordMemberSyncAdditionalRole,
   DiscordMemberSyncDryRunItem,
+  DiscordMemberSyncPermissionSources,
   DiscordMemberSyncDryRunResult,
   DiscordMemberSyncDryRunSummary,
   DiscordMemberSyncIgnoredRole,
@@ -12,6 +16,7 @@ import type {
   DiscordRoleMapping,
   FamilyMember,
   FamilyPermission,
+  FamilyRole,
   NormalizedDiscordGuildMember,
 } from '../types.js';
 
@@ -24,12 +29,60 @@ const EMPTY_SUMMARY: DiscordMemberSyncDryRunSummary = {
   ignored_bot: 0,
 };
 
+const OWNER_PROTECTED_PERMISSIONS: FamilyPermission[] = [
+  'manage_users',
+  'view_members',
+  'manage_members',
+  'manage_member_roles',
+  'manage_member_auth',
+  'delete_members',
+  'restore_members',
+  'view_member_private_fields',
+  'manage_tasks',
+  'manage_ranks',
+  'view_private_notes',
+  'manage_family_map',
+  'manage_events',
+  'manage_buyers',
+  'manage_family_posts',
+  'manage_family_news',
+  'manage_news',
+  'view_family_history',
+  'manage_family_economy',
+  'manage_family_quests',
+  'manage_family_assets',
+  'manage_discord_integration',
+  'manage_accounting',
+  'manage_treasury',
+  'manage_recruitment',
+  'manage_resources',
+  'manage_roles',
+];
+
+const SYSTEM_ROLE_PERMISSIONS: Record<FamilyRole, FamilyPermission[]> = {
+  owner: OWNER_PROTECTED_PERMISSIONS,
+  deputy: [],
+  moderator: [],
+  member: [],
+};
+
+type ProtectedOwnerConfig = {
+  familyMemberId: string;
+  discordUserId: string;
+} | null;
+
 export class DiscordMemberSyncDryRunService {
+  private readonly logger: AppLogger | null;
+
   constructor(
     private readonly reader: DiscordGuildMemberReader,
     private readonly memberRepository: FamilyMemberRepository,
     private readonly roleMappings: DiscordRoleMappingRepository,
-  ) {}
+    private readonly config: Pick<AppConfig, 'discord' | 'nodeEnv' | 'logLevel' | 'logFormat'> | null = null,
+    logger: AppLogger | null = null,
+  ) {
+    this.logger = logger ?? (config ? createLogger(config) : null);
+  }
 
   async run(generatedAt = new Date()): Promise<DiscordMemberSyncDryRunResult> {
     const [discordMembers, familyMembers, mappings] = await Promise.all([
@@ -37,9 +90,18 @@ export class DiscordMemberSyncDryRunService {
       listAllFamilyMembers(this.memberRepository),
       this.roleMappings.list(false),
     ]);
+    this.logger?.info('discord_sync_snapshot_completed', {
+      guildId: discordMembers[0]?.guildId ?? this.config?.discord.guildId ?? null,
+      discordMemberCount: discordMembers.length,
+      familyMemberCount: familyMembers.length,
+      roleMappingCount: mappings.length,
+    });
     const activeMappingsByRoleId = new Map(mappings.map((mapping) => [mapping.discordRoleId, mapping]));
     const result: DiscordMemberSyncDryRunResult = {
+      planId: '',
       generatedAt: generatedAt.toISOString(),
+      planExpiresAt: new Date(generatedAt.getTime() + (this.config?.discord.sync.planTtlSeconds ?? 300) * 1000).toISOString(),
+      planHash: '',
       guildId: discordMembers[0]?.guildId ?? '',
       discordMemberCount: discordMembers.length,
       familyMemberCount: familyMembers.length,
@@ -51,6 +113,7 @@ export class DiscordMemberSyncDryRunService {
     };
 
     const linkedMembersByDiscordId = indexLinkedFamilyMembers(familyMembers, result);
+    const protectedOwner = this.protectedOwnerConfig();
     const seenDiscordIds = new Set<string>();
     const matchedFamilyMemberIds = new Set<string>();
     const missingRoleMappings = new Set<string>();
@@ -91,9 +154,12 @@ export class DiscordMemberSyncDryRunService {
         ], resolution));
         continue;
       }
-      const resolutionWithPrimary = { ...resolution, primaryRank: resolution.primaryRank };
 
       const familyMember = linkedMembersByDiscordId.get(discordMember.discordUserId) ?? null;
+      const resolutionWithPrimary = protectOwnerResolution(familyMember, discordMember, protectedOwner, {
+        ...resolution,
+        primaryRank: resolution.primaryRank,
+      });
       if (!familyMember) {
         const warnings = [...identityWarnings];
         if (unknownRoles.length) warnings.push('Member has Discord roles without active Family Hub mappings.');
@@ -112,7 +178,11 @@ export class DiscordMemberSyncDryRunService {
 
       matchedFamilyMemberIds.add(familyMember.id);
       const changes = updateChanges(familyMember, discordMember, resolutionWithPrimary);
-      const warnings = [...identityWarnings, ...accessWarnings(familyMember, resolutionWithPrimary)];
+      const warnings = [
+        ...identityWarnings,
+        ...protectedOwnerWarnings(familyMember, discordMember, protectedOwner, resolution.primaryRank),
+        ...accessWarnings(familyMember, resolutionWithPrimary),
+      ];
       if (unknownRoles.length) warnings.push('Member has Discord roles without active Family Hub mappings.');
       addAction(result, {
         action: identityWarnings.length ? 'conflict' : changes.length ? 'update' : 'unchanged',
@@ -140,6 +210,7 @@ export class DiscordMemberSyncDryRunService {
         additionalRoles: [],
         effectivePermissions: [],
         matchedIgnoredRoles: [],
+        permissionSources: emptyPermissionSources(),
         changes: [{ field: 'status', current: familyMember.status, proposed: 'inactive' }],
         warnings: ['Member is active in Family Hub but absent from the Discord guild.', ...ownerDeputyWarnings(familyMember)],
         possibleManualLinkFamilyMemberIds: [],
@@ -153,7 +224,16 @@ export class DiscordMemberSyncDryRunService {
     }
 
     result.missingRoleMappings = [...missingRoleMappings].sort();
+    const planIdentity = hashDryRunPlan(result, mappings, this.config, false);
+    result.planId = planIdentity.slice(0, 32);
+    result.planHash = hashDryRunPlan(result, mappings, this.config, true);
     return result;
+  }
+
+  private protectedOwnerConfig(): ProtectedOwnerConfig {
+    const familyMemberId = this.config?.discord.sync.protectedOwnerMemberId;
+    const discordUserId = this.config?.discord.sync.protectedOwnerDiscordUserId;
+    return familyMemberId && discordUserId ? { familyMemberId, discordUserId } : null;
   }
 }
 
@@ -222,8 +302,10 @@ function indexLinkedFamilyMembers(
 type DiscordRoleResolution = {
   primaryRank?: DiscordMemberSyncProposedRole;
   additionalRoles: DiscordMemberSyncAdditionalRole[];
+  discordMappedPermissions: FamilyPermission[];
   effectivePermissions: FamilyPermission[];
   matchedIgnoredRoles: DiscordMemberSyncIgnoredRole[];
+  permissionSources: DiscordMemberSyncPermissionSources;
 };
 
 function resolveDiscordRoles(
@@ -234,11 +316,13 @@ function resolveDiscordRoles(
   const matched = mappings.filter((candidate) => candidate.enabled && roleIds.has(candidate.discordRoleId));
   const primaryRank = selectPrimaryRank(roleIds, mappings);
   const additionalRoles = collectAdditionalRoles(matched);
-  const effectivePermissions = calculateEffectivePermissions(primaryRank, additionalRoles);
+  const discordMappedPermissions = calculateDiscordMappedPermissions(primaryRank, additionalRoles);
+  const permissionSources = permissionSourcesFor(primaryRank, discordMappedPermissions);
+  const effectivePermissions = calculateEffectivePermissions(permissionSources);
   const matchedIgnoredRoles = matched
     .filter((mapping) => mapping.mappingType === 'ignored')
     .map((mapping) => ({ discordRoleId: mapping.discordRoleId, discordRoleName: mapping.discordRoleName }));
-  return { primaryRank, additionalRoles, effectivePermissions, matchedIgnoredRoles };
+  return { primaryRank, additionalRoles, discordMappedPermissions, effectivePermissions, matchedIgnoredRoles, permissionSources };
 }
 
 function selectPrimaryRank(roleIds: Set<string>, mappings: DiscordRoleMapping[]): DiscordMemberSyncProposedRole | undefined {
@@ -276,7 +360,7 @@ function collectAdditionalRoles(mappings: DiscordRoleMapping[]): DiscordMemberSy
     );
 }
 
-function calculateEffectivePermissions(
+function calculateDiscordMappedPermissions(
   primaryRank: DiscordMemberSyncProposedRole | undefined,
   additionalRoles: DiscordMemberSyncAdditionalRole[],
 ): FamilyPermission[] {
@@ -284,6 +368,16 @@ function calculateEffectivePermissions(
     ...(primaryRank?.permissions ?? []),
     ...additionalRoles.flatMap((role) => role.permissions),
   ]).sort();
+}
+
+function calculateEffectivePermissions(sources: DiscordMemberSyncPermissionSources): FamilyPermission[] {
+  const denied = new Set(sources.manualDeniedPermissions);
+  const base = uniquePermissions([
+    ...sources.systemRolePermissions,
+    ...sources.discordMappedPermissions,
+    ...sources.manualGrantedPermissions,
+  ]).filter((permission) => !denied.has(permission));
+  return uniquePermissions([...base, ...sources.protectedPermissions]).sort();
 }
 
 function toProposedRole(mapping: DiscordRoleMapping): DiscordMemberSyncProposedRole {
@@ -308,14 +402,27 @@ function resolutionItemFields(resolution: DiscordRoleResolution) {
     additionalRoles: resolution.additionalRoles,
     effectivePermissions: resolution.effectivePermissions,
     matchedIgnoredRoles: resolution.matchedIgnoredRoles,
+    permissionSources: resolution.permissionSources,
   };
 }
 
 function emptyRoleResolution(): DiscordRoleResolution {
   return {
     additionalRoles: [],
+    discordMappedPermissions: [],
     effectivePermissions: [],
     matchedIgnoredRoles: [],
+    permissionSources: emptyPermissionSources(),
+  };
+}
+
+function emptyPermissionSources(): DiscordMemberSyncPermissionSources {
+  return {
+    systemRolePermissions: [],
+    discordMappedPermissions: [],
+    manualGrantedPermissions: [],
+    manualDeniedPermissions: [],
+    protectedPermissions: [],
   };
 }
 
@@ -344,8 +451,10 @@ function createChanges(
   return [
     { field: 'discord_user_id', current: null, proposed: discordMember.discordUserId },
     { field: 'discord_username', current: null, proposed: discordMember.username },
+    { field: 'nickname', current: null, proposed: displayName(discordMember) },
     { field: 'role', current: null, proposed: resolution.primaryRank.familyRole },
     { field: 'rank', current: null, proposed: resolution.primaryRank.rank },
+    { field: 'permissions_discord', current: [], proposed: resolution.discordMappedPermissions },
     { field: 'permissions', current: [], proposed: resolution.effectivePermissions },
   ];
 }
@@ -359,24 +468,34 @@ function updateChanges(
     compare('discord_username', familyMember.discord?.discordUsername ?? null, discordMember.username),
     compare('discord_global_name', familyMember.discord?.discordGlobalName ?? null, discordMember.globalName),
     compare('discord_server_nickname', familyMember.discord?.discordServerNickname ?? null, discordMember.serverNickname),
-    compare('discord_avatar', familyMember.discord?.discordAvatar ?? null, discordMember.avatarUrl),
+    compare('discord_avatar', familyMember.discord?.discordAvatar ?? null, parseDiscordAvatarHash(discordMember.avatarUrl)),
     compare('guild_id', familyMember.discord?.guildId ?? null, discordMember.guildId),
     compare('discord_joined_at', familyMember.discord?.joinedAt ?? null, discordMember.joinedAt),
+    compare('nickname', familyMember.nickname, displayName(discordMember)),
     compare('role', familyMember.role, resolution.primaryRank.familyRole),
     compare('rank', familyMember.rank, resolution.primaryRank.rank),
-    comparePermissions(familyMember.permissions, resolution.effectivePermissions),
+    comparePermissions('permissions_discord', familyMember.permissionsDiscord, resolution.discordMappedPermissions),
+    comparePermissions('permissions', familyMember.permissions, resolution.effectivePermissions),
     compare('status', familyMember.status, 'active'),
   ].filter((change): change is DiscordMemberSyncChange => Boolean(change));
+}
+
+function displayName(member: NormalizedDiscordGuildMember): string {
+  return (member.serverNickname ?? member.globalName ?? member.username).trim();
+}
+
+function parseDiscordAvatarHash(avatarUrl: string | null): string | null {
+  return avatarUrl?.match(/\/avatars\/[^/]+\/([^/.?]+)/u)?.[1] ?? null;
 }
 
 function compare(field: string, current: unknown, proposed: unknown): DiscordMemberSyncChange | null {
   return current === proposed ? null : { field, current, proposed };
 }
 
-function comparePermissions(current: FamilyPermission[], proposed: FamilyPermission[]): DiscordMemberSyncChange | null {
+function comparePermissions(field: string, current: FamilyPermission[], proposed: FamilyPermission[]): DiscordMemberSyncChange | null {
   const left = [...current].sort();
   const right = [...proposed].sort();
-  return JSON.stringify(left) === JSON.stringify(right) ? null : { field: 'permissions', current, proposed };
+  return JSON.stringify(left) === JSON.stringify(right) ? null : { field, current, proposed };
 }
 
 function accessWarnings(
@@ -390,6 +509,73 @@ function accessWarnings(
   const removedPermissions = [...currentPermissions].filter((permission) => !proposedPermissions.has(permission));
   if (familyMember.role !== resolution.primaryRank.familyRole || removedPermissions.length > 0) {
     warnings.push('Dry-run includes a role or permission change that could revoke access.');
+  }
+  return warnings;
+}
+
+function protectOwnerResolution(
+  familyMember: FamilyMember | null,
+  discordMember: NormalizedDiscordGuildMember,
+  protectedOwner: ProtectedOwnerConfig,
+  resolution: DiscordRoleResolution & { primaryRank: DiscordMemberSyncProposedRole },
+): DiscordRoleResolution & { primaryRank: DiscordMemberSyncProposedRole } {
+  const ownerProtected = isProtectedOwner(familyMember, discordMember, protectedOwner);
+  const primaryRank = ownerProtected && (resolution.primaryRank.familyRole !== 'owner' || resolution.primaryRank.rank !== 10)
+    ? {
+        ...resolution.primaryRank,
+        familyRole: 'owner' as const,
+        rank: 10,
+        permissions: uniquePermissions([...resolution.primaryRank.permissions, ...OWNER_PROTECTED_PERMISSIONS]).sort(),
+      }
+    : resolution.primaryRank;
+  const discordMappedPermissions = calculateDiscordMappedPermissions(primaryRank, resolution.additionalRoles);
+  const permissionSources = permissionSourcesFor(primaryRank, discordMappedPermissions, familyMember, ownerProtected);
+  return {
+    ...resolution,
+    primaryRank,
+    discordMappedPermissions,
+    permissionSources,
+    effectivePermissions: calculateEffectivePermissions(permissionSources),
+  };
+}
+
+function permissionSourcesFor(
+  primaryRank: DiscordMemberSyncProposedRole | undefined,
+  discordMappedPermissions: FamilyPermission[],
+  familyMember: FamilyMember | null = null,
+  ownerProtected = false,
+): DiscordMemberSyncPermissionSources {
+  return {
+    systemRolePermissions: primaryRank ? [...SYSTEM_ROLE_PERMISSIONS[primaryRank.familyRole]].sort() : [],
+    discordMappedPermissions: [...discordMappedPermissions].sort(),
+    manualGrantedPermissions: [...(familyMember?.permissionsOverride ?? [])].sort(),
+    manualDeniedPermissions: [...(familyMember?.permissionsDenied ?? [])].sort(),
+    protectedPermissions: ownerProtected ? [...OWNER_PROTECTED_PERMISSIONS].sort() : [],
+  };
+}
+
+function isProtectedOwner(
+  familyMember: FamilyMember | null,
+  discordMember: NormalizedDiscordGuildMember,
+  protectedOwner: ProtectedOwnerConfig,
+): boolean {
+  return Boolean(
+    protectedOwner &&
+      familyMember?.id === protectedOwner.familyMemberId &&
+      discordMember.discordUserId === protectedOwner.discordUserId,
+  );
+}
+
+function protectedOwnerWarnings(
+  familyMember: FamilyMember,
+  discordMember: NormalizedDiscordGuildMember,
+  protectedOwner: ProtectedOwnerConfig,
+  mappedPrimaryRank: DiscordMemberSyncProposedRole,
+): string[] {
+  if (!isProtectedOwner(familyMember, discordMember, protectedOwner)) return [];
+  const warnings = ['Protected owner identity matched by stable Family Hub member ID and Discord user ID.'];
+  if (mappedPrimaryRank.familyRole !== 'owner' || mappedPrimaryRank.rank !== 10) {
+    warnings.push('Discord mapping conflicts with protected owner identity; dry-run preserves owner role and rank.');
   }
   return warnings;
 }
@@ -416,4 +602,55 @@ function toFamilyMemberRef(familyMember: FamilyMember): DiscordMemberSyncDryRunI
     deletedAt: familyMember.deletedAt,
     discordUserId: familyMember.discord?.discordUserId ?? null,
   };
+}
+
+function hashDryRunPlan(
+  result: DiscordMemberSyncDryRunResult,
+  mappings: DiscordRoleMapping[],
+  config: Pick<AppConfig, 'discord' | 'nodeEnv' | 'logLevel' | 'logFormat'> | null,
+  includePlanId: boolean,
+): string {
+  const stablePlan = {
+    planSchemaVersion: 2,
+    planId: includePlanId ? result.planId : null,
+    generatedAt: result.generatedAt,
+    planExpiresAt: result.planExpiresAt,
+    environment: config?.nodeEnv ?? 'unknown',
+    guildId: result.guildId,
+    configuredGuildId: config?.discord.guildId ?? null,
+    protectedOwner: {
+      familyMemberId: config?.discord.sync.protectedOwnerMemberId ?? null,
+      discordUserId: config?.discord.sync.protectedOwnerDiscordUserId ?? null,
+    },
+    roleMappings: mappings
+      .map((mapping) => ({
+        discordRoleId: mapping.discordRoleId,
+        mappingType: mapping.mappingType,
+        familyRole: mapping.familyRole,
+        rank: mapping.rank,
+        priority: mapping.priority,
+        permissions: [...mapping.permissions].sort(),
+        grantsPermissions: mapping.grantsPermissions,
+        enabled: mapping.enabled,
+      }))
+      .sort((left, right) => left.discordRoleId.localeCompare(right.discordRoleId)),
+    discordMemberCount: result.discordMemberCount,
+    familyMemberCount: result.familyMemberCount,
+    summary: result.summary,
+    missingRoleMappings: result.missingRoleMappings,
+    actions: result.actions.map((action) => ({
+      action: action.action,
+      reason: action.reason,
+      discordUserId: action.discordMember?.discordUserId ?? null,
+      familyMemberId: action.familyMember?.id ?? null,
+      primaryDiscordRoleId: action.primaryDiscordRoleId ?? null,
+      familyRole: action.primaryRank?.familyRole ?? null,
+      promotionRank: action.promotionRank ?? null,
+      additionalRoleIds: action.additionalRoles.map((role) => role.discordRoleId),
+      effectivePermissions: action.effectivePermissions,
+      changes: action.changes,
+      manualLinkCandidates: action.possibleManualLinkFamilyMemberIds,
+    })),
+  };
+  return createHash('sha256').update(JSON.stringify(stablePlan)).digest('hex');
 }

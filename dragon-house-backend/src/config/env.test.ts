@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { configuredChannelNames, getMissingDiscordConfig, loadConfig, maskSensitiveValue, requireDatabaseUrl } from './env.js';
+import {
+  configuredChannelNames,
+  getMissingDiscordConfig,
+  loadConfig,
+  maskSensitiveValue,
+  requireDatabaseUrl,
+  validateProductionConfig,
+} from './env.js';
 
 describe('env config', () => {
   it('uses disabled Discord mode when secrets are absent', () => {
@@ -29,5 +36,33 @@ describe('env config', () => {
     const config = loadConfig({ NODE_ENV: 'test', PORT: '8787' });
 
     expect(() => requireDatabaseUrl(config)).toThrow('DATABASE_URL is required');
+  });
+
+  it('parses explicit frontend allowed origins', () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      PORT: '8787',
+      FRONTEND_ALLOWED_ORIGINS: 'https://family.example, https://admin.example',
+    });
+
+    expect(config.frontendAllowedOrigins).toEqual(['https://family.example', 'https://admin.example']);
+  });
+
+  it('parses TRUST_PROXY=false as false', () => {
+    const config = loadConfig({ NODE_ENV: 'test', PORT: '8787', TRUST_PROXY: 'false' });
+
+    expect(config.trustProxy).toBe(false);
+  });
+
+  it('fails production validation when sync safety configuration is missing', () => {
+    const config = loadConfig({ NODE_ENV: 'production', PORT: '8787' });
+
+    expect(validateProductionConfig(config)).toEqual(expect.arrayContaining([
+      'DATABASE_URL',
+      'FRONTEND_EXTENSION_ID or FRONTEND_ALLOWED_ORIGINS',
+      'DISCORD_SYNC_PROTECTED_OWNER_MEMBER_ID',
+      'DISCORD_SYNC_PROTECTED_OWNER_USER_ID',
+      'DISCORD_BOT_TOKEN',
+    ]));
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { createTestConfig } from '../test/test-config.js';
 import { DuplicateFamilyAuthUserError, InMemoryFamilyAuthRepository } from './auth-repository.js';
 import { FamilyAuthService } from './auth-service.js';
@@ -7,6 +7,14 @@ import { hashSessionToken } from './tokens.js';
 
 const ANASTASIA_MEMBER_ID = 'a0b1c2d3-0001-4a00-8000-000000000001';
 const DISABLED_MEMBER_ID = 'a0b1c2d3-0002-4a00-8000-000000000002';
+let anastasiaPasswordHash = '';
+let disabledPasswordHash = '';
+
+beforeAll(async () => {
+  const config = createTestConfig({ bcryptCost: 10 });
+  anastasiaPasswordHash = await hashPassword('41384', config.bcryptCost);
+  disabledPasswordHash = await hashPassword('Password123', config.bcryptCost);
+});
 
 async function createService() {
   const repository = new InMemoryFamilyAuthRepository();
@@ -15,7 +23,7 @@ async function createService() {
     familyMemberId: ANASTASIA_MEMBER_ID,
     login: 'Anastasia_Dragons',
     staticId: '41384',
-    passwordHash: await hashPassword('41384', config.bcryptCost),
+    passwordHash: anastasiaPasswordHash,
     isActive: true,
     mustChangePassword: true,
     role: 'owner',
@@ -26,7 +34,7 @@ async function createService() {
     familyMemberId: DISABLED_MEMBER_ID,
     login: 'Disabled_Dragons',
     staticId: '999',
-    passwordHash: await hashPassword('Password123', config.bcryptCost),
+    passwordHash: disabledPasswordHash,
     isActive: false,
     mustChangePassword: false,
     role: 'member',

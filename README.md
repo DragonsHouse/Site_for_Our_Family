@@ -8,10 +8,10 @@ This repository preserves the current local working baseline. It is not configur
 
 ```text
 Site_for_Our_Family/
-├── chrome_app/
-├── dragon-house-backend/
-├── README.md
-└── .gitignore
+|-- chrome_app/
+|-- dragon-house-backend/
+|-- README.md
+`-- .gitignore
 ```
 
 ## Frontend
@@ -59,3 +59,91 @@ Use `dragon-house-backend/.env.example` as a template for local configuration.
 Never commit real `.env` files, database credentials, Discord secrets, bearer tokens, API keys, private keys, cookies, or production credentials.
 
 Production deployment is not configured yet.
+
+## Discord member synchronization
+
+Discord is the source of truth for Family Hub membership, Discord identity, server nickname, avatar, primary hierarchy rank, mapped family role, and permissions granted by Discord role mappings.
+
+Family Hub remains the source of truth for internal data such as notes, quests, accounting, statistics, settings, manual permission grants, and manual permission denials.
+
+### Sync lifecycle
+
+1. An owner calls the dry-run endpoint.
+2. The backend fetches the Discord guild member snapshot, excludes bots, resolves role mappings, and returns a `planId`, `planHash`, `generatedAt`, and `planExpiresAt`.
+3. The owner calls apply sync with `confirm: true`, the latest plan identity, and an `idempotencyKey`.
+4. The backend takes a PostgreSQL advisory lock scoped to the Discord guild, recomputes the dry-run, verifies that the plan identity and hash still match, rejects expired plans, and applies the plan in one transaction.
+5. The backend records a sync report in `discord_sync_reports` and writes detailed audit entries in `family_audit_log`.
+
+### Sync API
+
+All sync endpoints require authenticated owner access.
+
+- `POST /api/discord/dry-run`
+- `POST /api/discord/sync/members/dry-run`
+- `POST /api/discord/apply-sync`
+- `GET /api/discord/sync-report`
+
+Apply sync requires:
+
+```json
+{
+  "confirm": true,
+  "planId": "dry-run plan id",
+  "planGeneratedAt": "dry-run generatedAt value",
+  "planExpiresAt": "dry-run planExpiresAt value",
+  "planHash": "sha256 dry-run plan hash",
+  "idempotencyKey": "caller-generated unique key"
+}
+```
+
+### Production configuration
+
+Use environment variables for all deployment-specific values:
+
+- `DATABASE_URL`
+- `DISCORD_BOT_TOKEN`
+- `DISCORD_GUILD_ID`
+- `DISCORD_CLIENT_ID`
+- `DISCORD_CLIENT_SECRET`
+- `DISCORD_OAUTH_REDIRECT_URI`
+- `DISCORD_SYNC_PROTECTED_OWNER_MEMBER_ID`
+- `DISCORD_SYNC_PROTECTED_OWNER_USER_ID`
+- `DISCORD_SYNC_MIN_HUMAN_MEMBERS`
+- `DISCORD_SYNC_PLAN_TTL_SECONDS`
+- `DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE`
+- `DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR`
+- `DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE`
+- `DISCORD_SYNC_REPORT_DIR` if filesystem report copies are wanted
+- `LOG_LEVEL`
+- `LOG_FORMAT`
+- `TRUST_PROXY`
+- `FRONTEND_ALLOWED_ORIGINS`
+
+Production should run behind HTTPS and a reverse proxy. Do not commit real `.env` files or production credentials.
+
+### Security model
+
+- Apply sync is owner-only.
+- Apply sync is protected by a database-backed advisory lock scoped to the Discord guild.
+- Apply sync is idempotency-keyed to protect duplicate requests. Reusing the same key with a different plan is rejected.
+- Apply sync refuses stale plans by comparing the submitted plan identity and `planHash` with a freshly generated dry-run.
+- Dry-run, apply, and sync-report endpoints are rate-limited per authenticated Family Hub member. The current limiter is suitable for a single backend instance; multi-instance production should move the limiter store to PostgreSQL or Redis.
+- Protected owner identity is configured through stable Family Hub and Discord IDs.
+- Manual permissions are preserved separately from Discord-derived permissions.
+- Missing primary hierarchy roles remain conflicts and are not auto-created.
+- Production logs are structured JSON when `LOG_FORMAT=json`; secret-like fields are redacted before logging.
+
+### Audit policy
+
+Create events include the initial safe member context. Permission-change audit events are separate only when permissions are created or materially changed by sync. Repeated unchanged sync runs must not create member-change audit noise.
+
+### Test policy
+
+Auth tests keep production password hashing unchanged. Test setup reuses precomputed bcrypt hashes so the normal `npm run test` command remains deterministic and CI-friendly.
+
+### Known limitations
+
+- Discord OAuth login is prepared separately but not implemented as the primary login flow yet.
+- Scheduled sync is not implemented yet.
+- Discord banner/profile decoration fields are not fetched until the Discord reader supports those API fields.
+- Deployment, Docker production images, HTTPS, and reverse proxy configuration are not included yet.

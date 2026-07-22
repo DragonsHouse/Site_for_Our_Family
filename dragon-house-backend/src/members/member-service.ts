@@ -45,7 +45,7 @@ export class FamilyMemberService {
 
   async create(input: CreateFamilyMemberInput, auth: FamilyAuthContext): Promise<FamilyMember> {
     this.requirePermission(auth, 'manage_members');
-    await this.assertUnique(input.nickname, input.staticId);
+    await this.assertUnique(input.nickname, input.staticId ?? null);
     if (input.role === 'owner' && auth.role !== 'owner') {
       throw new FamilyMemberError('MEMBER_PERMISSION_DENIED', 'Only owner can create owner', 403);
     }
@@ -74,9 +74,9 @@ export class FamilyMemberService {
         throw new FamilyMemberError('MEMBER_NICKNAME_CONFLICT', 'Nickname conflict', 409);
       }
     }
-    if (input.staticId && input.staticId !== current.staticId) {
+    if (input.staticId !== undefined && input.staticId !== current.staticId) {
       this.requirePermission(auth, 'manage_member_auth');
-      if (await this.repository.existsByStaticId(input.staticId, id)) {
+      if (input.staticId && await this.repository.existsByStaticId(input.staticId, id)) {
         throw new FamilyMemberError('MEMBER_STATIC_ID_CONFLICT', 'Static ID conflict', 409);
       }
     }
@@ -119,7 +119,14 @@ export class FamilyMemberService {
   private assertCanUpdate(auth: FamilyAuthContext, member: FamilyMember, input: UpdateFamilyMemberInput): void {
     const isSelf = auth.familyMemberId === member.id;
     if (!isSelf) this.requirePermission(auth, 'manage_members');
-    const roleFields: Array<keyof UpdateFamilyMemberInput> = ['role', 'rank', 'permissions', 'permissionsOverride'];
+    const roleFields: Array<keyof UpdateFamilyMemberInput> = [
+      'role',
+      'rank',
+      'permissions',
+      'permissionsOverride',
+      'permissionsDiscord',
+      'permissionsDenied',
+    ];
     if (roleFields.some((field) => input[field] !== undefined)) {
       this.requirePermission(auth, 'manage_member_roles');
       if (input.role === 'owner' && auth.role !== 'owner') {
@@ -145,11 +152,11 @@ export class FamilyMemberService {
     }
   }
 
-  private async assertUnique(nickname: string, staticId: string): Promise<void> {
+  private async assertUnique(nickname: string, staticId: string | null): Promise<void> {
     if (await this.repository.existsByNickname(nickname)) {
       throw new FamilyMemberError('MEMBER_NICKNAME_CONFLICT', 'Nickname conflict', 409);
     }
-    if (await this.repository.existsByStaticId(staticId)) {
+    if (staticId && await this.repository.existsByStaticId(staticId)) {
       throw new FamilyMemberError('MEMBER_STATIC_ID_CONFLICT', 'Static ID conflict', 409);
     }
   }

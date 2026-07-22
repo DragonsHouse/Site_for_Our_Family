@@ -22,6 +22,11 @@ export function createCorsOptions(config: AppConfig): CorsOptions {
         return;
       }
 
+      if (origin && config.frontendAllowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
       if (origin && config.nodeEnv !== 'production' && isLocalhostOrigin(origin)) {
         callback(null, true);
         return;

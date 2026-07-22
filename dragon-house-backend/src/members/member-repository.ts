@@ -12,7 +12,8 @@ export type FamilyMemberAuditAction =
   | 'member_role_changed'
   | 'member_status_changed'
   | 'member_deleted'
-  | 'member_restored';
+  | 'member_restored'
+  | 'discord_sync_permissions_changed';
 
 export type FamilyMemberAuditEntry = {
   actorFamilyMemberId: string | null;
@@ -51,7 +52,7 @@ export class MemoryFamilyMemberRepository implements FamilyMemberRepository {
     let items = [...this.members.values()].filter((member) => query.includeDeleted || !member.deletedAt);
     if (search) {
       items = items.filter(
-        (member) => member.nickname.toLowerCase().includes(search) || member.staticId.toLowerCase().includes(search),
+        (member) => member.nickname.toLowerCase().includes(search) || Boolean(member.staticId?.toLowerCase().includes(search)),
       );
     }
     if (query.status && query.status !== 'all') items = items.filter((member) => member.status === query.status);
@@ -70,7 +71,7 @@ export class MemoryFamilyMemberRepository implements FamilyMemberRepository {
 
   async findByStaticId(staticId: string): Promise<FamilyMember | null> {
     const key = staticId.toLowerCase();
-    return [...this.members.values()].find((member) => member.staticId.toLowerCase() === key) ?? null;
+    return [...this.members.values()].find((member) => member.staticId?.toLowerCase() === key) ?? null;
   }
 
   async create(input: CreateFamilyMemberInput & { id: string }, actorId: string): Promise<FamilyMember> {
@@ -78,7 +79,7 @@ export class MemoryFamilyMemberRepository implements FamilyMemberRepository {
     const member: FamilyMember = {
       id: input.id,
       nickname: input.nickname,
-      staticId: input.staticId,
+      staticId: input.staticId ?? null,
       role: input.role,
       rank: input.rank,
       status: input.status ?? 'active',
@@ -87,6 +88,8 @@ export class MemoryFamilyMemberRepository implements FamilyMemberRepository {
       joinedAt: input.joinedAt ?? null,
       permissions: input.permissions ?? [],
       permissionsOverride: input.permissionsOverride ?? [],
+      permissionsDiscord: input.permissionsDiscord ?? [],
+      permissionsDenied: input.permissionsDenied ?? [],
       onboardingMetadata: input.onboardingMetadata ?? {},
       profileMetadata: input.profileMetadata ?? {},
       deletedAt: null,
@@ -111,6 +114,8 @@ export class MemoryFamilyMemberRepository implements FamilyMemberRepository {
       joinedAt: input.joinedAt === undefined ? current.joinedAt : input.joinedAt,
       permissions: input.permissions ?? current.permissions,
       permissionsOverride: input.permissionsOverride ?? current.permissionsOverride,
+      permissionsDiscord: input.permissionsDiscord ?? current.permissionsDiscord,
+      permissionsDenied: input.permissionsDenied ?? current.permissionsDenied,
       onboardingMetadata: input.onboardingMetadata ?? current.onboardingMetadata,
       profileMetadata: input.profileMetadata ?? current.profileMetadata,
       version: current.version + 1,
@@ -148,7 +153,7 @@ export class MemoryFamilyMemberRepository implements FamilyMemberRepository {
 
   async existsByStaticId(staticId: string, excludingId?: string): Promise<boolean> {
     const key = staticId.toLowerCase();
-    return [...this.members.values()].some((member) => member.id !== excludingId && member.staticId.toLowerCase() === key);
+    return [...this.members.values()].some((member) => member.id !== excludingId && member.staticId?.toLowerCase() === key);
   }
 
   async recordAudit(entry: FamilyMemberAuditEntry): Promise<void> {

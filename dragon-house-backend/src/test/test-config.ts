@@ -1,8 +1,9 @@
 import type { AppConfig } from '../config/env.js';
 
 type TestConfigOverrides = Partial<Omit<AppConfig, 'discord'>> & {
-  discord?: Partial<AppConfig['discord']> & {
+  discord?: Partial<Omit<AppConfig['discord'], 'channels' | 'sync'>> & {
     channels?: Partial<AppConfig['discord']['channels']>;
+    sync?: Partial<AppConfig['discord']['sync']>;
   };
 };
 
@@ -14,7 +15,11 @@ export function createTestConfig(overrides: TestConfigOverrides = {}): AppConfig
     authSessionTtlHours: overrides.authSessionTtlHours ?? 10,
     authRememberMeTtlDays: overrides.authRememberMeTtlDays ?? 30,
     bcryptCost: overrides.bcryptCost ?? 10,
+    logLevel: overrides.logLevel ?? 'silent',
+    logFormat: overrides.logFormat ?? 'pretty',
+    trustProxy: overrides.trustProxy ?? false,
     frontendExtensionId: overrides.frontendExtensionId ?? null,
+    frontendAllowedOrigins: overrides.frontendAllowedOrigins ?? [],
     discord: {
       clientId: overrides.discord?.clientId ?? null,
       clientSecret: overrides.discord?.clientSecret ?? null,
@@ -24,6 +29,16 @@ export function createTestConfig(overrides: TestConfigOverrides = {}): AppConfig
       oauthSuccessRedirectUri: overrides.discord?.oauthSuccessRedirectUri ?? null,
       oauthErrorRedirectUri: overrides.discord?.oauthErrorRedirectUri ?? null,
       guildId: overrides.discord?.guildId ?? null,
+      sync: {
+        protectedOwnerMemberId: overrides.discord?.sync?.protectedOwnerMemberId ?? null,
+        protectedOwnerDiscordUserId: overrides.discord?.sync?.protectedOwnerDiscordUserId ?? null,
+        reportDir: overrides.discord?.sync?.reportDir ?? null,
+        minHumanMembers: overrides.discord?.sync?.minHumanMembers ?? 1,
+        planTtlSeconds: overrides.discord?.sync?.planTtlSeconds ?? 300,
+        dryRunRateLimitPerMinute: overrides.discord?.sync?.dryRunRateLimitPerMinute ?? 1000,
+        applyRateLimitPerHour: overrides.discord?.sync?.applyRateLimitPerHour ?? 1000,
+        reportRateLimitPerMinute: overrides.discord?.sync?.reportRateLimitPerMinute ?? 1000,
+      },
       channels: {
         welcome: overrides.discord?.channels?.welcome ?? null,
         nicknameChange: overrides.discord?.channels?.nicknameChange ?? null,

@@ -15,7 +15,7 @@ import type { FamilyMemberAuditEntry, FamilyMemberRepository } from './member-re
 type MemberRow = {
   id: string;
   nickname: string;
-  static_id: string;
+  static_id: string | null;
   role: FamilyRole;
   rank: number;
   permissions: FamilyPermission[];
@@ -30,6 +30,8 @@ type MemberRow = {
   created_by_family_member_id: string | null;
   updated_by_family_member_id: string | null;
   permissions_override: FamilyPermission[];
+  permissions_discord: FamilyPermission[];
+  permissions_denied: FamilyPermission[];
   onboarding_metadata: Record<string, unknown>;
   profile_metadata: Record<string, unknown>;
   discord_user_id?: string | null;
@@ -132,13 +134,14 @@ export class PgFamilyMemberRepository implements FamilyMemberRepository {
     const result = await this.pool.query<MemberRow>(
       `insert into family_members
         (id, nickname, static_id, role, rank, permissions, status, avatar_asset_id, notes, joined_at,
-         created_by_family_member_id, updated_by_family_member_id, permissions_override, onboarding_metadata, profile_metadata)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $12, $13, $14)
+         created_by_family_member_id, updated_by_family_member_id, permissions_override, permissions_discord,
+         permissions_denied, onboarding_metadata, profile_metadata)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $12, $13, $14, $15, $16)
        returning *`,
       [
         input.id,
         input.nickname,
-        input.staticId,
+        input.staticId ?? null,
         input.role,
         input.rank,
         JSON.stringify(input.permissions ?? []),
@@ -148,6 +151,8 @@ export class PgFamilyMemberRepository implements FamilyMemberRepository {
         input.joinedAt ?? null,
         actorId,
         JSON.stringify(input.permissionsOverride ?? []),
+        JSON.stringify(input.permissionsDiscord ?? []),
+        JSON.stringify(input.permissionsDenied ?? []),
         JSON.stringify(input.onboardingMetadata ?? {}),
         JSON.stringify(input.profileMetadata ?? {}),
       ],
@@ -172,6 +177,8 @@ export class PgFamilyMemberRepository implements FamilyMemberRepository {
     if (input.joinedAt !== undefined) add('joined_at', input.joinedAt);
     if (input.permissions !== undefined) add('permissions', JSON.stringify(input.permissions));
     if (input.permissionsOverride !== undefined) add('permissions_override', JSON.stringify(input.permissionsOverride));
+    if (input.permissionsDiscord !== undefined) add('permissions_discord', JSON.stringify(input.permissionsDiscord));
+    if (input.permissionsDenied !== undefined) add('permissions_denied', JSON.stringify(input.permissionsDenied));
     if (input.onboardingMetadata !== undefined) add('onboarding_metadata', JSON.stringify(input.onboardingMetadata));
     if (input.profileMetadata !== undefined) add('profile_metadata', JSON.stringify(input.profileMetadata));
     values.push(actorId);
@@ -270,6 +277,8 @@ function mapMember(row: MemberRow): FamilyMember {
     role: row.role,
     rank: row.rank,
     permissions: row.permissions,
+    permissionsDiscord: row.permissions_discord,
+    permissionsDenied: row.permissions_denied,
     status: row.status,
     avatarAssetId: row.avatar_asset_id,
     notes: row.notes,

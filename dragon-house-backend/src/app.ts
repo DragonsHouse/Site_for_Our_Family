@@ -20,6 +20,7 @@ import {
   type DiscordOAuthStateRepository,
 } from './discord/oauth-state-repository.js';
 import { DiscordJsGuildMemberReader, type DiscordGuildMemberReader } from './discord/guild-member-reader.js';
+import { DiscordMemberSyncApplyService } from './discord/member-sync-apply-service.js';
 import { DiscordMemberSyncDryRunService } from './discord/member-sync-dry-run-service.js';
 import {
   InMemoryDiscordRoleMappingRepository,
@@ -42,6 +43,7 @@ export type AppDependencies = {
   oauthStates?: DiscordOAuthStateRepository;
   roleMappings?: DiscordRoleMappingRepository;
   guildMemberReader?: DiscordGuildMemberReader;
+  memberSyncApplyService?: DiscordMemberSyncApplyService | null;
   memberSyncDryRunService?: DiscordMemberSyncDryRunService | null;
   accountLinkOAuthService?: DiscordAccountLinkOAuthService;
   authRepository?: FamilyAuthRepository;
@@ -90,10 +92,17 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     dependencies.memberSyncDryRunService !== undefined
       ? dependencies.memberSyncDryRunService
       : memberRepository
-        ? new DiscordMemberSyncDryRunService(guildMemberReader, memberRepository, roleMappings)
+        ? new DiscordMemberSyncDryRunService(guildMemberReader, memberRepository, roleMappings, config)
+        : null;
+  const memberSyncApplyService =
+    dependencies.memberSyncApplyService !== undefined
+      ? dependencies.memberSyncApplyService
+      : pgPool && memberSyncDryRunService
+        ? new DiscordMemberSyncApplyService(pgPool, memberSyncDryRunService, config)
         : null;
 
   app.disable('x-powered-by');
+  if (config.trustProxy) app.set('trust proxy', 1);
   app.use(cors(createCorsOptions(config)));
   app.use(express.json({ limit: '256kb' }));
 
@@ -104,7 +113,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   app.use('/api', createFamilyMembersRouter(config, authService, memberService));
   app.use('/api', createDiscordRouter(discordService));
   app.use('/api', createDiscordAccountLinkRouter(config, accountLinks, accountLinkOAuthService, authService));
-  app.use('/api', createDiscordSyncRouter(config, authService, memberSyncDryRunService));
+  app.use('/api', createDiscordSyncRouter(config, authService, memberSyncDryRunService, memberSyncApplyService));
 
   app.use((_request, response) => {
     response.status(404).json({ error: 'not_found' });
@@ -117,6 +126,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     oauthStates,
     roleMappings,
     guildMemberReader,
+    memberSyncApplyService,
     memberSyncDryRunService,
     accountLinkOAuthService,
     authRepository,

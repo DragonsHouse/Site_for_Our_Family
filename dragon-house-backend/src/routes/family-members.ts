@@ -16,7 +16,7 @@ const permissionSchema = z.string().min(1).max(80).transform((value) => value as
 const CreateMemberSchema = z
   .object({
     nickname: z.string().trim().min(1).max(120),
-    staticId: z.string().trim().min(1).max(80),
+    staticId: z.string().trim().min(1).max(80).nullable().optional(),
     role: roleSchema.default('member'),
     rank: z.number().int().min(1).max(10).default(1),
     status: statusSchema.default('active'),
@@ -47,9 +47,9 @@ export function createFamilyMembersRouter(
 ): Router {
   const router = Router();
   const requireAuth = requireFamilyAuthContext(config, authService);
-  router.use('/family/members', requireAuth);
+  router.use(['/family/members', '/members'], requireAuth);
 
-  router.get('/family/members', async (request, response) => {
+  const listMembers = async (request: import('express').Request, response: import('express').Response) => {
     if (!memberService || !request.familyAuth) return respondServiceUnavailable(response);
     try {
       const query: FamilyMemberListQuery = {
@@ -67,16 +67,22 @@ export function createFamilyMembersRouter(
     } catch (error) {
       respondMemberError(response, error);
     }
-  });
+  };
 
-  router.get('/family/members/:memberId', async (request, response) => {
+  router.get('/family/members', listMembers);
+  router.get('/members', listMembers);
+
+  const getMember = async (request: import('express').Request, response: import('express').Response) => {
     if (!memberService || !request.familyAuth) return respondServiceUnavailable(response);
     try {
-      response.json(await memberService.get(request.params.memberId, request.familyAuth));
+      response.json(await memberService.get(String(request.params.memberId), request.familyAuth));
     } catch (error) {
       respondMemberError(response, error);
     }
-  });
+  };
+
+  router.get('/family/members/:memberId', getMember);
+  router.get('/members/:memberId', getMember);
 
   router.post('/family/members', async (request, response) => {
     if (!memberService || !request.familyAuth) return respondServiceUnavailable(response);

@@ -12,6 +12,7 @@ const requiredTables = [
   'discord_oauth_states',
   'discord_role_mappings',
   'family_audit_log',
+  'discord_sync_reports',
 ];
 
 async function tableExists(pool: NonNullable<ReturnType<typeof createPgPool>>, tableName: string) {
@@ -79,6 +80,16 @@ async function columnExists(pool: NonNullable<ReturnType<typeof createPgPool>>, 
   return result.rows[0]?.exists ?? false;
 }
 
+async function columnNotNull(pool: NonNullable<ReturnType<typeof createPgPool>>, tableName: string, columnName: string) {
+  const result = await pool.query<{ not_null: boolean }>(
+    `select is_nullable = 'NO' as not_null
+     from information_schema.columns
+     where table_schema = 'public' and table_name = $1 and column_name = $2`,
+    [tableName, columnName],
+  );
+  return result.rows[0]?.not_null ?? false;
+}
+
 async function indexExists(pool: NonNullable<ReturnType<typeof createPgPool>>, indexName: string) {
   const result = await pool.query<{ exists: boolean }>('select exists (select 1 from pg_indexes where indexname = $1)', [
     indexName,
@@ -98,7 +109,20 @@ async function runChecks() {
     checks.push({ name: 'family_members.id primary key', ok: await constraintExists(pool, 'family_members', 'p', 'id') });
     checks.push({ name: 'family_members.nickname is not primary key', ok: !(await constraintExists(pool, 'family_members', 'p', 'nickname')) });
     checks.push({ name: 'family_members.static_id unique', ok: await constraintExists(pool, 'family_members', 'u', 'static_id') });
-    for (const column of ['status', 'avatar_asset_id', 'notes', 'joined_at', 'deleted_at', 'version', 'permissions_override', 'onboarding_metadata', 'profile_metadata']) {
+    checks.push({ name: 'family_members.static_id nullable for Discord-created members', ok: !(await columnNotNull(pool, 'family_members', 'static_id')) });
+    for (const column of [
+      'status',
+      'avatar_asset_id',
+      'notes',
+      'joined_at',
+      'deleted_at',
+      'version',
+      'permissions_override',
+      'permissions_discord',
+      'permissions_denied',
+      'onboarding_metadata',
+      'profile_metadata',
+    ]) {
       checks.push({ name: `family_members.${column} column`, ok: await columnExists(pool, 'family_members', column) });
     }
     checks.push({ name: 'family_members lower(static_id) unique index', ok: await indexExists(pool, 'idx_family_members_static_id_lower_unique') });
@@ -136,6 +160,11 @@ async function runChecks() {
       name: 'family_audit_log.actor_family_member_id -> family_members.id',
       ok: await foreignKeyTargets(pool, 'family_audit_log', 'actor_family_member_id', 'family_members', 'id'),
     });
+    checks.push({ name: 'discord_sync_reports.id primary key', ok: await constraintExists(pool, 'discord_sync_reports', 'p', 'id') });
+    checks.push({ name: 'discord_sync_reports.created_at index', ok: await indexExists(pool, 'idx_discord_sync_reports_created_at') });
+    checks.push({ name: 'discord_sync_reports.idempotency_key column', ok: await columnExists(pool, 'discord_sync_reports', 'idempotency_key') });
+    checks.push({ name: 'discord_sync_reports idempotency key unique index', ok: await indexExists(pool, 'idx_discord_sync_reports_idempotency_key') });
+    checks.push({ name: 'family_audit_log syncRunId index', ok: await indexExists(pool, 'idx_family_audit_log_sync_run_id') });
   } finally {
     await pool.end();
   }

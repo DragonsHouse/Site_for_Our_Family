@@ -35,7 +35,7 @@ export type FamilyPermission =
 export type FamilyMember = {
   id: string;
   nickname: string;
-  staticId: string;
+  staticId: string | null;
   role: FamilyRole;
   rank: number;
   status: FamilyMemberStatus;
@@ -44,6 +44,8 @@ export type FamilyMember = {
   joinedAt: string | null;
   permissions: FamilyPermission[];
   permissionsOverride: FamilyPermission[];
+  permissionsDiscord: FamilyPermission[];
+  permissionsDenied: FamilyPermission[];
   onboardingMetadata: Record<string, unknown>;
   profileMetadata: Record<string, unknown>;
   deletedAt: string | null;
@@ -72,7 +74,7 @@ export type FamilyMemberStatus = 'active' | 'inactive';
 
 export type CreateFamilyMemberInput = {
   nickname: string;
-  staticId: string;
+  staticId?: string | null;
   role: FamilyRole;
   rank: number;
   status?: FamilyMemberStatus;
@@ -81,6 +83,8 @@ export type CreateFamilyMemberInput = {
   joinedAt?: string | null;
   permissions?: FamilyPermission[];
   permissionsOverride?: FamilyPermission[];
+  permissionsDiscord?: FamilyPermission[];
+  permissionsDenied?: FamilyPermission[];
   onboardingMetadata?: Record<string, unknown>;
   profileMetadata?: Record<string, unknown>;
 };
@@ -312,15 +316,27 @@ export type DiscordMemberSyncDryRunItem = {
   additionalRoles: DiscordMemberSyncAdditionalRole[];
   effectivePermissions: FamilyPermission[];
   matchedIgnoredRoles: DiscordMemberSyncIgnoredRole[];
+  permissionSources: DiscordMemberSyncPermissionSources;
   changes: DiscordMemberSyncChange[];
   warnings: string[];
   possibleManualLinkFamilyMemberIds: string[];
 };
 
+export type DiscordMemberSyncPermissionSources = {
+  systemRolePermissions: FamilyPermission[];
+  discordMappedPermissions: FamilyPermission[];
+  manualGrantedPermissions: FamilyPermission[];
+  manualDeniedPermissions: FamilyPermission[];
+  protectedPermissions: FamilyPermission[];
+};
+
 export type DiscordMemberSyncDryRunSummary = Record<DiscordMemberSyncAction, number>;
 
 export type DiscordMemberSyncDryRunResult = {
+  planId: string;
   generatedAt: string;
+  planExpiresAt: string;
+  planHash: string;
   guildId: string;
   discordMemberCount: number;
   familyMemberCount: number;
