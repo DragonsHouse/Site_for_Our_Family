@@ -1,4 +1,4 @@
-import type { BackendAuthUser } from './family-backend-auth-client';
+import type { AuthenticatedMember } from './family-backend-auth-client';
 import type { FamilyUser, FamilyUserStats } from './family-types';
 
 export type FamilyHubAuthState = {
@@ -21,27 +21,50 @@ const EMPTY_STATS: FamilyUserStats = {
   newMembersTrained: 0,
 };
 
-export function createBackendCurrentFamilyUser(
-  backendUser: BackendAuthUser,
-  backendMember: FamilyUser | null = null,
-): FamilyUser {
-  const displayName = backendMember?.displayName?.trim() || backendMember?.nickname || backendUser.login;
+export function createBackendCurrentFamilyUser(member: AuthenticatedMember): FamilyUser {
+  const now = new Date().toISOString();
   return {
-    ...createFallbackBackendMember(backendUser),
-    ...backendMember,
-    id: backendUser.familyMemberId,
-    nickname: backendMember?.nickname?.trim() || backendUser.login,
-    staticId: backendUser.staticId,
-    role: backendUser.role,
-    rank: backendMember?.rank || `Rank ${backendUser.rank}`,
-    rankLevel: backendUser.rank,
-    permissions: [...backendUser.permissions],
-    mustChangePassword: backendUser.mustChangePassword,
+    id: member.memberId,
+    nickname: member.nickname,
+    staticId: member.staticId ?? '',
     passwordHash: null,
-    displayName,
-    accountStatus: backendMember?.accountStatus ?? 'active',
-    status: backendMember?.status ?? 'offline',
-    isOnline: backendMember?.isOnline ?? false,
+    mustChangePassword: member.session.mustChangePassword,
+    role: member.role,
+    rank: `Rank ${member.rank}`,
+    rankLevel: member.rank,
+    promotionProgress: 0,
+    promotionRequirements: { completed: [], remaining: [] },
+    lastActive: member.session.lastUsedAt,
+    isOnline: false,
+    displayName: member.displayName,
+    avatarUrl: member.discord.avatar,
+    avatarDataUrl: null,
+    status: 'offline',
+    accountStatus: member.status,
+    statusMessage: null,
+    nextRank: null,
+    promotionUpdatedAt: now,
+    joinedAt: null,
+    notes: null,
+    permissions: [...member.permissions],
+    stats: { ...EMPTY_STATS },
+    tasks: [],
+    deletedAt: null,
+    discordUserId: member.discord.userId,
+    discordUsername: member.discord.username,
+    discordDisplayName: member.discord.displayName,
+    discordAvatarUrl: member.discord.avatar,
+    discordLinkedAt: null,
+    discordSyncedAt: member.discord.lastSyncedAt,
+    discordLinkStatus: member.discord.linked ? 'linked' : 'not_linked',
+    externalSource: member.discord.linked ? 'discord' : 'family_hub',
+    externalId: member.discord.userId ?? member.memberId,
+    externalRevision: null,
+    externalCreatedAt: null,
+    externalUpdatedAt: null,
+    lastSyncedAt: member.discord.lastSyncedAt,
+    syncStatus: member.discord.linked ? 'synced' : 'pending',
+    syncError: null,
   };
 }
 
@@ -49,52 +72,5 @@ export function createLoggedOutFamilyHubAuthState(): FamilyHubAuthState {
   return {
     currentUser: null,
     familyUsers: [],
-  };
-}
-
-function createFallbackBackendMember(backendUser: BackendAuthUser): FamilyUser {
-  const now = new Date().toISOString();
-  return {
-    id: backendUser.familyMemberId,
-    nickname: backendUser.login,
-    staticId: backendUser.staticId,
-    passwordHash: null,
-    mustChangePassword: backendUser.mustChangePassword,
-    role: backendUser.role,
-    rank: `Rank ${backendUser.rank}`,
-    rankLevel: backendUser.rank,
-    promotionProgress: 0,
-    promotionRequirements: { completed: [], remaining: [] },
-    lastActive: null,
-    isOnline: false,
-    displayName: backendUser.login,
-    avatarUrl: null,
-    avatarDataUrl: null,
-    status: 'offline',
-    accountStatus: 'active',
-    statusMessage: null,
-    nextRank: null,
-    promotionUpdatedAt: now,
-    joinedAt: null,
-    notes: null,
-    permissions: [...backendUser.permissions],
-    stats: { ...EMPTY_STATS },
-    tasks: [],
-    deletedAt: null,
-    discordUserId: null,
-    discordUsername: null,
-    discordDisplayName: null,
-    discordAvatarUrl: null,
-    discordLinkedAt: null,
-    discordSyncedAt: null,
-    discordLinkStatus: 'not_linked',
-    externalSource: 'family_hub',
-    externalId: backendUser.familyMemberId,
-    externalRevision: null,
-    externalCreatedAt: null,
-    externalUpdatedAt: null,
-    lastSyncedAt: null,
-    syncStatus: 'pending',
-    syncError: null,
   };
 }

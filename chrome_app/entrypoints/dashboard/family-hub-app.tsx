@@ -3,24 +3,22 @@ import {
   migrateDragonHouseAsyncData,
   migrateDragonHouseLocalData
 } from '../../lib/family-data-migration';
-import { createBackendCurrentFamilyUser, createLoggedOutFamilyHubAuthState } from '../../lib/family-backend-current-user';
+import { createLoggedOutFamilyHubAuthState } from '../../lib/family-backend-current-user';
 import {
   changePassword as changeBackendPassword,
   clearAuthSession,
   completeDiscordLogin,
   createAuthUser,
-  getCurrentUser as getBackendCurrentUser,
   loginWithDiscord,
   login as loginBackend,
-  logout as logoutBackend,
-  type BackendAuthUser
+  logout as logoutBackend
 } from '../../lib/family-backend-auth-client';
 import {
   createFamilyMemberDataSource,
   type FamilyMemberCreateInput,
   type FamilyMemberUpdateInput
 } from '../../lib/family-member-data-source';
-import { resolveBackendFamilyUser } from '../../lib/family-backend-user-session';
+import { loadCurrentBackendFamilyUser, resolveBackendFamilyUser } from '../../lib/family-backend-user-session';
 import { translateDiscordLoginError } from '../../lib/family-discord-login-errors';
 import { readFamilyPosts } from '../../lib/family-data';
 import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../lib/family-types';
@@ -304,10 +302,6 @@ export function FamilyHubApp() {
     return users;
   }
 
-  async function resolveCurrentUser(backendUser: BackendAuthUser) {
-    return resolveBackendFamilyUser(backendUser);
-  }
-
   useEffect(() => {
     void migrateDragonHouseAsyncData().catch(() => undefined);
   }, []);
@@ -325,7 +319,7 @@ export function FamilyHubApp() {
       void completeDiscordLogin(completionCode)
         .then(async (result) => {
           window.history.replaceState(null, document.title, window.location.pathname);
-          const user = await resolveCurrentUser(result.user);
+          const user = resolveBackendFamilyUser(result.user);
           setCurrentUser(user);
           void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
           setStep('oauth-success');
@@ -347,9 +341,8 @@ export function FamilyHubApp() {
       return;
     }
 
-    void getBackendCurrentUser()
-      .then(async (backendUser) => {
-        const user = await resolveCurrentUser(backendUser);
+    void loadCurrentBackendFamilyUser()
+      .then(async (user) => {
         setCurrentUser(user);
         void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
         setStep(user.mustChangePassword ? 'change-password' : 'hub');
@@ -366,7 +359,7 @@ export function FamilyHubApp() {
     setError(null);
     try {
       const result = await loginBackend(nickname, password, rememberMe);
-      const user = await resolveCurrentUser(result.user);
+      const user = resolveBackendFamilyUser(result.user);
       setCurrentUser(user);
       await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
       setPosts(readFamilyPosts());
@@ -390,8 +383,7 @@ export function FamilyHubApp() {
     setLoading(true);
     setError(null);
     try {
-      const backendUser = await changeBackendPassword(currentPassword, newPassword);
-      const user = await resolveCurrentUser(backendUser);
+      const user = resolveBackendFamilyUser(await changeBackendPassword(currentPassword, newPassword));
       setCurrentUser(user);
       await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
       setCurrentPassword('');
@@ -422,16 +414,17 @@ export function FamilyHubApp() {
     setStep('login');
   }
 
-  function backendUserFromCurrentUser(user: FamilyUser): BackendAuthUser {
-    return {
-      familyMemberId: user.id,
-      login: user.nickname,
-      staticId: user.staticId,
-      role: user.role,
-      rank: user.rankLevel,
-      permissions: user.permissions,
-      mustChangePassword: user.mustChangePassword
-    };
+  async function reloadAuthenticatedUser() {
+    try {
+      const user = await loadCurrentBackendFamilyUser();
+      setCurrentUser(user);
+      return user;
+    } catch {
+      await clearAuthSession().catch(() => undefined);
+      setCurrentUser(null);
+      setStep('login');
+      return null;
+    }
   }
 
   async function handleDiscordLogin() {
@@ -442,7 +435,7 @@ export function FamilyHubApp() {
     try {
       setStep('oauth-loading');
       const result = await loginWithDiscord();
-      const user = await resolveCurrentUser(result.user);
+      const user = resolveBackendFamilyUser(result.user);
       setCurrentUser(user);
       await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
       setPosts(readFamilyPosts());
@@ -470,8 +463,8 @@ export function FamilyHubApp() {
         permissions: currentUser.permissions,
         notes: currentUser.notes
       })
-      .then((member) => {
-        setCurrentUser(createBackendCurrentFamilyUser(backendUserFromCurrentUser(currentUser), member));
+      .then(() => {
+        void reloadAuthenticatedUser();
         return refreshFamilyUsers();
       })
       .catch(() => undefined);
@@ -500,9 +493,9 @@ export function FamilyHubApp() {
         permissions: updates.permissions,
         notes: existing.notes
       })
-      .then((member) => {
+      .then(() => {
         if (currentUser?.nickname === nickname) {
-          setCurrentUser(createBackendCurrentFamilyUser(backendUserFromCurrentUser(currentUser), member));
+          void reloadAuthenticatedUser();
         }
         return refreshFamilyUsers();
       })
@@ -527,17 +520,19 @@ export function FamilyHubApp() {
     originalNickname: string,
     updates: FamilyMemberUpdateInput
   ) {
-    const user = await memberDataSource.updateMember(originalNickname, updates);
+    await memberDataSource.updateMember(originalNickname, updates);
     if (currentUser?.nickname === originalNickname) {
-      setCurrentUser(createBackendCurrentFamilyUser(backendUserFromCurrentUser(currentUser), user));
+      await reloadAuthenticatedUser();
     }
     await refreshFamilyUsers();
   }
 
   async function handleUserDeactivate(nickname: string) {
-    const user = await memberDataSource.deleteMember(nickname);
+    await memberDataSource.deleteMember(nickname);
     if (currentUser?.nickname === nickname) {
-      setCurrentUser(user);
+      await clearAuthSession().catch(() => undefined);
+      setCurrentUser(null);
+      setStep('login');
     }
     await refreshFamilyUsers();
   }

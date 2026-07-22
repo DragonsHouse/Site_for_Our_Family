@@ -1,6 +1,9 @@
 import { createDiscordBackendClient } from './family-discord-backend-client';
 import { readDiscordFamilySettings } from './family-discord-integration';
 import type { FamilyPermission, FamilyRole } from './family-types';
+import { assertAuthenticatedMember, type AuthenticatedMember } from './family-authenticated-member';
+
+export type { AuthenticatedMember } from './family-authenticated-member';
 
 const SESSION_TOKEN_KEY = 'dragon_house_family_backend_session_token_v1';
 const PERSISTENT_SESSION_TOKEN_KEY = 'dragon_house_family_backend_persistent_session_token_v1';
@@ -9,7 +12,7 @@ const DISCORD_LOGIN_REDIRECT_PATH = 'dragon-house-discord-login';
 let memorySessionToken: string | null = null;
 let memoryPersistentSessionToken: string | null = null;
 
-export type BackendAuthUser = {
+export type LegacyCreatedAuthUser = {
   familyMemberId: string;
   login: string;
   staticId: string;
@@ -23,7 +26,7 @@ export type BackendAuthUser = {
 export type LoginResponse = {
   token: string;
   expiresAt: string;
-  user: BackendAuthUser;
+  user: AuthenticatedMember;
 };
 
 export type AuthSessionMode = 'session' | 'persistent';
@@ -110,6 +113,22 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function parseAuthenticatedMemberResponse(response: Response): Promise<AuthenticatedMember> {
+  return assertAuthenticatedMember(await parseJsonResponse<unknown>(response));
+}
+
+async function parseLoginResponse(response: Response): Promise<LoginResponse> {
+  const body = await parseJsonResponse<unknown>(response);
+  if (!isRecord(body) || typeof body.token !== 'string' || typeof body.expiresAt !== 'string') {
+    throw new Error('Family auth response was malformed');
+  }
+  return {
+    token: body.token,
+    expiresAt: body.expiresAt,
+    user: assertAuthenticatedMember(body.user),
+  };
+}
+
 export async function login(loginOrStaticId: string, password: string, rememberMe = false): Promise<LoginResponse> {
   const response = await fetch(`${getBackendApiBaseUrl().replace(/\/+$/u, '')}/api/auth/login`, {
     method: 'POST',
@@ -117,7 +136,7 @@ export async function login(loginOrStaticId: string, password: string, rememberM
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ loginOrStaticId, password, rememberMe }),
   });
-  const result = await parseJsonResponse<LoginResponse>(response);
+  const result = await parseLoginResponse(response);
   await setSessionToken(result.token, rememberMe ? 'persistent' : 'session');
   return result;
 }
@@ -141,7 +160,7 @@ export async function startDiscordLogin(redirectTarget: string | null = getDisco
 }
 
 export async function completeDiscordLogin(completionCode: string): Promise<LoginResponse> {
-  const result = await parseJsonResponse<LoginResponse>(
+  const result = await parseLoginResponse(
     await fetch(`${getBackendApiBaseUrl().replace(/\/+$/u, '')}/api/auth/discord/complete`, {
       method: 'POST',
       credentials: 'omit',
@@ -174,8 +193,8 @@ export async function loginWithDiscord(): Promise<LoginResponse> {
   return completeDiscordLogin(completionCode);
 }
 
-export async function getCurrentUser(): Promise<BackendAuthUser> {
-  return parseJsonResponse<BackendAuthUser>(await authenticatedFetch('/api/auth/me', { method: 'GET' }));
+export async function getCurrentUser(): Promise<AuthenticatedMember> {
+  return parseAuthenticatedMemberResponse(await authenticatedFetch('/api/auth/me', { method: 'GET' }));
 }
 
 export async function logout(): Promise<void> {
@@ -186,8 +205,8 @@ export async function logout(): Promise<void> {
   }
 }
 
-export async function changePassword(currentPassword: string, newPassword: string): Promise<BackendAuthUser> {
-  return parseJsonResponse<BackendAuthUser>(
+export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthenticatedMember> {
+  return parseAuthenticatedMemberResponse(
     await authenticatedFetch('/api/auth/change-password', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
@@ -203,8 +222,8 @@ export async function createAuthUser(input: {
   rank: number;
   permissions: FamilyPermission[];
   isActive: boolean;
-}): Promise<BackendAuthUser> {
-  return parseJsonResponse<BackendAuthUser>(
+}): Promise<LegacyCreatedAuthUser> {
+  return parseJsonResponse<LegacyCreatedAuthUser>(
     await authenticatedFetch('/api/auth/users', {
       method: 'POST',
       body: JSON.stringify(input),
@@ -215,4 +234,8 @@ export async function createAuthUser(input: {
 export function createAuthenticatedDiscordBackendClient() {
   const baseClient = createDiscordBackendClient(getBackendApiBaseUrl(), authenticatedFetch);
   return baseClient;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
