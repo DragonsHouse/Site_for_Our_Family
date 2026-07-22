@@ -10,11 +10,13 @@ import { createCorsOptions } from './http/cors.js';
 import { DiscordService } from './discord/discord-service.js';
 import {
   InMemoryDiscordAccountLinkRepository,
+  PgDiscordAccountLinkRepository,
   type DiscordAccountLinkRepository,
 } from './discord/account-link-repository.js';
 import { DiscordAccountLinkOAuthService } from './discord/discord-account-link-oauth-service.js';
 import {
   InMemoryDiscordOAuthStateRepository,
+  PgDiscordOAuthStateRepository,
   type DiscordOAuthStateRepository,
 } from './discord/oauth-state-repository.js';
 import { createDiscordAccountLinkRouter } from './routes/discord-account-link.js';
@@ -41,9 +43,13 @@ export type AppDependencies = {
 export function createApp(config: AppConfig, dependencies: AppDependencies = {}) {
   const app = express();
   const discordService = dependencies.discordService ?? new DiscordService(config);
-  const accountLinks = dependencies.accountLinks ?? new InMemoryDiscordAccountLinkRepository();
-  const oauthStates = dependencies.oauthStates ?? new InMemoryDiscordOAuthStateRepository();
   const pgPool = dependencies.pgPool !== undefined ? dependencies.pgPool : createPgPool(config);
+  const accountLinks =
+    dependencies.accountLinks ??
+    (pgPool ? new PgDiscordAccountLinkRepository(pgPool) : new InMemoryDiscordAccountLinkRepository());
+  const oauthStates =
+    dependencies.oauthStates ??
+    (pgPool ? new PgDiscordOAuthStateRepository(pgPool) : new InMemoryDiscordOAuthStateRepository());
   const authRepository =
     dependencies.authRepository ??
     (pgPool ? new PgFamilyAuthRepository(pgPool) : config.nodeEnv === 'test' ? new InMemoryFamilyAuthRepository() : null);
