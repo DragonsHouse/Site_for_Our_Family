@@ -106,7 +106,7 @@ export async function applyPendingMigrations(pool: pg.Pool) {
         continue;
       }
       await client.query(migration.sql);
-      await client.query('insert into schema_migrations (version, name, checksum) values ($1, $2, $3)', [
+      await client.query('insert into schema_migrations (version, name, checksum) values ($1, $2, $3) on conflict (version) do nothing', [
         migration.version,
         migration.name,
         migration.checksum,

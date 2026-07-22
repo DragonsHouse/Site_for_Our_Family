@@ -10,6 +10,7 @@ const requiredTables = [
   'family_sessions',
   'discord_account_links',
   'discord_oauth_states',
+  'discord_role_mappings',
   'family_audit_log',
 ];
 
@@ -119,6 +120,15 @@ async function runChecks() {
       ok: await foreignKeyTargets(pool, 'discord_account_links', 'family_member_id', 'family_members', 'id'),
     });
     checks.push({ name: 'discord_account_links.discord_user_id unique', ok: await constraintExists(pool, 'discord_account_links', 'u', 'discord_user_id') });
+    for (const column of ['discord_server_nickname', 'discord_avatar', 'guild_id', 'joined_at', 'left_at', 'last_synced_at', 'verified']) {
+      checks.push({ name: `discord_account_links.${column} column`, ok: await columnExists(pool, 'discord_account_links', column) });
+    }
+    checks.push({ name: 'discord_role_mappings.discord_role_id primary key', ok: await constraintExists(pool, 'discord_role_mappings', 'p', 'discord_role_id') });
+    checks.push({ name: 'discord_role_mappings.family_role check', ok: await constraintExists(pool, 'discord_role_mappings', 'c', 'family_role') });
+    checks.push({ name: 'discord_role_mappings.rank check', ok: await constraintExists(pool, 'discord_role_mappings', 'c', 'rank') });
+    for (const column of ['discord_role_name', 'permissions', 'priority', 'enabled']) {
+      checks.push({ name: `discord_role_mappings.${column} column`, ok: await columnExists(pool, 'discord_role_mappings', column) });
+    }
     checks.push({ name: 'family_sessions.token_hash unique', ok: await constraintExists(pool, 'family_sessions', 'u', 'token_hash') });
     checks.push({
       name: 'family_audit_log.actor_family_member_id -> family_members.id',

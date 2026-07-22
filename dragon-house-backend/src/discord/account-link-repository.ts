@@ -66,7 +66,14 @@ type DiscordAccountLinkRow = {
   discord_user_id: string;
   discord_username: string;
   discord_global_name: string | null;
+  discord_server_nickname: string | null;
+  discord_avatar: string | null;
   discord_avatar_url: string | null;
+  guild_id: string | null;
+  joined_at: Date | null;
+  left_at: Date | null;
+  last_synced_at: Date | null;
+  verified: boolean;
   guild_member_verified: boolean;
   linked_at: Date;
   updated_at: Date;
@@ -113,13 +120,21 @@ export class PgDiscordAccountLinkRepository implements DiscordAccountLinkReposit
 
       const result = await client.query<DiscordAccountLinkRow>(
         `insert into discord_account_links
-          (family_member_id, discord_user_id, discord_username, discord_global_name, discord_avatar_url,
+          (family_member_id, discord_user_id, discord_username, discord_global_name, discord_server_nickname,
+           discord_avatar, discord_avatar_url, guild_id, joined_at, left_at, last_synced_at, verified,
            guild_member_verified, linked_at, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          on conflict (family_member_id) do update
          set discord_username = excluded.discord_username,
              discord_global_name = excluded.discord_global_name,
+             discord_server_nickname = excluded.discord_server_nickname,
+             discord_avatar = excluded.discord_avatar,
              discord_avatar_url = excluded.discord_avatar_url,
+             guild_id = excluded.guild_id,
+             joined_at = excluded.joined_at,
+             left_at = excluded.left_at,
+             last_synced_at = excluded.last_synced_at,
+             verified = excluded.verified,
              guild_member_verified = excluded.guild_member_verified,
              updated_at = excluded.updated_at
          returning *`,
@@ -128,7 +143,14 @@ export class PgDiscordAccountLinkRepository implements DiscordAccountLinkReposit
           link.discordUserId,
           link.discordUsername,
           link.discordGlobalName ?? null,
+          link.discordServerNickname ?? null,
+          link.discordAvatar ?? link.discordAvatarUrl ?? null,
           link.discordAvatarUrl ?? null,
+          link.guildId ?? null,
+          link.joinedAt ?? null,
+          link.leftAt ?? null,
+          link.lastSyncedAt ?? null,
+          link.verified ?? link.guildMemberVerified,
           link.guildMemberVerified,
           link.linkedAt,
           link.updatedAt,
@@ -165,7 +187,14 @@ function mapDiscordAccountLink(row: DiscordAccountLinkRow): DiscordAccountLink {
     discordUserId: row.discord_user_id,
     discordUsername: row.discord_username,
     discordGlobalName: row.discord_global_name,
+    discordServerNickname: row.discord_server_nickname,
+    discordAvatar: row.discord_avatar,
     discordAvatarUrl: row.discord_avatar_url,
+    guildId: row.guild_id,
+    joinedAt: row.joined_at?.toISOString() ?? null,
+    leftAt: row.left_at?.toISOString() ?? null,
+    lastSyncedAt: row.last_synced_at?.toISOString() ?? null,
+    verified: row.verified,
     guildMemberVerified: row.guild_member_verified,
     linkedAt: row.linked_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),

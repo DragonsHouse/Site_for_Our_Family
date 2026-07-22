@@ -56,6 +56,14 @@ export type FamilyMember = {
     linked: boolean;
     discordUserId?: string;
     discordUsername?: string;
+    discordGlobalName?: string | null;
+    discordServerNickname?: string | null;
+    discordAvatar?: string | null;
+    guildId?: string | null;
+    joinedAt?: string | null;
+    leftAt?: string | null;
+    lastSyncedAt?: string | null;
+    verified?: boolean;
     linkedAt?: string;
   };
 };
@@ -207,9 +215,28 @@ export type DiscordAccountLink = {
   discordUserId: string;
   discordUsername: string;
   discordGlobalName?: string | null;
+  discordServerNickname?: string | null;
+  discordAvatar?: string | null;
   discordAvatarUrl?: string | null;
+  guildId?: string | null;
+  joinedAt?: string | null;
+  leftAt?: string | null;
+  lastSyncedAt?: string | null;
+  verified?: boolean;
   guildMemberVerified: boolean;
   linkedAt: string;
+  updatedAt: string;
+};
+
+export type DiscordRoleMapping = {
+  discordRoleId: string;
+  discordRoleName: string;
+  familyRole: FamilyRole;
+  rank: number;
+  permissions: FamilyPermission[];
+  priority: number;
+  enabled: boolean;
+  createdAt: string;
   updatedAt: string;
 };
 

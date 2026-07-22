@@ -34,6 +34,14 @@ type MemberRow = {
   profile_metadata: Record<string, unknown>;
   discord_user_id?: string | null;
   discord_username?: string | null;
+  discord_global_name?: string | null;
+  discord_server_nickname?: string | null;
+  discord_avatar?: string | null;
+  guild_id?: string | null;
+  discord_joined_at?: Date | null;
+  discord_left_at?: Date | null;
+  discord_last_synced_at?: Date | null;
+  discord_verified?: boolean | null;
   discord_linked_at?: Date | null;
 };
 
@@ -80,7 +88,10 @@ export class PgFamilyMemberRepository implements FamilyMemberRepository {
     const sortColumn = SORT_COLUMNS[query.sortBy];
     const sortOrder = query.sortOrder === 'desc' ? 'desc' : 'asc';
     const result = await this.pool.query<MemberRow>(
-      `select m.*, d.discord_user_id, d.discord_username, d.linked_at as discord_linked_at
+      `select m.*, d.discord_user_id, d.discord_username, d.discord_global_name, d.discord_server_nickname,
+              d.discord_avatar, d.guild_id, d.joined_at as discord_joined_at, d.left_at as discord_left_at,
+              d.last_synced_at as discord_last_synced_at, d.verified as discord_verified,
+              d.linked_at as discord_linked_at
        from family_members m
        left join discord_account_links d on d.family_member_id = m.id
        ${whereSql}
@@ -98,7 +109,10 @@ export class PgFamilyMemberRepository implements FamilyMemberRepository {
 
   async findById(id: string): Promise<FamilyMember | null> {
     const result = await this.pool.query<MemberRow>(
-      `select m.*, d.discord_user_id, d.discord_username, d.linked_at as discord_linked_at
+      `select m.*, d.discord_user_id, d.discord_username, d.discord_global_name, d.discord_server_nickname,
+              d.discord_avatar, d.guild_id, d.joined_at as discord_joined_at, d.left_at as discord_left_at,
+              d.last_synced_at as discord_last_synced_at, d.verified as discord_verified,
+              d.linked_at as discord_linked_at
        from family_members m
        left join discord_account_links d on d.family_member_id = m.id
        where m.id = $1`,
@@ -274,6 +288,14 @@ function mapMember(row: MemberRow): FamilyMember {
           linked: true,
           discordUserId: row.discord_user_id,
           discordUsername: row.discord_username ?? '',
+          discordGlobalName: row.discord_global_name,
+          discordServerNickname: row.discord_server_nickname,
+          discordAvatar: row.discord_avatar,
+          guildId: row.guild_id,
+          joinedAt: row.discord_joined_at?.toISOString() ?? null,
+          leftAt: row.discord_left_at?.toISOString() ?? null,
+          lastSyncedAt: row.discord_last_synced_at?.toISOString() ?? null,
+          verified: row.discord_verified ?? false,
           linkedAt: row.discord_linked_at?.toISOString(),
         }
       : { linked: false },
