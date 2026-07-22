@@ -1,0 +1,48 @@
+{
+  "name": "gta5-quant-rp-chrome-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "build:chrome": "wxt build -b chrome",
+    "build:edge": "wxt build -b edge",
+    "build:opera": "wxt build -b opera",
+    "build:brave": "wxt build -b brave",
+    "build:firefox": "wxt build -b firefox",
+    "build:chromium-all": "npm run build:chrome && npm run build:edge && npm run build:opera && npm run build:brave",
+    "build:all": "npm run build:chromium-all && npm run build:firefox",
+    "zip": "wxt zip",
+    "zip:chrome": "wxt zip -b chrome",
+    "zip:edge": "wxt zip -b edge",
+    "zip:opera": "wxt zip -b opera",
+    "zip:brave": "wxt zip -b brave",
+    "zip:firefox": "wxt zip -b firefox",
+    "zip:chromium-all": "npm run zip:chrome && npm run zip:edge && npm run zip:opera && npm run zip:brave",
+    "zip:all": "npm run zip:chromium-all && npm run zip:firefox",
+    "map:sync-assets": "node scripts/sync-map-assets.mjs",
+    "map:sync-assets:with-images": "node scripts/sync-map-assets.mjs --include-popup-images",
+    "map:build-default-data": "node scripts/build-map-default-data.mjs",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.298",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@wxt-dev/module-react": "^1.1.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.19.0",
+    "postcss": "^8.5.1",
+    "prettier": "^3.4.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "wxt": "^0.20.6"
+  }
+}

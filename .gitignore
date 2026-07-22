@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.output/
+.wxt/
+coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Logs and reports
+*.log
+logs/
+test-results/
+playwright-report/
+
+# Browser profiles and temporary runtime data
+.tmp/
+tmp/
+temp/
+**/chrome-*-profile*/
+**/chromium-*-profile*/
+**/edge-*-profile*/
+**/*browser-profile*/
+**/*cdp-profile*/
+ui-audit-screenshots/
+
+# Local synchronized map cache
+chrome_app/public/map-cache/
+
+# Local PostgreSQL and Docker volume data
+pgdata/
+postgres-data/
+postgres_data/
+docker-data/
+docker-volumes/
+volumes/
+
+# Backups and temporary audit output
+.openclaw-backups/
+*.bak
+*.backup
+*.zip
+*.tar
+*.tar.gz
+audit-output/
+secret-audit-output/
+
+# Local certificates and private keys
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini

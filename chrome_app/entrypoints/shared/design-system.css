@@ -1,0 +1,233 @@
+:root {
+  --dh-bg: #090909;
+  --dh-bg-deep: #0d0d0d;
+  --dh-surface: rgba(25, 25, 25, 0.92);
+  --dh-surface-soft: rgba(30, 30, 30, 0.86);
+  --dh-surface-strong: rgba(13, 13, 13, 0.96);
+  --dh-border: rgba(255, 255, 255, 0.08);
+  --dh-border-strong: rgba(255, 255, 255, 0.12);
+  --dh-text: #f4f1ec;
+  --dh-text-soft: #aaa39a;
+  --dh-text-muted: #77736d;
+  --dh-fire-red: #b91c12;
+  --dh-fire-red-hot: #d52a17;
+  --dh-fire-orange: #f04a16;
+  --dh-fire-orange-hot: #ff6a00;
+  --dh-fire-gold: #d99a24;
+  --dh-fire-gold-soft: #f2b84b;
+  --dh-success: #8fa66a;
+  --dh-danger: #f87171;
+  --dh-radius-xs: 0.5rem;
+  --dh-radius-sm: 0.75rem;
+  --dh-radius-md: 0.875rem;
+  --dh-radius-lg: 1rem;
+  --dh-radius-xl: 1.25rem;
+  --dh-space-1: 0.25rem;
+  --dh-space-2: 0.5rem;
+  --dh-space-3: 0.75rem;
+  --dh-space-4: 1rem;
+  --dh-space-5: 1.25rem;
+  --dh-space-6: 1.5rem;
+  --dh-font-xs: 0.75rem;
+  --dh-font-sm: 0.875rem;
+  --dh-font-md: 1rem;
+  --dh-font-lg: 1.125rem;
+  --dh-font-xl: 1.25rem;
+  --dh-motion-fast: 140ms;
+  --dh-motion-base: 220ms;
+  --dh-motion-slow: 420ms;
+  --dh-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dh-ease-spring: cubic-bezier(0.2, 0.9, 0.2, 1.15);
+  --dh-shadow-card: 0 18px 48px rgba(0, 0, 0, 0.34);
+  --dh-shadow-panel: 0 24px 74px rgba(0, 0, 0, 0.48);
+  --dh-shadow-fire: 0 0 28px rgba(240, 74, 22, 0.18);
+  --dh-focus-ring: 0 0 0 3px rgba(255, 106, 0, 0.22);
+}
+
+* {
+  scrollbar-color: rgba(242, 184, 75, 0.35) rgba(13, 13, 13, 0.5);
+}
+
+::selection {
+  background: rgba(255, 106, 0, 0.34);
+  color: #fff;
+}
+
+:is(.dh-shell, .dh-auth-shell, .dh-popup, .dh-options) {
+  color: var(--dh-text);
+  color-scheme: dark;
+}
+
+:is(.dh-shell, .dh-auth-shell, .dh-popup, .dh-options) :is(button, a, input, select, textarea) {
+  transition:
+    border-color var(--dh-motion-base) var(--dh-ease-out),
+    background-color var(--dh-motion-base) var(--dh-ease-out),
+    box-shadow var(--dh-motion-base) var(--dh-ease-out),
+    color var(--dh-motion-base) var(--dh-ease-out),
+    opacity var(--dh-motion-base) var(--dh-ease-out),
+    transform var(--dh-motion-fast) var(--dh-ease-spring),
+    filter var(--dh-motion-base) var(--dh-ease-out);
+}
+
+:is(.dh-shell, .dh-auth-shell, .dh-popup, .dh-options) :is(button, a[href]) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(.dh-shell, .dh-auth-shell, .dh-popup, .dh-options) button:not(:disabled):hover {
+  transform: translateY(-1px) scale(1.01);
+}
+
+:is(.dh-shell, .dh-auth-shell, .dh-popup, .dh-options) button:not(:disabled):active {
+  transform: translateY(0) scale(0.99);
+}
+
+:is(.dh-shell, .dh-auth-shell, .dh-popup, .dh-options) :is(button, a, input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: var(--dh-focus-ring), var(--dh-shadow-fire);
+}
+
+:is(.dh-shell, .dh-auth-shell, .dh-popup, .dh-options) :is(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+  filter: grayscale(0.28);
+}
+
+:is(.dh-shell, .dh-popup, .dh-options) :is(input, select, textarea) {
+  min-height: 2.5rem;
+  background: var(--dh-surface-strong);
+  border-color: var(--dh-border-strong);
+}
+
+:is(.dh-shell, .dh-popup, .dh-options) :is(input, select, textarea):focus {
+  border-color: rgba(255, 106, 0, 0.58);
+  box-shadow: var(--dh-focus-ring), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+:is(.dh-shell, .dh-popup, .dh-options) :is(button, input, select, textarea) {
+  font: inherit;
+}
+
+:is(.dh-shell, .dh-popup, .dh-options) :is(button, input, select, textarea, [role='button']) {
+  min-width: 0;
+}
+
+:is(.dh-shell, .dh-popup, .dh-options) :is(section, article).dh-surface,
+:is(.dh-shell, .dh-popup, .dh-options) .dh-surface {
+  border: 1px solid var(--dh-border);
+  border-radius: var(--dh-radius-xl);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(255, 106, 0, 0.08), transparent 18rem),
+    linear-gradient(145deg, var(--dh-surface-soft), var(--dh-surface-strong));
+  box-shadow: var(--dh-shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+:is(.dh-shell, .dh-popup, .dh-options) .dh-surface-interactive {
+  position: relative;
+  overflow: hidden;
+}
+
+:is(.dh-shell, .dh-popup, .dh-options) .dh-surface-interactive::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255, 106, 0, 0.10), transparent 40%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dh-motion-base) var(--dh-ease-out);
+}
+
+:is(.dh-shell, .dh-popup, .dh-options) .dh-surface-interactive:hover {
+  border-color: rgba(242, 184, 75, 0.28);
+  box-shadow: var(--dh-shadow-card), var(--dh-shadow-fire);
+  transform: translateY(-1px);
+}
+
+:is(.dh-shell, .dh-popup, .dh-options) .dh-surface-interactive:hover::after {
+  opacity: 1;
+}
+
+.dh-fire-action {
+  border: 1px solid rgba(255, 106, 0, 0.42);
+  border-radius: var(--dh-radius-md);
+  background: linear-gradient(135deg, var(--dh-fire-red), var(--dh-fire-red-hot) 48%, var(--dh-fire-orange-hot));
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(213, 42, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.dh-fire-action:not(:disabled):hover {
+  box-shadow: 0 18px 44px rgba(213, 42, 23, 0.34), 0 0 28px rgba(255, 106, 0, 0.22);
+}
+
+.dh-muted-action {
+  border: 1px solid var(--dh-border);
+  border-radius: var(--dh-radius-sm);
+  background: rgba(13, 13, 13, 0.44);
+  color: var(--dh-text-soft);
+}
+
+.dh-muted-action:not(:disabled):hover {
+  border-color: rgba(242, 184, 75, 0.30);
+  background: rgba(36, 36, 36, 0.76);
+  color: var(--dh-text);
+}
+
+.dh-enter {
+  animation: dh-enter var(--dh-motion-slow) var(--dh-ease-out) both;
+}
+
+:is(.dh-shell, .dh-options) [role='dialog'],
+:is(.dh-shell, .dh-options) .fixed.inset-0 {
+  animation: dh-dialog-enter var(--dh-motion-base) var(--dh-ease-out) both;
+}
+
+:is(.dh-shell, .dh-options) [role='dialog'] > *,
+:is(.dh-shell, .dh-options) .fixed.inset-0 > * {
+  animation: dh-dialog-surface var(--dh-motion-slow) var(--dh-ease-out) both;
+}
+
+@keyframes dh-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes dh-dialog-enter {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(10px);
+  }
+}
+
+@keyframes dh-dialog-surface {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.dh-shell, .dh-auth-shell, .dh-popup, .dh-options) *,
+  .dh-enter {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}

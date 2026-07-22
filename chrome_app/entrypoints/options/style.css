@@ -1,0 +1,36 @@
+@import '../shared/design-system.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--dh-bg);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.dh-options {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 84% 0%, rgba(255, 106, 0, 0.14), transparent 28rem),
+    radial-gradient(circle at 10% 10%, rgba(185, 28, 18, 0.12), transparent 24rem),
+    linear-gradient(180deg, var(--dh-bg), var(--dh-bg-deep));
+}
+
+.dh-options :is(section, .dh-options-hero) {
+  border-color: var(--dh-border) !important;
+  border-radius: var(--dh-radius-xl) !important;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(255, 106, 0, 0.07), transparent 16rem),
+    linear-gradient(145deg, var(--dh-surface), var(--dh-surface-strong)) !important;
+  box-shadow: var(--dh-shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: dh-enter var(--dh-motion-slow) var(--dh-ease-out) both;
+}
+
+.dh-options label.rounded-lg,
+.dh-options .rounded-lg {
+  border-radius: var(--dh-radius-sm) !important;
+}
