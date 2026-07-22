@@ -76,21 +76,21 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   const roleMappings =
     dependencies.roleMappings ??
     (pgPool ? new PgDiscordRoleMappingRepository(pgPool) : new InMemoryDiscordRoleMappingRepository());
+  const memberRepository =
+    dependencies.memberRepository ??
+    (pgPool ? new PgFamilyMemberRepository(pgPool) : config.nodeEnv === 'test' ? new MemoryFamilyMemberRepository() : null);
   const authRepository =
     dependencies.authRepository ??
     (pgPool ? new PgFamilyAuthRepository(pgPool) : config.nodeEnv === 'test' ? new InMemoryFamilyAuthRepository() : null);
   const authService =
     dependencies.authService !== undefined
       ? dependencies.authService
-      : authRepository
-        ? new FamilyAuthService(config, authRepository)
+      : authRepository && memberRepository
+        ? new FamilyAuthService(config, authRepository, memberRepository)
         : null;
   const accountLinkOAuthService =
     dependencies.accountLinkOAuthService ??
     new DiscordAccountLinkOAuthService(config, accountLinks, oauthStates);
-  const memberRepository =
-    dependencies.memberRepository ??
-    (pgPool ? new PgFamilyMemberRepository(pgPool) : config.nodeEnv === 'test' ? new MemoryFamilyMemberRepository() : null);
   const memberService =
     dependencies.memberService !== undefined
       ? dependencies.memberService
@@ -136,7 +136,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   const healthRouter = createHealthRouter(discordService, pgPool);
   app.use('/api', healthRouter);
   app.use('/', healthRouter);
-  app.use('/api', createAuthRouter(authService, memberRepository));
+  app.use('/api', createAuthRouter(authService));
   app.use('/api', createDiscordAuthRouter(config, oauthLoginService));
   app.use('/api', createFamilyMembersRouter(config, authService, memberService));
   app.use('/api', createDiscordRouter(discordService));

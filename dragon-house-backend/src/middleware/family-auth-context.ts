@@ -2,14 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import type { AppConfig } from '../config/env.js';
 import { FamilyAuthError, authErrorMessage } from '../auth/auth-errors.js';
 import type { FamilyAuthService } from '../auth/auth-service.js';
-import type { FamilyPermission, FamilyRole } from '../types.js';
-
-export type FamilyAuthContext = {
-  familyMemberId: string;
-  role: FamilyRole;
-  rank: number;
-  permissions: FamilyPermission[];
-};
+import type { FamilyAuthContext } from '../types.js';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -26,7 +19,7 @@ export function requireFamilyAuthContext(config: AppConfig, authService: FamilyA
           response.status(401).json({ error: 'missing_test_family_member' });
           return;
         }
-        request.familyAuth = { familyMemberId, role: 'member', rank: 1, permissions: [] };
+        request.familyAuth = { familyMemberId, role: 'member', rank: 1, status: 'active', permissions: [] };
         next();
         return;
       }

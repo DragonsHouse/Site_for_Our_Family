@@ -21,6 +21,7 @@ function authService(role: 'owner' | 'member', familyMemberId = 'family-1'): Fam
         familyMemberId,
         role,
         rank: role === 'owner' ? 10 : 1,
+        status: 'active',
         permissions: [],
       },
       session: {

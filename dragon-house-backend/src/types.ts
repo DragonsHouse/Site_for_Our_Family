@@ -144,6 +144,7 @@ export type FamilyAuthContext = {
   familyMemberId: string;
   role: FamilyRole;
   rank: number;
+  status: FamilyMemberStatus;
   permissions: FamilyPermission[];
 };
 

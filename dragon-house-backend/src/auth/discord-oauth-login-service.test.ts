@@ -108,7 +108,7 @@ async function createHarness(options: { member?: FamilyMember; link?: DiscordAcc
     completions,
     links,
     members,
-    new FamilyAuthService(config, authRepository),
+    new FamilyAuthService(config, authRepository, members),
     createLogger(config),
     fetchImpl,
   );
@@ -183,8 +183,8 @@ describe('DiscordOAuthLoginService', () => {
 
     const first = await service.complete({ completionCode: callback.completionCode, clientType: 'chrome_extension' }, NOW);
     expect(first.token).toBeTruthy();
-    expect(first.user.familyMemberId).toBe(MEMBER_ID);
-    expect(first.user.loginProvider).toBe('discord');
+    expect(first.user.memberId).toBe(MEMBER_ID);
+    expect(first.user.session.loginProvider).toBe('discord');
     await expect(service.complete({ completionCode: callback.completionCode, clientType: 'chrome_extension' }, NOW)).rejects.toMatchObject({
       code: 'LOGIN_COMPLETION_ALREADY_USED',
     });

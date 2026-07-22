@@ -8,6 +8,7 @@ const ownerAuth: FamilyAuthContext = {
   familyMemberId: 'owner-id',
   role: 'owner',
   rank: 10,
+  status: 'active',
   permissions: [],
 };
 
@@ -15,6 +16,7 @@ const memberAuth: FamilyAuthContext = {
   familyMemberId: 'member-id',
   role: 'member',
   rank: 1,
+  status: 'active',
   permissions: ['view_members'],
 };
 

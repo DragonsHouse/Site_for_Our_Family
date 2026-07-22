@@ -1,10 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import type { AppConfig } from '../config/env.js';
+import type { FamilyMemberRepository } from '../members/member-repository.js';
 import type { FamilyAuthRepository } from './auth-repository.js';
 import { FamilyAuthError } from './auth-errors.js';
+import { createAuthenticatedMemberDto, type AuthenticatedMemberDto } from './authenticated-member-dto.js';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from './password.js';
 import { createSessionToken, hashSessionToken } from './tokens.js';
-import type { FamilyAuthContext, FamilyAuthUser, FamilyPermission, FamilyRole, FamilySession, SanitizedFamilyAuthUser } from '../types.js';
+import type {
+  FamilyAuthContext,
+  FamilyAuthUser,
+  FamilyMember,
+  FamilyPermission,
+  FamilyRole,
+  FamilySession,
+  SanitizedFamilyAuthUser,
+} from '../types.js';
 
 const LAST_USED_UPDATE_INTERVAL_MS = 60_000;
 
@@ -19,12 +29,13 @@ export class FamilyAuthService {
   constructor(
     private readonly config: AppConfig,
     private readonly repository: FamilyAuthRepository,
+    private readonly members: FamilyMemberRepository,
   ) {}
 
   async login(loginOrStaticId: string, password: string, options: { rememberMe?: boolean } = {}): Promise<{
     token: string;
     expiresAt: string;
-    user: SanitizedFamilyAuthUser;
+    user: AuthenticatedMemberDto;
   }> {
     const rateKey = loginOrStaticId.trim().toLowerCase() || 'empty';
     this.assertLoginRateLimit(rateKey);
@@ -41,6 +52,7 @@ export class FamilyAuthService {
       this.recordFailedLogin(rateKey);
       throw new FamilyAuthError('invalid_credentials', 'Invalid credentials');
     }
+    const member = await this.loadActiveMember(user.familyMemberId, 'account_disabled');
 
     this.loginAttempts.delete(rateKey);
     const token = createSessionToken();
@@ -61,12 +73,13 @@ export class FamilyAuthService {
       loginProvider: 'password',
     });
 
-    return { token, expiresAt, user: sanitizeAuthUser(user) };
+    return { token, expiresAt, user: createAuthenticatedMemberDto(member, sessionShell(expiresAt, now, 'password'), user) };
   }
 
   async authenticateToken(token: string, options: { allowPasswordChangeRequired?: boolean } = {}): Promise<{
     session: FamilySession;
     user: FamilyAuthUser;
+    member: FamilyMember;
     context: FamilyAuthContext;
   }> {
     if (!token.trim()) throw new FamilyAuthError('session_required', 'Session required');
@@ -81,6 +94,7 @@ export class FamilyAuthService {
 
     const user = await this.repository.findUserByFamilyMemberId(session.familyMemberId);
     if (!user || !user.isActive) throw new FamilyAuthError('session_invalid', 'Session invalid');
+    const member = await this.loadActiveMember(session.familyMemberId, 'session_invalid');
     if (user.mustChangePassword && !options.allowPasswordChangeRequired) {
       throw new FamilyAuthError('password_change_required', 'Password change required', 403);
     }
@@ -92,18 +106,20 @@ export class FamilyAuthService {
     return {
       session,
       user,
+      member,
       context: {
-        familyMemberId: user.familyMemberId,
-        role: user.role,
-        rank: user.rank,
-        permissions: user.permissions,
+        familyMemberId: member.id,
+        role: member.role,
+        rank: member.rank,
+        status: member.status,
+        permissions: member.permissions,
       },
     };
   }
 
-  async me(token: string): Promise<SanitizedFamilyAuthUser> {
-    const { user, session } = await this.authenticateToken(token, { allowPasswordChangeRequired: true });
-    return sanitizeAuthUser(user, session.loginProvider);
+  async me(token: string): Promise<AuthenticatedMemberDto> {
+    const { user, session, member } = await this.authenticateToken(token, { allowPasswordChangeRequired: true });
+    return createAuthenticatedMemberDto(member, session, user);
   }
 
   async logout(token: string): Promise<void> {
@@ -114,9 +130,10 @@ export class FamilyAuthService {
   async createSessionForFamilyMember(
     familyMemberId: string,
     options: { loginProvider: 'discord' | 'password'; rememberMe?: boolean } = { loginProvider: 'password' },
-  ): Promise<{ token: string; expiresAt: string; user: SanitizedFamilyAuthUser }> {
+  ): Promise<{ token: string; expiresAt: string; user: AuthenticatedMemberDto }> {
     const user = await this.repository.findUserByFamilyMemberId(familyMemberId);
     if (!user || !user.isActive) throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
+    const member = await this.loadActiveMember(familyMemberId, 'account_disabled');
 
     const token = createSessionToken();
     const now = new Date();
@@ -136,11 +153,11 @@ export class FamilyAuthService {
       revokedReason: null,
     });
 
-    return { token, expiresAt, user: sanitizeAuthUser(user, options.loginProvider) };
+    return { token, expiresAt, user: createAuthenticatedMemberDto(member, sessionShell(expiresAt, now, options.loginProvider), user) };
   }
 
-  async changePassword(token: string, currentPassword: string, newPassword: string): Promise<SanitizedFamilyAuthUser> {
-    const { session, user } = await this.authenticateToken(token, { allowPasswordChangeRequired: true });
+  async changePassword(token: string, currentPassword: string, newPassword: string): Promise<AuthenticatedMemberDto> {
+    const { session, user, member } = await this.authenticateToken(token, { allowPasswordChangeRequired: true });
     if (!(await verifyPassword(currentPassword, user.passwordHash))) {
       throw new FamilyAuthError('current_password_invalid', 'Current password is invalid');
     }
@@ -153,7 +170,7 @@ export class FamilyAuthService {
       false,
     );
     await this.repository.revokeOtherSessions(user.familyMemberId, session.sessionId, new Date().toISOString());
-    return sanitizeAuthUser(nextUser);
+    return createAuthenticatedMemberDto(member, session, nextUser);
   }
 
   async createAuthUser(
@@ -168,7 +185,7 @@ export class FamilyAuthService {
       isActive: boolean;
     },
   ): Promise<SanitizedFamilyAuthUser> {
-    const { user: actor } = await this.authenticateToken(token);
+    const { context: actor } = await this.authenticateToken(token);
     if (actor.role !== 'owner' && !actor.permissions.includes('manage_users')) {
       throw new FamilyAuthError('session_invalid', 'Insufficient permissions', 403);
     }
@@ -202,6 +219,13 @@ export class FamilyAuthService {
     }
     this.loginAttempts.set(key, { ...current, count: current.count + 1 });
   }
+
+  private async loadActiveMember(familyMemberId: string, errorCode: 'account_disabled' | 'session_invalid'): Promise<FamilyMember> {
+    const member = await this.members.findById(familyMemberId);
+    if (member && member.status === 'active' && !member.deletedAt) return member;
+    if (errorCode === 'account_disabled') throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
+    throw new FamilyAuthError('session_invalid', 'Session invalid');
+  }
 }
 
 export function sanitizeAuthUser(user: FamilyAuthUser, loginProvider?: 'password' | 'discord'): SanitizedFamilyAuthUser {
@@ -215,4 +239,12 @@ export function sanitizeAuthUser(user: FamilyAuthUser, loginProvider?: 'password
     mustChangePassword: user.mustChangePassword,
     ...(loginProvider ? { loginProvider } : {}),
   };
+}
+
+function sessionShell(
+  expiresAt: string,
+  now: Date,
+  loginProvider: FamilySession['loginProvider'] = 'password',
+): Pick<FamilySession, 'loginProvider' | 'expiresAt' | 'lastUsedAt'> {
+  return { loginProvider, expiresAt, lastUsedAt: now.toISOString() };
 }

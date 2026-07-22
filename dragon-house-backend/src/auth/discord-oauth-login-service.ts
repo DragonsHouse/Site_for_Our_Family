@@ -4,7 +4,7 @@ import type { DiscordAccountLinkRepository } from '../discord/account-link-repos
 import type { DiscordOAuthStateRepository } from '../discord/oauth-state-repository.js';
 import type { AppLogger } from '../logging/logger.js';
 import type { FamilyMemberRepository } from '../members/member-repository.js';
-import type { SanitizedFamilyAuthUser } from '../types.js';
+import type { AuthenticatedMemberDto } from './authenticated-member-dto.js';
 import type { FamilyAuthService } from './auth-service.js';
 import type { DiscordLoginClientType, DiscordLoginCompletionRepository } from './discord-login-completion-repository.js';
 
@@ -184,7 +184,7 @@ export class DiscordOAuthLoginService {
   async complete(input: { completionCode: string; clientType?: DiscordLoginClientType }, now = new Date()): Promise<{
     token: string;
     expiresAt: string;
-    user: SanitizedFamilyAuthUser;
+    user: AuthenticatedMemberDto;
   }> {
     const codeHash = hashToken(input.completionCode);
     const existing = await this.completions.getByCodeHash(codeHash);
