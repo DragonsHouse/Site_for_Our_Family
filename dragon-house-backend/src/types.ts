@@ -240,6 +240,72 @@ export type DiscordRoleMapping = {
   updatedAt: string;
 };
 
+export type NormalizedDiscordGuildMember = {
+  discordUserId: string;
+  username: string;
+  globalName: string | null;
+  serverNickname: string | null;
+  avatarUrl: string | null;
+  guildId: string;
+  roleIds: string[];
+  joinedAt: string | null;
+  bot: boolean;
+};
+
+export type DiscordMemberSyncAction =
+  | 'create'
+  | 'update'
+  | 'unchanged'
+  | 'deactivate_candidate'
+  | 'conflict'
+  | 'ignored_bot';
+
+export type DiscordMemberSyncChange = {
+  field: string;
+  current: unknown;
+  proposed: unknown;
+};
+
+export type DiscordMemberSyncProposedRole = {
+  discordRoleId: string;
+  discordRoleName: string;
+  familyRole: FamilyRole;
+  rank: number;
+  permissions: FamilyPermission[];
+  priority: number;
+};
+
+export type DiscordMemberSyncDryRunItem = {
+  action: DiscordMemberSyncAction;
+  reason: string;
+  discordMember?: NormalizedDiscordGuildMember;
+  familyMember?: Pick<
+    FamilyMember,
+    'id' | 'nickname' | 'staticId' | 'role' | 'rank' | 'status' | 'permissions' | 'deletedAt'
+  > & {
+    discordUserId?: string | null;
+  };
+  matchedBy: 'discord_user_id' | 'none' | 'not_applicable';
+  proposedRole?: DiscordMemberSyncProposedRole;
+  changes: DiscordMemberSyncChange[];
+  warnings: string[];
+  possibleManualLinkFamilyMemberIds: string[];
+};
+
+export type DiscordMemberSyncDryRunSummary = Record<DiscordMemberSyncAction, number>;
+
+export type DiscordMemberSyncDryRunResult = {
+  generatedAt: string;
+  guildId: string;
+  discordMemberCount: number;
+  familyMemberCount: number;
+  summary: DiscordMemberSyncDryRunSummary;
+  actions: DiscordMemberSyncDryRunItem[];
+  warnings: string[];
+  conflicts: string[];
+  missingRoleMappings: string[];
+};
+
 export type DiscordOAuthState = {
   stateId: string;
   familyMemberId: string;

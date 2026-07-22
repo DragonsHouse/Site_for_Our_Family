@@ -19,8 +19,16 @@ import {
   PgDiscordOAuthStateRepository,
   type DiscordOAuthStateRepository,
 } from './discord/oauth-state-repository.js';
+import { DiscordJsGuildMemberReader, type DiscordGuildMemberReader } from './discord/guild-member-reader.js';
+import { DiscordMemberSyncDryRunService } from './discord/member-sync-dry-run-service.js';
+import {
+  InMemoryDiscordRoleMappingRepository,
+  PgDiscordRoleMappingRepository,
+  type DiscordRoleMappingRepository,
+} from './discord/role-mapping-repository.js';
 import { createDiscordAccountLinkRouter } from './routes/discord-account-link.js';
 import { createDiscordRouter } from './routes/discord.js';
+import { createDiscordSyncRouter } from './routes/discord-sync.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createHealthRouter } from './routes/health.js';
 import { MemoryFamilyMemberRepository, type FamilyMemberRepository } from './members/member-repository.js';
@@ -32,6 +40,9 @@ export type AppDependencies = {
   discordService?: DiscordService;
   accountLinks?: DiscordAccountLinkRepository;
   oauthStates?: DiscordOAuthStateRepository;
+  roleMappings?: DiscordRoleMappingRepository;
+  guildMemberReader?: DiscordGuildMemberReader;
+  memberSyncDryRunService?: DiscordMemberSyncDryRunService | null;
   accountLinkOAuthService?: DiscordAccountLinkOAuthService;
   authRepository?: FamilyAuthRepository;
   authService?: FamilyAuthService | null;
@@ -50,6 +61,9 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   const oauthStates =
     dependencies.oauthStates ??
     (pgPool ? new PgDiscordOAuthStateRepository(pgPool) : new InMemoryDiscordOAuthStateRepository());
+  const roleMappings =
+    dependencies.roleMappings ??
+    (pgPool ? new PgDiscordRoleMappingRepository(pgPool) : new InMemoryDiscordRoleMappingRepository());
   const authRepository =
     dependencies.authRepository ??
     (pgPool ? new PgFamilyAuthRepository(pgPool) : config.nodeEnv === 'test' ? new InMemoryFamilyAuthRepository() : null);
@@ -71,6 +85,13 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
       : memberRepository
         ? new FamilyMemberService(memberRepository, authRepository)
         : null;
+  const guildMemberReader = dependencies.guildMemberReader ?? new DiscordJsGuildMemberReader(config);
+  const memberSyncDryRunService =
+    dependencies.memberSyncDryRunService !== undefined
+      ? dependencies.memberSyncDryRunService
+      : memberRepository
+        ? new DiscordMemberSyncDryRunService(guildMemberReader, memberRepository, roleMappings)
+        : null;
 
   app.disable('x-powered-by');
   app.use(cors(createCorsOptions(config)));
@@ -83,6 +104,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   app.use('/api', createFamilyMembersRouter(config, authService, memberService));
   app.use('/api', createDiscordRouter(discordService));
   app.use('/api', createDiscordAccountLinkRouter(config, accountLinks, accountLinkOAuthService, authService));
+  app.use('/api', createDiscordSyncRouter(config, authService, memberSyncDryRunService));
 
   app.use((_request, response) => {
     response.status(404).json({ error: 'not_found' });
@@ -93,6 +115,9 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     discordService,
     accountLinks,
     oauthStates,
+    roleMappings,
+    guildMemberReader,
+    memberSyncDryRunService,
     accountLinkOAuthService,
     authRepository,
     authService,
