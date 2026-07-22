@@ -3,19 +3,21 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 import { InMemoryFamilyAuthRepository } from '../auth/auth-repository.js';
 import { hashPassword } from '../auth/password.js';
-import { createTestConfig } from '../test/test-config.js';
+import { createTestConfig, type TestConfigOverrides } from '../test/test-config.js';
 
 const servers: Array<{ close: (callback?: (error?: Error) => void) => void }> = [];
 const ANASTASIA_MEMBER_ID = 'a0b1c2d3-0001-4a00-8000-000000000001';
 
-async function createServer() {
+async function createServer(overrides: TestConfigOverrides = {}) {
   const config = createTestConfig({
+    ...overrides,
     bcryptCost: 10,
     discord: {
       clientId: '1527643777554972709',
       clientSecret: 'test-secret',
       oauthRedirectUri: 'http://localhost:8787/api/discord/account-link/callback',
       guildId: '936687501316354068',
+      ...overrides.discord,
     },
   });
   const authRepository = new InMemoryFamilyAuthRepository();
@@ -100,5 +102,33 @@ describe('auth routes', () => {
     expect(start.status).toBe(200);
     expect(body.authorizationUrl).toContain('client_id=1527643777554972709');
     expect(body.authorizationUrl).not.toContain('test-secret');
+  });
+
+  it('rate limits Discord OAuth login start requests', async () => {
+    const baseUrl = await createServer({
+      discord: {
+        oauthRedirectUri: 'http://localhost:8787/api/auth/discord/callback',
+        oauth: {
+          startRateLimitPerMinute: 1,
+          loginRedirectUris: ['https://extension.example/login-complete'],
+        },
+      },
+    });
+
+    const first = await fetch(`${baseUrl}/api/auth/discord/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientType: 'chrome_extension' }),
+    });
+    const second = await fetch(`${baseUrl}/api/auth/discord/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientType: 'chrome_extension' }),
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(429);
+    expect(second.headers.get('Retry-After')).toBeTruthy();
+    expect(await second.json()).toMatchObject({ error: 'rate_limited' });
   });
 });

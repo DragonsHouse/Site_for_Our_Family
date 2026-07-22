@@ -1,9 +1,10 @@
 import type { AppConfig } from '../config/env.js';
 
-type TestConfigOverrides = Partial<Omit<AppConfig, 'discord'>> & {
-  discord?: Partial<Omit<AppConfig['discord'], 'channels' | 'sync'>> & {
+export type TestConfigOverrides = Partial<Omit<AppConfig, 'discord'>> & {
+  discord?: Partial<Omit<AppConfig['discord'], 'channels' | 'sync' | 'oauth'>> & {
     channels?: Partial<AppConfig['discord']['channels']>;
     sync?: Partial<AppConfig['discord']['sync']>;
+    oauth?: Partial<AppConfig['discord']['oauth']>;
   };
 };
 
@@ -28,6 +29,16 @@ export function createTestConfig(overrides: TestConfigOverrides = {}): AppConfig
       oauthRedirectUri: overrides.discord?.oauthRedirectUri ?? overrides.discord?.redirectUri ?? null,
       oauthSuccessRedirectUri: overrides.discord?.oauthSuccessRedirectUri ?? null,
       oauthErrorRedirectUri: overrides.discord?.oauthErrorRedirectUri ?? null,
+      oauth: {
+        scopes: overrides.discord?.oauth?.scopes ?? ['identify'],
+        stateTtlSeconds: overrides.discord?.oauth?.stateTtlSeconds ?? 600,
+        completionTtlSeconds: overrides.discord?.oauth?.completionTtlSeconds ?? 120,
+        loginSuccessRedirectUri: overrides.discord?.oauth?.loginSuccessRedirectUri ?? null,
+        loginErrorRedirectUri: overrides.discord?.oauth?.loginErrorRedirectUri ?? null,
+        loginRedirectUris: overrides.discord?.oauth?.loginRedirectUris ?? ['https://extension.example/login-complete'],
+        startRateLimitPerMinute: overrides.discord?.oauth?.startRateLimitPerMinute ?? 1000,
+        completeRateLimitPerMinute: overrides.discord?.oauth?.completeRateLimitPerMinute ?? 1000,
+      },
       guildId: overrides.discord?.guildId ?? null,
       sync: {
         protectedOwnerMemberId: overrides.discord?.sync?.protectedOwnerMemberId ?? null,

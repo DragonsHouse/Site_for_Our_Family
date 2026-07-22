@@ -13,7 +13,12 @@ export type FamilyMemberAuditAction =
   | 'member_status_changed'
   | 'member_deleted'
   | 'member_restored'
-  | 'discord_sync_permissions_changed';
+  | 'discord_sync_permissions_changed'
+  | 'discord_oauth_login_succeeded'
+  | 'discord_oauth_login_failed'
+  | 'session_created'
+  | 'session_revoked'
+  | 'account_login_denied';
 
 export type FamilyMemberAuditEntry = {
   actorFamilyMemberId: string | null;

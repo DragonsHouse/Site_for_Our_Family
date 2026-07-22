@@ -6,7 +6,7 @@ export default defineConfig({
     name: 'Dragon House Family',
     description: 'Приватний Family Hub для Dragon House.',
     version: '0.1.0',
-    permissions: ['activeTab', 'tabs', 'storage', 'notifications', 'alarms'],
+    permissions: ['activeTab', 'tabs', 'storage', 'notifications', 'alarms', 'identity'],
     host_permissions: ['<all_urls>'],
     icons: {
       16: 'assets/dragon-house/dragon-house-logo.png',

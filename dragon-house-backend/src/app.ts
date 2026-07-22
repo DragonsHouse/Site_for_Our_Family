@@ -31,11 +31,19 @@ import { createDiscordAccountLinkRouter } from './routes/discord-account-link.js
 import { createDiscordRouter } from './routes/discord.js';
 import { createDiscordSyncRouter } from './routes/discord-sync.js';
 import { createAuthRouter } from './routes/auth.js';
+import { createDiscordAuthRouter } from './routes/auth-discord.js';
 import { createHealthRouter } from './routes/health.js';
 import { MemoryFamilyMemberRepository, type FamilyMemberRepository } from './members/member-repository.js';
 import { PgFamilyMemberRepository } from './members/pg-member-repository.js';
 import { FamilyMemberService } from './members/member-service.js';
 import { createFamilyMembersRouter } from './routes/family-members.js';
+import {
+  InMemoryDiscordLoginCompletionRepository,
+  PgDiscordLoginCompletionRepository,
+  type DiscordLoginCompletionRepository,
+} from './auth/discord-login-completion-repository.js';
+import { DiscordOAuthLoginService } from './auth/discord-oauth-login-service.js';
+import { createLogger } from './logging/logger.js';
 
 export type AppDependencies = {
   discordService?: DiscordService;
@@ -48,6 +56,8 @@ export type AppDependencies = {
   accountLinkOAuthService?: DiscordAccountLinkOAuthService;
   authRepository?: FamilyAuthRepository;
   authService?: FamilyAuthService | null;
+  loginCompletions?: DiscordLoginCompletionRepository;
+  oauthLoginService?: DiscordOAuthLoginService | null;
   memberRepository?: FamilyMemberRepository;
   memberService?: FamilyMemberService | null;
   pgPool?: pg.Pool | null;
@@ -87,6 +97,23 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
       : memberRepository
         ? new FamilyMemberService(memberRepository, authRepository)
         : null;
+  const loginCompletions =
+    dependencies.loginCompletions ??
+    (pgPool ? new PgDiscordLoginCompletionRepository(pgPool) : new InMemoryDiscordLoginCompletionRepository());
+  const oauthLoginService =
+    dependencies.oauthLoginService !== undefined
+      ? dependencies.oauthLoginService
+      : authService && memberRepository
+        ? new DiscordOAuthLoginService(
+            config,
+            oauthStates,
+            loginCompletions,
+            accountLinks,
+            memberRepository,
+            authService,
+            createLogger(config),
+          )
+        : null;
   const guildMemberReader = dependencies.guildMemberReader ?? new DiscordJsGuildMemberReader(config);
   const memberSyncDryRunService =
     dependencies.memberSyncDryRunService !== undefined
@@ -109,7 +136,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   const healthRouter = createHealthRouter(discordService, pgPool);
   app.use('/api', healthRouter);
   app.use('/', healthRouter);
-  app.use('/api', createAuthRouter(authService));
+  app.use('/api', createAuthRouter(authService, memberRepository));
+  app.use('/api', createDiscordAuthRouter(config, oauthLoginService));
   app.use('/api', createFamilyMembersRouter(config, authService, memberService));
   app.use('/api', createDiscordRouter(discordService));
   app.use('/api', createDiscordAccountLinkRouter(config, accountLinks, accountLinkOAuthService, authService));
@@ -131,6 +159,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     accountLinkOAuthService,
     authRepository,
     authService,
+    loginCompletions,
+    oauthLoginService,
     memberRepository,
     memberService,
     pgPool,

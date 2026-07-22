@@ -105,7 +105,16 @@ Use environment variables for all deployment-specific values:
 - `DISCORD_GUILD_ID`
 - `DISCORD_CLIENT_ID`
 - `DISCORD_CLIENT_SECRET`
+- `DISCORD_REDIRECT_URI` for the authenticated account-link callback
 - `DISCORD_OAUTH_REDIRECT_URI`
+- `DISCORD_OAUTH_SCOPES`
+- `DISCORD_LOGIN_SUCCESS_REDIRECT_URI`
+- `DISCORD_LOGIN_ERROR_REDIRECT_URI`
+- `DISCORD_LOGIN_ALLOWED_REDIRECT_URIS`
+- `DISCORD_OAUTH_STATE_TTL_SECONDS`
+- `DISCORD_LOGIN_COMPLETION_TTL_SECONDS`
+- `DISCORD_OAUTH_START_RATE_LIMIT_PER_MINUTE`
+- `DISCORD_OAUTH_COMPLETE_RATE_LIMIT_PER_MINUTE`
 - `DISCORD_SYNC_PROTECTED_OWNER_MEMBER_ID`
 - `DISCORD_SYNC_PROTECTED_OWNER_USER_ID`
 - `DISCORD_SYNC_MIN_HUMAN_MEMBERS`
@@ -121,6 +130,30 @@ Use environment variables for all deployment-specific values:
 
 Production should run behind HTTPS and a reverse proxy. Do not commit real `.env` files or production credentials.
 
+### Discord OAuth login
+
+Discord OAuth authenticates identity only. Discord member sync remains the source of truth for guild membership, hierarchy rank, mapped Family Hub role, and Discord-derived permissions.
+
+Login flow:
+
+1. The extension calls `POST /api/auth/discord/start`.
+2. The backend creates a durable one-time OAuth transaction in PostgreSQL, binds it to an approved redirect target, and returns a Discord authorization URL.
+3. Discord redirects to `DISCORD_OAUTH_REDIRECT_URI`, normally `/api/auth/discord/callback`.
+4. The backend validates state and PKCE, exchanges the authorization code server-side, fetches `/users/@me`, and resolves `discord_account_links.discord_user_id`.
+5. Login is denied if the Discord account is not linked, the member is inactive, the link is not verified for the configured guild, or protected-owner IDs do not match.
+6. The backend issues a short-lived one-time completion code, not a Family Hub session token.
+7. The extension calls `POST /api/auth/discord/complete` with the completion code and receives the normal Family Hub bearer session.
+8. The extension then calls `GET /api/auth/me`, which returns backend member data as the source of truth.
+
+Required Discord Developer Portal redirect URLs:
+
+- Local login: `http://localhost:8787/api/auth/discord/callback`
+- Local account linking: `http://localhost:8787/api/discord/account-link/callback`
+- Staging: `https://staging-api.example.com/api/auth/discord/callback`
+- Production: `https://api.example.com/api/auth/discord/callback`
+
+The exact staging and production hosts must be replaced with the deployed HTTPS API domains. The Chrome extension completion URL must be added to `DISCORD_LOGIN_ALLOWED_REDIRECT_URIS`; never allow arbitrary redirect URLs.
+
 ### Security model
 
 - Apply sync is owner-only.
@@ -132,6 +165,8 @@ Production should run behind HTTPS and a reverse proxy. Do not commit real `.env
 - Manual permissions are preserved separately from Discord-derived permissions.
 - Missing primary hierarchy roles remain conflicts and are not auto-created.
 - Production logs are structured JSON when `LOG_FORMAT=json`; secret-like fields are redacted before logging.
+- Discord OAuth access tokens are used only server-side to resolve identity and are not persisted after login completion.
+- OAuth state, PKCE verifier, and login completion codes are short-lived, single-use, and stored durably in PostgreSQL.
 
 ### Audit policy
 
@@ -143,7 +178,8 @@ Auth tests keep production password hashing unchanged. Test setup reuses precomp
 
 ### Known limitations
 
-- Discord OAuth login is prepared separately but not implemented as the primary login flow yet.
+- OAuth login supports the Chrome extension flow, but public staging/production URLs and Discord Developer Portal redirect URLs still need to be configured before deployment.
+- The current unauthenticated OAuth rate limiter is process-local and suitable for one backend instance. Multi-instance production should move it to PostgreSQL or Redis.
 - Scheduled sync is not implemented yet.
 - Discord banner/profile decoration fields are not fetched until the Discord reader supports those API fields.
 - Deployment, Docker production images, HTTPS, and reverse proxy configuration are not included yet.

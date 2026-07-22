@@ -11,6 +11,7 @@ export function LoginForm({
   onLoginChange,
   onPasswordChange,
   onRememberMeChange,
+  onDiscordLogin,
   onSubmit,
 }: {
   error: string | null;
@@ -21,18 +22,37 @@ export function LoginForm({
   onLoginChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onRememberMeChange: (value: boolean) => void;
+  onDiscordLogin: () => void;
   onSubmit: () => void;
 }) {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <section className="dh-login-card">
+    <section className="dh-login-card w-full max-w-lg">
       <div className="dh-login-crest-row">
-        <DragonHouseCrest slot="dragon_house_logo" size="sm" />
+        <DragonHouseCrest slot="dragon_house_logo" size="lg" />
         <div>
           <p className="dh-login-kicker">Dragon House</p>
-          <h1>Dragon House Family Hub</h1>
+          <h1>Ласкаво просимо до Dragon House</h1>
         </div>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        <p className="text-lg font-semibold text-amber-100">Твоє місце у сім’ї вже чекає.</p>
+        <p className="text-sm leading-6 text-slate-300">
+          Увійди через Discord, щоб відкрити свій профіль, роль і доступ до Family Hub.
+          Доступ доступний тільки чинним учасникам Dragon House.
+        </p>
+      </div>
+
+      <button type="button" disabled={loading} className="dh-login-submit mt-6" onClick={onDiscordLogin}>
+        {loading ? 'Відкриваємо Discord...' : 'Увійти через Discord'}
+      </button>
+
+      <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-500">
+        <span className="h-px flex-1 bg-white/10" />
+        <span>резервний вхід</span>
+        <span className="h-px flex-1 bg-white/10" />
       </div>
 
       <form
@@ -81,7 +101,7 @@ export function LoginForm({
         </button>
       </form>
 
-      <p className="dh-login-footer">Полум’я єднає. Честь веде. Сім’я понад усе.</p>
+      <p className="dh-login-footer">Discord підтверджує особу. Family Hub відкриває тільки вже створений профіль.</p>
     </section>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createAuthenticatedDiscordBackendClient } from '../../../lib/family-backend-auth-client';
-import { readDiscordFamilySettings } from '../../../lib/family-discord-integration';
+import { createAuthenticatedDiscordBackendClient, getDiscordBackendRuntimeConfig } from '../../../lib/family-backend-auth-client';
+import type { DiscordBackendPublicConfigResponse } from '../../../lib/family-discord-backend-client';
 import type { DiscordAccountLink } from '../../../lib/family-types';
 
 function formatDate(value: string) {
@@ -20,10 +20,23 @@ export function LinkedAccountsPanel() {
   const [message, setMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
-  const settings = useMemo(() => readDiscordFamilySettings(), []);
-  const apiBaseUrl = settings.backend.apiBaseUrl;
-  const oauthConfigured = Boolean(apiBaseUrl && settings.backend.discordClientId && settings.backend.oauthRedirectUrl);
+  const [apiBaseUrl, setApiBaseUrl] = useState<string | null>(null);
+  const [publicConfig, setPublicConfig] = useState<DiscordBackendPublicConfigResponse | null>(null);
+  const oauthConfigured = Boolean(apiBaseUrl && publicConfig?.clientId && publicConfig.redirectUri);
   const client = useMemo(() => (apiBaseUrl ? createAuthenticatedDiscordBackendClient() : null), [apiBaseUrl]);
+
+  async function refreshRuntimeConfig() {
+    try {
+      const runtime = await getDiscordBackendRuntimeConfig();
+      setApiBaseUrl(runtime.apiBaseUrl);
+      setPublicConfig(runtime.publicConfig);
+      return runtime;
+    } catch {
+      setApiBaseUrl(null);
+      setPublicConfig(null);
+      return null;
+    }
+  }
 
   async function refreshDiscordLink(showSuccessMessage = false) {
     if (!client) {
@@ -85,7 +98,15 @@ export function LinkedAccountsPanel() {
   }
 
   useEffect(() => {
+    void refreshRuntimeConfig();
+  }, []);
+
+  useEffect(() => {
     if (!client) return;
+
+    if (!hasChecked) {
+      void refreshDiscordLink(false);
+    }
 
     const handleFocus = () => {
       if (!hasChecked) return;
@@ -105,8 +126,8 @@ export function LinkedAccountsPanel() {
           </p>
           <h2 className="mt-1 text-lg font-semibold text-white">Discord</h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
-            Основний вхід у Family Hub лишається через nickname/static ID та пароль. Discord є тільки
-            додатковою прив’язкою після входу.
+            Discord-вхід відкриває Family Hub для вже синхронізованих учасників Dragon House. Прив’язка нижче
+            показує, який Discord акаунт з’єднаний із цим профілем; вхід паролем лишається резервним.
           </p>
         </div>
         <span
@@ -116,14 +137,14 @@ export function LinkedAccountsPanel() {
               : 'w-fit rounded-full border border-slate-700 bg-black/30 px-3 py-1 text-sm text-slate-300'
           }
         >
-          {discordLink ? 'Прив’язано' : 'Не прив’язано'}
+          {discordLink ? 'Прив’язано' : hasChecked ? 'Не прив’язано' : 'Перевіряємо'}
         </span>
       </div>
 
       {!oauthConfigured ? (
         <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
-          Discord OAuth ще не налаштовано повністю. Потрібні backend URL, public client ID та redirect URL у
-          “Сім’я → Керування → Discord-сервер”.
+          Discord-прив’язка ще не налаштована повністю на сервері. Для входу через Discord використовуй
+          головний екран входу; ця секція лише показує або оновлює вже прив’язаний акаунт.
         </div>
       ) : null}
 
@@ -159,6 +180,10 @@ export function LinkedAccountsPanel() {
           >
             Відв’язати Discord
           </button>
+        </div>
+      ) : !hasChecked ? (
+        <div className="mt-4 rounded-xl border border-slate-700 bg-black/25 p-3 text-sm text-slate-300">
+          Перевіряємо, який Discord акаунт прив’язаний до цього профілю.
         </div>
       ) : (
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

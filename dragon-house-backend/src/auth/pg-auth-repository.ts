@@ -22,10 +22,12 @@ type SessionRow = {
   session_id: string;
   family_member_id: string;
   token_hash: string;
+  login_provider?: 'password' | 'discord';
   created_at: Date;
   expires_at: Date;
   last_used_at: Date;
   revoked_at: Date | null;
+  revoked_reason?: string | null;
 };
 
 export class PgFamilyAuthRepository implements FamilyAuthRepository {
@@ -52,7 +54,27 @@ export class PgFamilyAuthRepository implements FamilyAuthRepository {
        where u.family_member_id = $1`,
       [familyMemberId],
     );
-    return result.rows[0] ? mapUser(result.rows[0]) : null;
+    if (result.rows[0]) return mapUser(result.rows[0]);
+
+    const memberResult = await this.pool.query<AuthUserRow>(
+      `select m.id as family_member_id,
+              m.nickname as login,
+              coalesce(m.static_id, '') as static_id,
+              '' as password_hash,
+              (m.status <> 'inactive' and m.deleted_at is null) as is_active,
+              false as must_change_password,
+              m.role,
+              m.rank,
+              m.permissions,
+              m.created_at,
+              m.updated_at,
+              m.status as member_status,
+              m.deleted_at as member_deleted_at
+       from family_members m
+       where m.id = $1`,
+      [familyMemberId],
+    );
+    return memberResult.rows[0] ? mapUser(memberResult.rows[0]) : null;
   }
 
   async createUser(input: CreateFamilyAuthUserInput): Promise<FamilyAuthUser> {
@@ -108,17 +130,19 @@ export class PgFamilyAuthRepository implements FamilyAuthRepository {
   async createSession(session: FamilySession): Promise<FamilySession> {
     const result = await this.pool.query<SessionRow>(
       `insert into family_sessions
-        (session_id, family_member_id, token_hash, created_at, expires_at, last_used_at, revoked_at)
-       values ($1, $2, $3, $4, $5, $6, $7)
+        (session_id, family_member_id, token_hash, login_provider, created_at, expires_at, last_used_at, revoked_at, revoked_reason)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        returning *`,
       [
         session.sessionId,
         session.familyMemberId,
         session.tokenHash,
+        session.loginProvider,
         session.createdAt,
         session.expiresAt,
         session.lastUsedAt,
         session.revokedAt ?? null,
+        session.revokedReason ?? null,
       ],
     );
     return mapSession(result.rows[0]);
@@ -136,13 +160,20 @@ export class PgFamilyAuthRepository implements FamilyAuthRepository {
   }
 
   async revokeSession(sessionId: string, revokedAt: string): Promise<void> {
-    await this.pool.query('update family_sessions set revoked_at = $2 where session_id = $1', [sessionId, revokedAt]);
+    await this.pool.query(
+      `update family_sessions
+       set revoked_at = coalesce(revoked_at, $2),
+           revoked_reason = coalesce(revoked_reason, 'logout')
+       where session_id = $1`,
+      [sessionId, revokedAt],
+    );
   }
 
   async revokeOtherSessions(familyMemberId: string, currentSessionId: string, revokedAt: string): Promise<void> {
     await this.pool.query(
       `update family_sessions
-       set revoked_at = $3
+       set revoked_at = $3,
+           revoked_reason = coalesce(revoked_reason, 'password_changed')
        where family_member_id = $1 and session_id <> $2 and revoked_at is null`,
       [familyMemberId, currentSessionId, revokedAt],
     );
@@ -151,7 +182,8 @@ export class PgFamilyAuthRepository implements FamilyAuthRepository {
   async revokeSessionsForFamilyMember(familyMemberId: string, revokedAt: string): Promise<void> {
     await this.pool.query(
       `update family_sessions
-       set revoked_at = $2
+       set revoked_at = $2,
+           revoked_reason = coalesce(revoked_reason, 'member_deactivated')
        where family_member_id = $1 and revoked_at is null`,
       [familyMemberId, revokedAt],
     );
@@ -179,9 +211,11 @@ function mapSession(row: SessionRow): FamilySession {
     sessionId: row.session_id,
     familyMemberId: row.family_member_id,
     tokenHash: row.token_hash,
+    loginProvider: row.login_provider ?? 'password',
     createdAt: row.created_at.toISOString(),
     expiresAt: row.expires_at.toISOString(),
     lastUsedAt: row.last_used_at.toISOString(),
     revokedAt: row.revoked_at?.toISOString() ?? null,
+    revokedReason: row.revoked_reason ?? null,
   };
 }

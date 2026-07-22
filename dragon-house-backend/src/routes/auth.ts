@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { FamilyAuthError, authErrorMessage } from '../auth/auth-errors.js';
 import type { FamilyAuthService } from '../auth/auth-service.js';
 import { readBearerToken, respondWithAuthError } from '../middleware/family-auth-context.js';
-import type { FamilyPermission } from '../types.js';
+import type { FamilyMember, FamilyPermission, SanitizedFamilyAuthUser } from '../types.js';
+import type { FamilyMemberRepository } from '../members/member-repository.js';
 
 const LoginSchema = z.object({
   loginOrStaticId: z.string().trim().min(1).max(80),
@@ -26,7 +27,7 @@ const CreateAuthUserSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-export function createAuthRouter(authService: FamilyAuthService | null): Router {
+export function createAuthRouter(authService: FamilyAuthService | null, memberRepository: FamilyMemberRepository | null = null): Router {
   const router = Router();
 
   router.use((_request, response, next) => {
@@ -62,7 +63,8 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
       return;
     }
     try {
-      response.json(await authService.me(token));
+      const authUser = await authService.me(token);
+      response.json(memberRepository ? await attachMemberProfile(authUser, memberRepository) : authUser);
     } catch (error) {
       respondWithAuthError(response, error);
     }
@@ -82,6 +84,10 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
       await authService.logout(token);
       response.status(204).send();
     } catch (error) {
+      if (error instanceof FamilyAuthError && (error.code === 'session_invalid' || error.code === 'session_expired')) {
+        response.status(204).send();
+        return;
+      }
       respondWithAuthError(response, error);
     }
   });
@@ -136,6 +142,41 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
   });
 
   return router;
+}
+
+async function attachMemberProfile(
+  authUser: SanitizedFamilyAuthUser,
+  memberRepository: FamilyMemberRepository,
+): Promise<SanitizedFamilyAuthUser> {
+  const member = await memberRepository.findById(authUser.familyMemberId);
+  if (!member) return authUser;
+  return {
+    ...authUser,
+    member: safeMemberProfile(member),
+  };
+}
+
+function safeMemberProfile(member: FamilyMember): NonNullable<SanitizedFamilyAuthUser['member']> {
+  return {
+    id: member.id,
+    nickname: member.nickname,
+    displayName: discordDisplayName(member),
+    status: member.status,
+    staticId: member.staticId,
+    role: member.role,
+    rank: member.rank,
+    permissions: member.permissions,
+    discordUserId: member.discord?.discordUserId ?? null,
+    discordUsername: member.discord?.discordUsername ?? null,
+    discordDisplayName: member.discord?.discordServerNickname ?? member.discord?.discordGlobalName ?? member.discord?.discordUsername ?? null,
+    discordAvatar: member.discord?.discordAvatar ?? null,
+    guildId: member.discord?.guildId ?? null,
+    lastSyncedAt: member.discord?.lastSyncedAt ?? null,
+  };
+}
+
+function discordDisplayName(member: FamilyMember): string {
+  return member.discord?.discordServerNickname?.trim() || member.discord?.discordGlobalName?.trim() || member.nickname;
 }
 
 function normalizeLoginError(error: unknown): unknown {

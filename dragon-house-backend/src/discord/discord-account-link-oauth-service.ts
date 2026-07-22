@@ -68,6 +68,7 @@ export class DiscordAccountLinkOAuthService {
     await this.oauthStates.create({
       stateId,
       familyMemberId,
+      purpose: 'account_link',
       createdAt: now.toISOString(),
       expiresAt,
       consumedAt: null,
@@ -76,7 +77,7 @@ export class DiscordAccountLinkOAuthService {
     const authorizationUrl = new URL(DISCORD_AUTHORIZE_URL);
     authorizationUrl.searchParams.set('client_id', this.config.discord.clientId ?? '');
     authorizationUrl.searchParams.set('response_type', 'code');
-    authorizationUrl.searchParams.set('redirect_uri', this.config.discord.oauthRedirectUri ?? '');
+    authorizationUrl.searchParams.set('redirect_uri', this.accountLinkRedirectUri());
     authorizationUrl.searchParams.set('scope', OAUTH_SCOPES.join(' '));
     authorizationUrl.searchParams.set('state', rawState);
     authorizationUrl.searchParams.set('prompt', 'consent');
@@ -123,6 +124,9 @@ export class DiscordAccountLinkOAuthService {
       throw new DiscordAccountLinkOAuthError('discord_oauth_state_consumed', 'OAuth state could not be consumed');
     }
 
+    if (!consumedState.familyMemberId) {
+      throw new DiscordAccountLinkOAuthError('discord_oauth_state_invalid', 'OAuth state is not linked to a Family Hub member');
+    }
     const existingFamilyLink = await this.accountLinks.getByFamilyMemberId(consumedState.familyMemberId);
     if (existingFamilyLink) {
       throw new DiscordAccountLinkOAuthError(
@@ -169,7 +173,7 @@ export class DiscordAccountLinkOAuthService {
   }
 
   private assertOAuthConfigured(): void {
-    if (!isDiscordOAuthConfigComplete(this.config)) {
+    if (!isDiscordOAuthConfigComplete(this.config) || !this.accountLinkRedirectUri()) {
       throw new DiscordAccountLinkOAuthError(
         'discord_oauth_not_configured',
         `Discord OAuth is not configured: ${getMissingDiscordOAuthConfig(this.config).join(', ')}`,
@@ -184,7 +188,7 @@ export class DiscordAccountLinkOAuthService {
       client_secret: this.config.discord.clientSecret ?? '',
       grant_type: 'authorization_code',
       code,
-      redirect_uri: this.config.discord.oauthRedirectUri ?? '',
+      redirect_uri: this.accountLinkRedirectUri(),
     });
 
     const response = await this.fetchImpl(`${DISCORD_API_BASE_URL}/oauth2/token`, {
@@ -212,6 +216,10 @@ export class DiscordAccountLinkOAuthService {
     }
 
     return { accessToken: parsed.data.access_token };
+  }
+
+  private accountLinkRedirectUri(): string {
+    return this.config.discord.redirectUri ?? this.config.discord.oauthRedirectUri ?? '';
   }
 
   private async fetchCurrentDiscordUser(accessToken: string): Promise<{

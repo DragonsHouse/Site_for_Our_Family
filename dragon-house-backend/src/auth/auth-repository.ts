@@ -82,9 +82,10 @@ export class InMemoryFamilyAuthRepository implements FamilyAuthRepository {
   }
 
   async createSession(session: FamilySession): Promise<FamilySession> {
-    this.sessionsById.set(session.sessionId, session);
+    const nextSession = { ...session, loginProvider: session.loginProvider ?? 'password', revokedReason: session.revokedReason ?? null };
+    this.sessionsById.set(session.sessionId, nextSession);
     this.sessionIdByTokenHash.set(session.tokenHash, session.sessionId);
-    return session;
+    return nextSession;
   }
 
   async findSessionByTokenHash(tokenHash: string): Promise<FamilySession | null> {
@@ -99,7 +100,7 @@ export class InMemoryFamilyAuthRepository implements FamilyAuthRepository {
 
   async revokeSession(sessionId: string, revokedAt: string): Promise<void> {
     const session = this.sessionsById.get(sessionId);
-    if (session) this.sessionsById.set(sessionId, { ...session, revokedAt });
+    if (session) this.sessionsById.set(sessionId, { ...session, revokedAt, revokedReason: session.revokedReason ?? 'logout' });
   }
 
   async revokeOtherSessions(familyMemberId: string, currentSessionId: string, revokedAt: string): Promise<void> {

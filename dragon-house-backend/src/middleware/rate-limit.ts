@@ -9,6 +9,10 @@ type RateLimitOptions = {
   logger?: AppLogger;
 };
 
+type AnonymousRateLimitOptions = RateLimitOptions & {
+  key?: (request: Parameters<RequestHandler>[0]) => string;
+};
+
 type RateBucket = {
   count: number;
   resetAt: number;
@@ -38,6 +42,42 @@ export function createAuthenticatedRateLimit(options: RateLimitOptions): Request
       options.logger?.warn('rate_limit_rejected', {
         limiter: options.name,
         familyMemberId: request.familyAuth.familyMemberId,
+        retryAfterSeconds,
+      });
+      response.status(429).json({
+        error: 'rate_limited',
+        message: 'Too many requests. Try again later.',
+        retryAfterSeconds,
+      });
+      return;
+    }
+
+    activeBucket.count += 1;
+    buckets.set(key, activeBucket);
+    response.setHeader('X-RateLimit-Limit', String(options.limit));
+    response.setHeader('X-RateLimit-Remaining', String(Math.max(0, options.limit - activeBucket.count)));
+    response.setHeader('X-RateLimit-Reset', new Date(activeBucket.resetAt).toISOString());
+    next();
+  };
+}
+
+export function createAnonymousRateLimit(options: AnonymousRateLimitOptions): RequestHandler {
+  return (request, response, next) => {
+    const identity = options.key?.(request) ?? `${request.ip}:${String(request.headers['user-agent'] ?? 'unknown').slice(0, 120)}`;
+    const key = `${options.keyPrefix ?? options.name}:${identity}`;
+    const now = Date.now();
+    const bucket = buckets.get(key);
+    const activeBucket = bucket && bucket.resetAt > now ? bucket : { count: 0, resetAt: now + options.windowMs };
+
+    if (activeBucket.count >= options.limit) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((activeBucket.resetAt - now) / 1000));
+      response.setHeader('Retry-After', String(retryAfterSeconds));
+      response.setHeader('X-RateLimit-Limit', String(options.limit));
+      response.setHeader('X-RateLimit-Remaining', '0');
+      response.setHeader('X-RateLimit-Reset', new Date(activeBucket.resetAt).toISOString());
+      options.logger?.warn('rate_limit_rejected', {
+        limiter: options.name,
+        keyKind: 'network_client',
         retryAfterSeconds,
       });
       response.status(429).json({

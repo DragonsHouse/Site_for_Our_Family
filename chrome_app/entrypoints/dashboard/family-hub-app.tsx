@@ -7,19 +7,21 @@ import { createBackendCurrentFamilyUser, createLoggedOutFamilyHubAuthState } fro
 import {
   changePassword as changeBackendPassword,
   clearAuthSession,
+  completeDiscordLogin,
   createAuthUser,
   getCurrentUser as getBackendCurrentUser,
+  loginWithDiscord,
   login as loginBackend,
   logout as logoutBackend,
   type BackendAuthUser
 } from '../../lib/family-backend-auth-client';
-import { FamilyMemberApiClient } from '../../lib/family-member-api-client';
 import {
   createFamilyMemberDataSource,
-  mapDtoToFamilyUser,
   type FamilyMemberCreateInput,
   type FamilyMemberUpdateInput
 } from '../../lib/family-member-data-source';
+import { resolveBackendFamilyUser } from '../../lib/family-backend-user-session';
+import { translateDiscordLoginError } from '../../lib/family-discord-login-errors';
 import { readFamilyPosts } from '../../lib/family-data';
 import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../lib/family-types';
 import { AuthStartupGate } from './auth/AuthStartupGate';
@@ -29,7 +31,7 @@ import { FamilyShell } from './family/family-shell';
 import { DragonLoadingScreen } from './loading/DragonLoadingScreen';
 import { useFamilyAssetUrl } from './family/use-family-asset-url';
 
-type AuthStep = 'checking' | 'login' | 'change-password' | 'loading' | 'hub';
+type AuthStep = 'checking' | 'login' | 'oauth-loading' | 'oauth-success' | 'change-password' | 'loading' | 'hub';
 
 const FAMILY_TABS: FamilyTab[] = ['cabinet', 'family', 'buyers', 'events', 'map', 'resources'];
 const FAMILY_SECTIONS: FamilySection[] = [
@@ -97,6 +99,7 @@ function LoginScreen({
   onNicknameChange,
   onPasswordChange,
   onRememberMeChange,
+  onDiscordLogin,
   onSubmit
 }: {
   error: string | null;
@@ -107,6 +110,7 @@ function LoginScreen({
   onNicknameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onRememberMeChange: (value: boolean) => void;
+  onDiscordLogin: () => void;
   onSubmit: () => void;
 }) {
   return (
@@ -120,6 +124,7 @@ function LoginScreen({
         onLoginChange={onNicknameChange}
         onPasswordChange={onPasswordChange}
         onRememberMeChange={onRememberMeChange}
+        onDiscordLogin={onDiscordLogin}
         onSubmit={onSubmit}
       />
     </AuthShell>
@@ -217,12 +222,66 @@ function ChangePasswordScreen({
   );
 }
 
+function OAuthLoadingScreen() {
+  return (
+    <AuthShell>
+      <section className="dh-auth-card w-full max-w-md rounded-3xl p-6 text-center">
+        <div className="mx-auto flex justify-center">
+          <DragonHouseCrest slot="dragon_house_logo" size="lg" />
+        </div>
+        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">Discord Login</p>
+        <h1 className="mt-2 text-2xl font-semibold text-white">Відкриваємо ворота Dragon House…</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          Перевіряємо твій Discord і шукаємо тебе серед наших.
+        </p>
+      </section>
+    </AuthShell>
+  );
+}
+
+function OAuthSuccessScreen({ user, onEnter }: { user: FamilyUser; onEnter: () => void }) {
+  const isElevated = user.role === 'owner' || user.role === 'deputy' || user.role === 'moderator';
+  const avatarUrl = user.discordAvatarUrl ?? user.avatarDataUrl ?? user.avatarUrl;
+
+  return (
+    <AuthShell>
+      <section className="dh-auth-card w-full max-w-md rounded-3xl p-6 text-center">
+        <div className="mx-auto flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl border border-amber-500/35 bg-black/40">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={user.nickname} className="h-full w-full object-cover" />
+          ) : (
+            <DragonHouseCrest slot="dragon_house_logo" size="sm" />
+          )}
+        </div>
+        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">Discord підтверджено</p>
+        <h1 className="mt-2 text-2xl font-semibold text-white">Вітаємо вдома, {user.nickname}</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          Твій Discord підтверджено. Доступ до Family Hub відкрито.
+        </p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs">
+          <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-3 py-1 text-amber-100">
+            Ранг {user.rankLevel}
+          </span>
+          <span className="rounded-full border border-slate-600 bg-black/30 px-3 py-1 text-slate-200">{user.rank}</span>
+          {isElevated ? (
+            <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-emerald-100">
+              доступ хранителя
+            </span>
+          ) : null}
+        </div>
+        <button type="button" className="dh-login-submit mt-6 min-w-44 whitespace-nowrap px-6" onClick={onEnter}>
+          Увійти до лігва
+        </button>
+      </section>
+    </AuthShell>
+  );
+}
+
 export function FamilyHubApp() {
   migrateDragonHouseLocalData();
 
   const [currentUser, setCurrentUser] = useState<FamilyUser | null>(null);
   const memberDataSource = useMemo(() => createFamilyMemberDataSource(), []);
-  const memberApiClient = useMemo(() => new FamilyMemberApiClient(), []);
   const [familyUsers, setFamilyUsers] = useState<FamilyUser[]>([]);
   const [posts, setPosts] = useState<FamilyPost[]>(() => readFamilyPosts());
   const [step, setStep] = useState<AuthStep>('checking');
@@ -237,6 +296,7 @@ export function FamilyHubApp() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const authCheckStartedRef = useRef(false);
+  const discordLoginInFlightRef = useRef(false);
 
   async function refreshFamilyUsers() {
     const users = await memberDataSource.listMembers();
@@ -245,11 +305,7 @@ export function FamilyHubApp() {
   }
 
   async function resolveCurrentUser(backendUser: BackendAuthUser) {
-    const backendMember = await memberApiClient
-      .getMember(backendUser.familyMemberId)
-      .then(mapDtoToFamilyUser)
-      .catch(() => null);
-    return createBackendCurrentFamilyUser(backendUser, backendMember);
+    return resolveBackendFamilyUser(backendUser);
   }
 
   useEffect(() => {
@@ -259,6 +315,37 @@ export function FamilyHubApp() {
   useEffect(() => {
     if (authCheckStartedRef.current) return;
     authCheckStartedRef.current = true;
+
+    const completionCode = new URL(window.location.href).searchParams.get('completionCode');
+    const loginStatus = new URL(window.location.href).searchParams.get('discordLoginStatus');
+    const loginError = new URL(window.location.href).searchParams.get('error');
+
+    if (completionCode) {
+      setStep('oauth-loading');
+      void completeDiscordLogin(completionCode)
+        .then(async (result) => {
+          window.history.replaceState(null, document.title, window.location.pathname);
+          const user = await resolveCurrentUser(result.user);
+          setCurrentUser(user);
+          void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
+          setStep('oauth-success');
+        })
+        .catch((err) => {
+          window.history.replaceState(null, document.title, window.location.pathname);
+          void clearAuthSession().catch(() => undefined);
+          setCurrentUser(null);
+          setError(err instanceof Error ? translateDiscordLoginError(err.message) : 'Discord login failed');
+          setStep('login');
+        });
+      return;
+    }
+
+    if (loginStatus === 'error') {
+      window.history.replaceState(null, document.title, window.location.pathname);
+      setError(loginError ?? 'Discord login failed');
+      setStep('login');
+      return;
+    }
 
     void getBackendCurrentUser()
       .then(async (backendUser) => {
@@ -345,6 +432,28 @@ export function FamilyHubApp() {
       permissions: user.permissions,
       mustChangePassword: user.mustChangePassword
     };
+  }
+
+  async function handleDiscordLogin() {
+    if (discordLoginInFlightRef.current) return;
+    discordLoginInFlightRef.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      setStep('oauth-loading');
+      const result = await loginWithDiscord();
+      const user = await resolveCurrentUser(result.user);
+      setCurrentUser(user);
+      await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
+      setPosts(readFamilyPosts());
+      setStep('oauth-success');
+    } catch (err) {
+      setError(err instanceof Error ? translateDiscordLoginError(err.message) : 'Discord login failed');
+      setStep('login');
+    } finally {
+      discordLoginInFlightRef.current = false;
+      setLoading(false);
+    }
   }
 
   function handleAvatarChange(avatarDataUrl: string | null) {
@@ -444,6 +553,7 @@ export function FamilyHubApp() {
         onNicknameChange={setNickname}
         onPasswordChange={setPassword}
         onRememberMeChange={setRememberMe}
+        onDiscordLogin={() => void handleDiscordLogin()}
         onSubmit={() => void handleLogin()}
       />
     );
@@ -472,6 +582,14 @@ export function FamilyHubApp() {
         onSubmit={() => void handleChangePassword()}
       />
     );
+  }
+
+  if (step === 'oauth-loading') {
+    return <OAuthLoadingScreen />;
+  }
+
+  if (step === 'oauth-success' && currentUser) {
+    return <OAuthSuccessScreen user={currentUser} onEnter={() => setStep('hub')} />;
   }
 
   if (step === 'loading' && currentUser) {

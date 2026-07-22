@@ -132,10 +132,12 @@ export type FamilySession = {
   sessionId: string;
   familyMemberId: string;
   tokenHash: string;
+  loginProvider: 'password' | 'discord';
   createdAt: string;
   expiresAt: string;
   lastUsedAt: string;
   revokedAt?: string | null;
+  revokedReason?: string | null;
 };
 
 export type FamilyAuthContext = {
@@ -153,6 +155,23 @@ export type SanitizedFamilyAuthUser = {
   rank: number;
   permissions: FamilyPermission[];
   mustChangePassword: boolean;
+  loginProvider?: 'password' | 'discord';
+  member?: {
+    id: string;
+    nickname: string;
+    displayName: string;
+    status: FamilyMemberStatus;
+    staticId: string | null;
+    role: FamilyRole;
+    rank: number;
+    permissions: FamilyPermission[];
+    discordUserId: string | null;
+    discordUsername: string | null;
+    discordDisplayName: string | null;
+    discordAvatar: string | null;
+    guildId: string | null;
+    lastSyncedAt: string | null;
+  };
 };
 
 export type FamilyAuthErrorCode =
@@ -349,7 +368,13 @@ export type DiscordMemberSyncDryRunResult = {
 
 export type DiscordOAuthState = {
   stateId: string;
-  familyMemberId: string;
+  familyMemberId: string | null;
+  purpose: 'account_link' | 'login';
+  clientType?: 'web' | 'chrome_extension' | null;
+  redirectTarget?: string | null;
+  codeVerifier?: string | null;
+  environment?: string | null;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   expiresAt: string;
   consumedAt?: string | null;

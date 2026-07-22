@@ -5,6 +5,7 @@ import type { FamilyPermission, FamilyRole } from './family-types';
 const SESSION_TOKEN_KEY = 'dragon_house_family_backend_session_token_v1';
 const PERSISTENT_SESSION_TOKEN_KEY = 'dragon_house_family_backend_persistent_session_token_v1';
 const DEFAULT_BACKEND_API_BASE_URL = 'http://localhost:8787';
+const DISCORD_LOGIN_REDIRECT_PATH = 'dragon-house-discord-login';
 let memorySessionToken: string | null = null;
 let memoryPersistentSessionToken: string | null = null;
 
@@ -16,6 +17,7 @@ export type BackendAuthUser = {
   rank: number;
   permissions: FamilyPermission[];
   mustChangePassword: boolean;
+  loginProvider?: 'password' | 'discord';
 };
 
 export type LoginResponse = {
@@ -28,6 +30,13 @@ export type AuthSessionMode = 'session' | 'persistent';
 
 export function getBackendApiBaseUrl(): string {
   return readDiscordFamilySettings().backend.apiBaseUrl ?? DEFAULT_BACKEND_API_BASE_URL;
+}
+
+export async function getDiscordBackendRuntimeConfig() {
+  const apiBaseUrl = getBackendApiBaseUrl();
+  const client = createDiscordBackendClient(apiBaseUrl);
+  const publicConfig = await client.getPublicConfig();
+  return { apiBaseUrl, publicConfig };
 }
 
 export async function getSessionToken(): Promise<string | null> {
@@ -111,6 +120,58 @@ export async function login(loginOrStaticId: string, password: string, rememberM
   const result = await parseJsonResponse<LoginResponse>(response);
   await setSessionToken(result.token, rememberMe ? 'persistent' : 'session');
   return result;
+}
+
+export function getDiscordLoginCompletionRedirectUrl(): string | null {
+  if (typeof chrome !== 'undefined' && chrome.identity?.getRedirectURL) {
+    return chrome.identity.getRedirectURL(DISCORD_LOGIN_REDIRECT_PATH);
+  }
+  return null;
+}
+
+export async function startDiscordLogin(redirectTarget: string | null = getDiscordLoginCompletionRedirectUrl()): Promise<{ authorizationUrl: string; expiresAt: string }> {
+  return parseJsonResponse<{ authorizationUrl: string; expiresAt: string }>(
+    await fetch(`${getBackendApiBaseUrl().replace(/\/+$/u, '')}/api/auth/discord/start`, {
+      method: 'POST',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ clientType: 'chrome_extension', ...(redirectTarget ? { redirectTarget } : {}) }),
+    }),
+  );
+}
+
+export async function completeDiscordLogin(completionCode: string): Promise<LoginResponse> {
+  const result = await parseJsonResponse<LoginResponse>(
+    await fetch(`${getBackendApiBaseUrl().replace(/\/+$/u, '')}/api/auth/discord/complete`, {
+      method: 'POST',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ completionCode, clientType: 'chrome_extension' }),
+    }),
+  );
+  await setSessionToken(result.token, 'session');
+  return result;
+}
+
+export async function loginWithDiscord(): Promise<LoginResponse> {
+  if (typeof chrome === 'undefined' || !chrome.identity?.launchWebAuthFlow) {
+    throw new Error('Chrome Identity API is not available');
+  }
+  const redirectTarget = getDiscordLoginCompletionRedirectUrl();
+  if (!redirectTarget) throw new Error('Chrome Identity redirect URL is not available');
+  const start = await startDiscordLogin(redirectTarget);
+  const finalUrl = await chrome.identity.launchWebAuthFlow({
+    url: start.authorizationUrl,
+    interactive: true,
+  });
+  if (!finalUrl) throw new Error('Discord login was cancelled');
+  const url = new URL(finalUrl);
+  const status = url.searchParams.get('discordLoginStatus');
+  const error = url.searchParams.get('error');
+  if (status === 'error' || error) throw new Error(error ?? 'Discord login failed');
+  const completionCode = url.searchParams.get('completionCode');
+  if (!completionCode) throw new Error('Discord login completion code is missing');
+  return completeDiscordLogin(completionCode);
 }
 
 export async function getCurrentUser(): Promise<BackendAuthUser> {

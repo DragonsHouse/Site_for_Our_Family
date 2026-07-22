@@ -25,8 +25,16 @@ const EnvSchema = z.object({
   DISCORD_BOT_TOKEN: z.string().trim().optional().default(''),
   DISCORD_REDIRECT_URI: z.string().trim().optional().default(''),
   DISCORD_OAUTH_REDIRECT_URI: z.string().trim().optional().default(''),
+  DISCORD_OAUTH_SCOPES: z.string().trim().optional().default('identify'),
   DISCORD_OAUTH_SUCCESS_REDIRECT_URI: z.string().trim().optional().default(''),
   DISCORD_OAUTH_ERROR_REDIRECT_URI: z.string().trim().optional().default(''),
+  DISCORD_LOGIN_SUCCESS_REDIRECT_URI: z.string().trim().optional().default(''),
+  DISCORD_LOGIN_ERROR_REDIRECT_URI: z.string().trim().optional().default(''),
+  DISCORD_LOGIN_ALLOWED_REDIRECT_URIS: z.string().trim().optional().default(''),
+  DISCORD_OAUTH_STATE_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(600),
+  DISCORD_LOGIN_COMPLETION_TTL_SECONDS: z.coerce.number().int().min(30).max(300).default(120),
+  DISCORD_OAUTH_START_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(12),
+  DISCORD_OAUTH_COMPLETE_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
   DISCORD_GUILD_ID: z.string().trim().optional().default(''),
   DISCORD_WELCOME_CHANNEL_ID: z.string().trim().optional().default(''),
   DISCORD_NICKNAME_CHANGE_CHANNEL_ID: z.string().trim().optional().default(''),
@@ -83,6 +91,16 @@ export type AppConfig = {
     oauthRedirectUri: string | null;
     oauthSuccessRedirectUri: string | null;
     oauthErrorRedirectUri: string | null;
+    oauth: {
+      scopes: string[];
+      stateTtlSeconds: number;
+      completionTtlSeconds: number;
+      loginSuccessRedirectUri: string | null;
+      loginErrorRedirectUri: string | null;
+      loginRedirectUris: string[];
+      startRateLimitPerMinute: number;
+      completeRateLimitPerMinute: number;
+    };
     guildId: string | null;
     sync: {
       protectedOwnerMemberId: string | null;
@@ -128,8 +146,16 @@ export function maskConfigForDiagnostics(env: AppEnv): Record<string, string | n
     DISCORD_BOT_TOKEN: maskSensitiveValue(env.DISCORD_BOT_TOKEN),
     DISCORD_REDIRECT_URI: nullable(env.DISCORD_REDIRECT_URI),
     DISCORD_OAUTH_REDIRECT_URI: nullable(env.DISCORD_OAUTH_REDIRECT_URI),
+    DISCORD_OAUTH_SCOPES: nullable(env.DISCORD_OAUTH_SCOPES),
     DISCORD_OAUTH_SUCCESS_REDIRECT_URI: nullable(env.DISCORD_OAUTH_SUCCESS_REDIRECT_URI),
     DISCORD_OAUTH_ERROR_REDIRECT_URI: nullable(env.DISCORD_OAUTH_ERROR_REDIRECT_URI),
+    DISCORD_LOGIN_SUCCESS_REDIRECT_URI: nullable(env.DISCORD_LOGIN_SUCCESS_REDIRECT_URI),
+    DISCORD_LOGIN_ERROR_REDIRECT_URI: nullable(env.DISCORD_LOGIN_ERROR_REDIRECT_URI),
+    DISCORD_LOGIN_ALLOWED_REDIRECT_URIS: nullable(env.DISCORD_LOGIN_ALLOWED_REDIRECT_URIS),
+    DISCORD_OAUTH_STATE_TTL_SECONDS: env.DISCORD_OAUTH_STATE_TTL_SECONDS,
+    DISCORD_LOGIN_COMPLETION_TTL_SECONDS: env.DISCORD_LOGIN_COMPLETION_TTL_SECONDS,
+    DISCORD_OAUTH_START_RATE_LIMIT_PER_MINUTE: env.DISCORD_OAUTH_START_RATE_LIMIT_PER_MINUTE,
+    DISCORD_OAUTH_COMPLETE_RATE_LIMIT_PER_MINUTE: env.DISCORD_OAUTH_COMPLETE_RATE_LIMIT_PER_MINUTE,
     DISCORD_GUILD_ID: nullable(env.DISCORD_GUILD_ID),
     DISCORD_WELCOME_CHANNEL_ID: nullable(env.DISCORD_WELCOME_CHANNEL_ID),
     DISCORD_NICKNAME_CHANGE_CHANNEL_ID: nullable(env.DISCORD_NICKNAME_CHANGE_CHANNEL_ID),
@@ -186,6 +212,16 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       oauthRedirectUri: nullable(env.DISCORD_OAUTH_REDIRECT_URI) ?? nullable(env.DISCORD_REDIRECT_URI),
       oauthSuccessRedirectUri: nullable(env.DISCORD_OAUTH_SUCCESS_REDIRECT_URI),
       oauthErrorRedirectUri: nullable(env.DISCORD_OAUTH_ERROR_REDIRECT_URI),
+      oauth: {
+        scopes: csvList(env.DISCORD_OAUTH_SCOPES.replace(/\s+/gu, ',')),
+        stateTtlSeconds: env.DISCORD_OAUTH_STATE_TTL_SECONDS,
+        completionTtlSeconds: env.DISCORD_LOGIN_COMPLETION_TTL_SECONDS,
+        loginSuccessRedirectUri: nullable(env.DISCORD_LOGIN_SUCCESS_REDIRECT_URI) ?? nullable(env.DISCORD_OAUTH_SUCCESS_REDIRECT_URI),
+        loginErrorRedirectUri: nullable(env.DISCORD_LOGIN_ERROR_REDIRECT_URI) ?? nullable(env.DISCORD_OAUTH_ERROR_REDIRECT_URI),
+        loginRedirectUris: loginRedirectUris(env),
+        startRateLimitPerMinute: env.DISCORD_OAUTH_START_RATE_LIMIT_PER_MINUTE,
+        completeRateLimitPerMinute: env.DISCORD_OAUTH_COMPLETE_RATE_LIMIT_PER_MINUTE,
+      },
       guildId: nullable(env.DISCORD_GUILD_ID),
       sync: {
         protectedOwnerMemberId: nullable(env.DISCORD_SYNC_PROTECTED_OWNER_MEMBER_ID),
@@ -235,6 +271,7 @@ export function validateProductionConfig(config: AppConfig): string[] {
   if (!config.discord.sync.protectedOwnerMemberId) missing.push('DISCORD_SYNC_PROTECTED_OWNER_MEMBER_ID');
   if (!config.discord.sync.protectedOwnerDiscordUserId) missing.push('DISCORD_SYNC_PROTECTED_OWNER_USER_ID');
   missing.push(...getMissingDiscordConfig(config));
+  missing.push(...getMissingDiscordOAuthLoginConfig(config));
   return [...new Set(missing)];
 }
 
@@ -265,6 +302,13 @@ export function isDiscordOAuthConfigComplete(config: AppConfig): boolean {
   return getMissingDiscordOAuthConfig(config).length === 0;
 }
 
+export function getMissingDiscordOAuthLoginConfig(config: AppConfig): string[] {
+  const missing = getMissingDiscordOAuthConfig(config);
+  if (config.discord.oauth.scopes.length === 0) missing.push('DISCORD_OAUTH_SCOPES');
+  if (config.discord.oauth.loginRedirectUris.length === 0) missing.push('DISCORD_LOGIN_ALLOWED_REDIRECT_URIS or DISCORD_LOGIN_SUCCESS_REDIRECT_URI');
+  return missing;
+}
+
 export function configuredChannelNames(config: AppConfig): string[] {
   return Object.entries(config.discord.channels)
     .filter(([, channelId]) => Boolean(channelId))
@@ -272,3 +316,11 @@ export function configuredChannelNames(config: AppConfig): string[] {
 }
 
 export const configuredChannelPurposes = configuredChannelNames;
+
+function loginRedirectUris(env: AppEnv): string[] {
+  return [
+    ...csvList(env.DISCORD_LOGIN_ALLOWED_REDIRECT_URIS),
+    nullable(env.DISCORD_LOGIN_SUCCESS_REDIRECT_URI),
+    nullable(env.DISCORD_OAUTH_SUCCESS_REDIRECT_URI),
+  ].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
+}

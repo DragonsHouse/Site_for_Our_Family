@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { readFamilyPosts } from '../../lib/family-data';
 import {
   getFamilyNotificationsForUser,
   markFamilyNotificationRead,
   syncFamilyNotificationsFromLocalState
 } from '../../lib/family-notifications';
-import { getCurrentFamilyUser } from '../../lib/family-auth';
 import {
   getBuyerPagesLatestData,
   getBuyerWatchRules,
@@ -14,8 +13,11 @@ import {
 } from '../../lib/db';
 import { getActiveSlot, getNextSlotOccurrence } from '../../lib/events-time';
 import { getSettings } from '../../lib/storage';
+import { loginWithDiscord } from '../../lib/family-backend-auth-client';
+import { loadCurrentBackendFamilyUser } from '../../lib/family-backend-user-session';
+import { translateDiscordLoginError } from '../../lib/family-discord-login-errors';
 import type { BuyerWatchRule, PollState } from '../../lib/types';
-import type { FamilyNotification, FamilyPost, FamilySection } from '../../lib/family-types';
+import type { FamilyNotification, FamilyPost, FamilySection, FamilyUser } from '../../lib/family-types';
 import { useFamilyAssetUrl } from '../dashboard/family/use-family-asset-url';
 
 type PollStatusResponse =
@@ -104,11 +106,12 @@ export function PopupApp() {
   const [error, setError] = useState<string | null>(null);
   const [settingsText, setSettingsText] = useState('Статус: завантаження...');
   const [pollStatusText, setPollStatusText] = useState('Синхронізація: завантаження...');
-  const [currentUser, setCurrentUser] = useState(() => getCurrentFamilyUser());
+  const [currentUser, setCurrentUser] = useState<FamilyUser | null>(null);
   const [notifications, setNotifications] = useState<FamilyNotification[]>([]);
   const [posts, setPosts] = useState<FamilyPost[]>([]);
   const [buyerRows, setBuyerRows] = useState<BuyerPopupRow[]>([]);
   const [eventsSummary, setEventsSummary] = useState<EventsPopupSummary | null>(null);
+  const discordLoginInFlightRef = useRef(false);
 
   const unreadCount = notifications.filter((notification) => !notification.readAt).length;
   const importantPosts = useMemo(
@@ -131,7 +134,7 @@ export function PopupApp() {
 
   async function refreshAll() {
     try {
-      const user = getCurrentFamilyUser();
+      const user = await loadPopupCurrentUser();
       setCurrentUser(user);
       setPosts(readFamilyPosts());
 
@@ -150,6 +153,10 @@ export function PopupApp() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Помилка завантаження popup');
     }
+  }
+
+  async function loadPopupCurrentUser() {
+    return loadCurrentBackendFamilyUser().catch(() => null);
   }
 
   async function refreshPollStatus(pollIntervalMinutes?: number) {
@@ -293,6 +300,24 @@ export function PopupApp() {
     }
   }
 
+  async function handleDiscordLogin() {
+    if (discordLoginInFlightRef.current) return;
+    discordLoginInFlightRef.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      await loginWithDiscord();
+      setCurrentUser(await loadPopupCurrentUser());
+      openDashboard({ tab: 'cabinet' });
+      window.close();
+    } catch (err) {
+      setError(err instanceof Error ? translateDiscordLoginError(err.message) : 'Не вдалося завершити Discord-вхід.');
+    } finally {
+      discordLoginInFlightRef.current = false;
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="dh-popup max-h-[600px] w-[min(380px,100vw)] overflow-x-hidden overflow-y-auto p-3 text-[#f4f1ec]">
       <header className="mb-3 rounded-2xl border border-white/10 bg-[#191919]/95 p-3 shadow-xl shadow-black/30">
@@ -325,7 +350,17 @@ export function PopupApp() {
           </span>
         </div>
         {!currentUser ? (
-          <p className="text-xs text-[#77736d]">Авторизуйся у Family Hub, щоб бачити персональні повідомлення.</p>
+          <div className="space-y-2">
+            <p className="text-xs text-[#77736d]">Увійди через Discord, щоб відкрити Family Hub і персональні повідомлення.</p>
+            <button
+              type="button"
+              onClick={() => void handleDiscordLogin()}
+              disabled={loading}
+              className="w-full rounded-xl border border-indigo-400/40 bg-indigo-500/10 px-3 py-2 text-sm font-semibold text-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? 'Відкриваємо ворота...' : 'Увійти через Discord'}
+            </button>
+          </div>
         ) : notifications.length ? (
           <div className="space-y-2">
             {notifications.slice(0, 5).map((notification) => (

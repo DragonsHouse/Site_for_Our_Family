@@ -57,6 +57,8 @@ export class FamilyAuthService {
       expiresAt,
       lastUsedAt: now.toISOString(),
       revokedAt: null,
+      revokedReason: null,
+      loginProvider: 'password',
     });
 
     return { token, expiresAt, user: sanitizeAuthUser(user) };
@@ -100,13 +102,41 @@ export class FamilyAuthService {
   }
 
   async me(token: string): Promise<SanitizedFamilyAuthUser> {
-    const { user } = await this.authenticateToken(token, { allowPasswordChangeRequired: true });
-    return sanitizeAuthUser(user);
+    const { user, session } = await this.authenticateToken(token, { allowPasswordChangeRequired: true });
+    return sanitizeAuthUser(user, session.loginProvider);
   }
 
   async logout(token: string): Promise<void> {
     const { session } = await this.authenticateToken(token, { allowPasswordChangeRequired: true });
     await this.repository.revokeSession(session.sessionId, new Date().toISOString());
+  }
+
+  async createSessionForFamilyMember(
+    familyMemberId: string,
+    options: { loginProvider: 'discord' | 'password'; rememberMe?: boolean } = { loginProvider: 'password' },
+  ): Promise<{ token: string; expiresAt: string; user: SanitizedFamilyAuthUser }> {
+    const user = await this.repository.findUserByFamilyMemberId(familyMemberId);
+    if (!user || !user.isActive) throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
+
+    const token = createSessionToken();
+    const now = new Date();
+    const ttlMs = options.rememberMe
+      ? this.config.authRememberMeTtlDays * 24 * 60 * 60 * 1000
+      : this.config.authSessionTtlHours * 60 * 60 * 1000;
+    const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
+    await this.repository.createSession({
+      sessionId: randomUUID(),
+      familyMemberId: user.familyMemberId,
+      tokenHash: hashSessionToken(token),
+      loginProvider: options.loginProvider,
+      createdAt: now.toISOString(),
+      expiresAt,
+      lastUsedAt: now.toISOString(),
+      revokedAt: null,
+      revokedReason: null,
+    });
+
+    return { token, expiresAt, user: sanitizeAuthUser(user, options.loginProvider) };
   }
 
   async changePassword(token: string, currentPassword: string, newPassword: string): Promise<SanitizedFamilyAuthUser> {
@@ -174,7 +204,7 @@ export class FamilyAuthService {
   }
 }
 
-export function sanitizeAuthUser(user: FamilyAuthUser): SanitizedFamilyAuthUser {
+export function sanitizeAuthUser(user: FamilyAuthUser, loginProvider?: 'password' | 'discord'): SanitizedFamilyAuthUser {
   return {
     familyMemberId: user.familyMemberId,
     login: user.login,
@@ -183,5 +213,6 @@ export function sanitizeAuthUser(user: FamilyAuthUser): SanitizedFamilyAuthUser 
     rank: user.rank,
     permissions: user.permissions,
     mustChangePassword: user.mustChangePassword,
+    ...(loginProvider ? { loginProvider } : {}),
   };
 }

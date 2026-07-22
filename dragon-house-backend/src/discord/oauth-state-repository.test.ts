@@ -9,6 +9,7 @@ function createState(familyMemberId: string, stateId: string, expiresAt = '2026-
   return {
     stateId,
     familyMemberId,
+    purpose: 'account_link',
     createdAt: '2026-07-17T00:00:00.000Z',
     expiresAt,
     consumedAt: null,

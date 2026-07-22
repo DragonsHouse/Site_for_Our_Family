@@ -11,8 +11,13 @@ export class InMemoryDiscordOAuthStateRepository implements DiscordOAuthStateRep
   private readonly states = new Map<string, DiscordOAuthState>();
 
   async create(state: DiscordOAuthState): Promise<DiscordOAuthState> {
-    this.states.set(state.stateId, state);
-    return state;
+    const nextState = {
+      ...state,
+      purpose: state.purpose ?? 'account_link',
+      metadata: state.metadata ?? {},
+    };
+    this.states.set(state.stateId, nextState);
+    return nextState;
   }
 
   async getByStateId(stateId: string): Promise<DiscordOAuthState | null> {
@@ -32,7 +37,13 @@ export class InMemoryDiscordOAuthStateRepository implements DiscordOAuthStateRep
 
 type DiscordOAuthStateRow = {
   state_id: string;
-  family_member_id: string;
+  family_member_id: string | null;
+  purpose?: 'account_link' | 'login';
+  client_type?: 'web' | 'chrome_extension' | null;
+  redirect_target?: string | null;
+  code_verifier?: string | null;
+  environment?: string | null;
+  metadata?: Record<string, unknown> | null;
   created_at: Date;
   expires_at: Date;
   consumed_at: Date | null;
@@ -44,10 +55,22 @@ export class PgDiscordOAuthStateRepository implements DiscordOAuthStateRepositor
   async create(state: DiscordOAuthState): Promise<DiscordOAuthState> {
     const result = await this.pool.query<DiscordOAuthStateRow>(
       `insert into discord_oauth_states
-        (state_id, family_member_id, created_at, expires_at, consumed_at)
-       values ($1, $2, $3, $4, $5)
+        (state_id, family_member_id, purpose, client_type, redirect_target, code_verifier, environment, metadata, created_at, expires_at, consumed_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        returning *`,
-      [state.stateId, state.familyMemberId, state.createdAt, state.expiresAt, state.consumedAt ?? null],
+      [
+        state.stateId,
+        state.familyMemberId,
+        state.purpose,
+        state.clientType ?? null,
+        state.redirectTarget ?? null,
+        state.codeVerifier ?? null,
+        state.environment ?? null,
+        JSON.stringify(state.metadata ?? {}),
+        state.createdAt,
+        state.expiresAt,
+        state.consumedAt ?? null,
+      ],
     );
     return mapDiscordOAuthState(result.rows[0]);
   }
@@ -78,6 +101,12 @@ function mapDiscordOAuthState(row: DiscordOAuthStateRow): DiscordOAuthState {
   return {
     stateId: row.state_id,
     familyMemberId: row.family_member_id,
+    purpose: row.purpose ?? 'account_link',
+    clientType: row.client_type ?? null,
+    redirectTarget: row.redirect_target ?? null,
+    codeVerifier: row.code_verifier ?? null,
+    environment: row.environment ?? null,
+    metadata: row.metadata ?? {},
     createdAt: row.created_at.toISOString(),
     expiresAt: row.expires_at.toISOString(),
     consumedAt: row.consumed_at?.toISOString() ?? null,

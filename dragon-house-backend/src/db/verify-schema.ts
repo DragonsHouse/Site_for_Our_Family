@@ -10,6 +10,7 @@ const requiredTables = [
   'family_sessions',
   'discord_account_links',
   'discord_oauth_states',
+  'discord_login_completions',
   'discord_role_mappings',
   'family_audit_log',
   'discord_sync_reports',
@@ -156,6 +157,23 @@ async function runChecks() {
     }
     checks.push({ name: 'discord_role_mappings type priority index', ok: await indexExists(pool, 'idx_discord_role_mappings_type_priority') });
     checks.push({ name: 'family_sessions.token_hash unique', ok: await constraintExists(pool, 'family_sessions', 'u', 'token_hash') });
+    checks.push({ name: 'family_sessions.login_provider column', ok: await columnExists(pool, 'family_sessions', 'login_provider') });
+    checks.push({ name: 'family_sessions.revoked_reason column', ok: await columnExists(pool, 'family_sessions', 'revoked_reason') });
+    checks.push({ name: 'family_sessions.login_provider check', ok: await constraintExists(pool, 'family_sessions', 'c', 'login_provider') });
+    for (const column of ['purpose', 'client_type', 'redirect_target', 'code_verifier', 'environment', 'metadata']) {
+      checks.push({ name: `discord_oauth_states.${column} column`, ok: await columnExists(pool, 'discord_oauth_states', column) });
+    }
+    checks.push({ name: 'discord_oauth_states purpose check', ok: await constraintExists(pool, 'discord_oauth_states', 'c', 'purpose') });
+    checks.push({ name: 'discord_oauth_states client type check', ok: await constraintExists(pool, 'discord_oauth_states', 'c', 'client_type') });
+    checks.push({
+      name: 'discord_login_completions.family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'discord_login_completions', 'family_member_id', 'family_members', 'id'),
+    });
+    checks.push({
+      name: 'discord_login_completions.state_id -> discord_oauth_states.state_id',
+      ok: await foreignKeyTargets(pool, 'discord_login_completions', 'state_id', 'discord_oauth_states', 'state_id'),
+    });
+    checks.push({ name: 'discord_login_completions expires index', ok: await indexExists(pool, 'idx_discord_login_completions_expires_at') });
     checks.push({
       name: 'family_audit_log.actor_family_member_id -> family_members.id',
       ok: await foreignKeyTargets(pool, 'family_audit_log', 'actor_family_member_id', 'family_members', 'id'),
