@@ -1,14 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  getFamilyUsers,
-  updateFamilyUserAccess,
-  updateFamilyUserAvatar,
-  type FamilyUser
-} from '../../lib/family-auth';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   migrateDragonHouseAsyncData,
   migrateDragonHouseLocalData
 } from '../../lib/family-data-migration';
+import { createBackendCurrentFamilyUser, createLoggedOutFamilyHubAuthState } from '../../lib/family-backend-current-user';
 import {
   changePassword as changeBackendPassword,
   clearAuthSession,
@@ -18,9 +13,15 @@ import {
   logout as logoutBackend,
   type BackendAuthUser
 } from '../../lib/family-backend-auth-client';
-import { createFamilyMemberDataSource, type FamilyMemberCreateInput, type FamilyMemberUpdateInput } from '../../lib/family-member-data-source';
+import { FamilyMemberApiClient } from '../../lib/family-member-api-client';
+import {
+  createFamilyMemberDataSource,
+  mapDtoToFamilyUser,
+  type FamilyMemberCreateInput,
+  type FamilyMemberUpdateInput
+} from '../../lib/family-member-data-source';
 import { readFamilyPosts } from '../../lib/family-data';
-import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab } from '../../lib/family-types';
+import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../lib/family-types';
 import { AuthStartupGate } from './auth/AuthStartupGate';
 import { LoginForm } from './auth/LoginForm';
 import { DragonHouseCrest } from './family/dragon-house-crest';
@@ -85,27 +86,6 @@ function translateAuthError(message: string) {
     return 'Новий пароль має містити щонайменше 6 символів';
   }
   return message;
-}
-
-function mergeBackendUser(backendUser: BackendAuthUser): FamilyUser {
-  const localUser = getFamilyUsers().find(
-    (user) =>
-      user.id === backendUser.familyMemberId ||
-      user.nickname.toLowerCase() === backendUser.login.toLowerCase() ||
-      user.nickname === backendUser.familyMemberId ||
-      user.staticId === backendUser.staticId
-  );
-  if (!localUser) {
-    throw new Error('Authenticated user profile is missing in local Family Hub data');
-  }
-  return {
-    ...localUser,
-    role: backendUser.role,
-    rankLevel: backendUser.rank,
-    permissions: backendUser.permissions,
-    mustChangePassword: backendUser.mustChangePassword,
-    passwordHash: null
-  };
 }
 
 function LoginScreen({
@@ -242,7 +222,8 @@ export function FamilyHubApp() {
 
   const [currentUser, setCurrentUser] = useState<FamilyUser | null>(null);
   const memberDataSource = useMemo(() => createFamilyMemberDataSource(), []);
-  const [familyUsers, setFamilyUsers] = useState<FamilyUser[]>(() => getFamilyUsers());
+  const memberApiClient = useMemo(() => new FamilyMemberApiClient(), []);
+  const [familyUsers, setFamilyUsers] = useState<FamilyUser[]>([]);
   const [posts, setPosts] = useState<FamilyPost[]>(() => readFamilyPosts());
   const [step, setStep] = useState<AuthStep>('checking');
   const [activeTab, setActiveTab] = useState<FamilyTab>(() => getInitialFamilyTab());
@@ -263,6 +244,14 @@ export function FamilyHubApp() {
     return users;
   }
 
+  async function resolveCurrentUser(backendUser: BackendAuthUser) {
+    const backendMember = await memberApiClient
+      .getMember(backendUser.familyMemberId)
+      .then(mapDtoToFamilyUser)
+      .catch(() => null);
+    return createBackendCurrentFamilyUser(backendUser, backendMember);
+  }
+
   useEffect(() => {
     void migrateDragonHouseAsyncData().catch(() => undefined);
   }, []);
@@ -272,10 +261,10 @@ export function FamilyHubApp() {
     authCheckStartedRef.current = true;
 
     void getBackendCurrentUser()
-      .then((backendUser) => {
-        const user = mergeBackendUser(backendUser);
+      .then(async (backendUser) => {
+        const user = await resolveCurrentUser(backendUser);
         setCurrentUser(user);
-        void refreshFamilyUsers().catch(() => setFamilyUsers(getFamilyUsers()));
+        void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
         setStep(user.mustChangePassword ? 'change-password' : 'hub');
       })
       .catch(() => {
@@ -290,9 +279,9 @@ export function FamilyHubApp() {
     setError(null);
     try {
       const result = await loginBackend(nickname, password, rememberMe);
-      const user = mergeBackendUser(result.user);
+      const user = await resolveCurrentUser(result.user);
       setCurrentUser(user);
-      await refreshFamilyUsers();
+      await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
       setPosts(readFamilyPosts());
       setCurrentPassword(user.mustChangePassword ? password : '');
       setPassword('');
@@ -315,9 +304,9 @@ export function FamilyHubApp() {
     setError(null);
     try {
       const backendUser = await changeBackendPassword(currentPassword, newPassword);
-      const user = mergeBackendUser(backendUser);
+      const user = await resolveCurrentUser(backendUser);
       setCurrentUser(user);
-      await refreshFamilyUsers();
+      await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -333,8 +322,9 @@ export function FamilyHubApp() {
     void logoutBackend()
       .catch(() => clearAuthSession())
       .catch(() => undefined);
-    setCurrentUser(null);
-    void refreshFamilyUsers().catch(() => setFamilyUsers(getFamilyUsers()));
+    const loggedOutState = createLoggedOutFamilyHubAuthState();
+    setCurrentUser(loggedOutState.currentUser);
+    setFamilyUsers(loggedOutState.familyUsers);
     setNickname('');
     setPassword('');
     setCurrentPassword('');
@@ -345,11 +335,37 @@ export function FamilyHubApp() {
     setStep('login');
   }
 
+  function backendUserFromCurrentUser(user: FamilyUser): BackendAuthUser {
+    return {
+      familyMemberId: user.id,
+      login: user.nickname,
+      staticId: user.staticId,
+      role: user.role,
+      rank: user.rankLevel,
+      permissions: user.permissions,
+      mustChangePassword: user.mustChangePassword
+    };
+  }
+
   function handleAvatarChange(avatarDataUrl: string | null) {
     if (!currentUser) return;
-    const user = updateFamilyUserAvatar(currentUser.nickname, avatarDataUrl);
-    setCurrentUser(user);
-    setFamilyUsers(getFamilyUsers());
+    void memberDataSource
+      .updateMember(currentUser.nickname, {
+        nickname: currentUser.nickname,
+        staticId: currentUser.staticId,
+        rankLevel: currentUser.rankLevel,
+        role: currentUser.role,
+        joinedAt: currentUser.joinedAt,
+        accountStatus: currentUser.accountStatus,
+        avatarDataUrl,
+        permissions: currentUser.permissions,
+        notes: currentUser.notes
+      })
+      .then((member) => {
+        setCurrentUser(createBackendCurrentFamilyUser(backendUserFromCurrentUser(currentUser), member));
+        return refreshFamilyUsers();
+      })
+      .catch(() => undefined);
   }
 
   function handleUserAccessChange(
@@ -361,26 +377,40 @@ export function FamilyHubApp() {
       permissions: FamilyPermission[];
     }
   ) {
-    const user = updateFamilyUserAccess(nickname, updates);
-    if (currentUser?.nickname === nickname) {
-      setCurrentUser(user);
-    }
-    setFamilyUsers(getFamilyUsers());
+    const existing = familyUsers.find((user) => user.nickname === nickname);
+    if (!existing) return;
+    void memberDataSource
+      .updateMember(nickname, {
+        nickname: existing.nickname,
+        staticId: existing.staticId,
+        rankLevel: updates.rankLevel,
+        role: updates.role,
+        joinedAt: existing.joinedAt,
+        accountStatus: existing.accountStatus,
+        avatarDataUrl: existing.avatarDataUrl,
+        permissions: updates.permissions,
+        notes: existing.notes
+      })
+      .then((member) => {
+        if (currentUser?.nickname === nickname) {
+          setCurrentUser(createBackendCurrentFamilyUser(backendUserFromCurrentUser(currentUser), member));
+        }
+        return refreshFamilyUsers();
+      })
+      .catch(() => undefined);
   }
 
   async function handleUserCreate(input: FamilyMemberCreateInput) {
     const user = await memberDataSource.createMember(input);
-    if (memberDataSource.mode === 'local') {
-      await createAuthUser({
-        familyMemberId: user.id,
-        login: user.nickname,
-        staticId: user.staticId,
-        role: user.role,
-        rank: user.rankLevel,
-        permissions: user.permissions,
-        isActive: user.accountStatus === 'active'
-      });
-    }
+    await createAuthUser({
+      familyMemberId: user.id,
+      login: user.nickname,
+      staticId: user.staticId,
+      role: user.role,
+      rank: user.rankLevel,
+      permissions: user.permissions,
+      isActive: user.accountStatus === 'active'
+    });
     await refreshFamilyUsers();
   }
 
@@ -390,7 +420,7 @@ export function FamilyHubApp() {
   ) {
     const user = await memberDataSource.updateMember(originalNickname, updates);
     if (currentUser?.nickname === originalNickname) {
-      setCurrentUser(user);
+      setCurrentUser(createBackendCurrentFamilyUser(backendUserFromCurrentUser(currentUser), user));
     }
     await refreshFamilyUsers();
   }

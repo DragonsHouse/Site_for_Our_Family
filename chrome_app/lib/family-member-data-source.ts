@@ -28,7 +28,7 @@ export function getFamilyMembersDataSourceMode(): FamilyMembersDataSourceMode {
     typeof window !== 'undefined'
       ? window.localStorage.getItem('dragon_house_family_members_data_source')
       : null;
-  return envMode === 'api' || localMode === 'api' ? 'api' : 'local';
+  return envMode === 'local' || localMode === 'local' ? 'local' : 'api';
 }
 
 export function createFamilyMemberDataSource(mode: FamilyMembersDataSourceMode = getFamilyMembersDataSourceMode()): FamilyMemberDataSource {
@@ -122,7 +122,7 @@ export class ApiFamilyMemberDataSource implements FamilyMemberDataSource {
   }
 }
 
-function mapDtoToFamilyUser(dto: FamilyMemberDto): FamilyUser {
+export function mapDtoToFamilyUser(dto: FamilyMemberDto): FamilyUser {
   const rank = getFamilyRank(dto.rank);
   const metadata = dto.profileMetadata as {
     avatarDataUrl?: string | null;
