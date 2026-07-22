@@ -126,9 +126,11 @@ async function runChecks() {
     checks.push({ name: 'discord_role_mappings.discord_role_id primary key', ok: await constraintExists(pool, 'discord_role_mappings', 'p', 'discord_role_id') });
     checks.push({ name: 'discord_role_mappings.family_role check', ok: await constraintExists(pool, 'discord_role_mappings', 'c', 'family_role') });
     checks.push({ name: 'discord_role_mappings.rank check', ok: await constraintExists(pool, 'discord_role_mappings', 'c', 'rank') });
-    for (const column of ['discord_role_name', 'permissions', 'priority', 'enabled']) {
+    checks.push({ name: 'discord_role_mappings.mapping_type check', ok: await constraintExists(pool, 'discord_role_mappings', 'c', 'mapping_type') });
+    for (const column of ['discord_role_name', 'mapping_type', 'permissions', 'priority', 'grants_permissions', 'metadata', 'enabled']) {
       checks.push({ name: `discord_role_mappings.${column} column`, ok: await columnExists(pool, 'discord_role_mappings', column) });
     }
+    checks.push({ name: 'discord_role_mappings type priority index', ok: await indexExists(pool, 'idx_discord_role_mappings_type_priority') });
     checks.push({ name: 'family_sessions.token_hash unique', ok: await constraintExists(pool, 'family_sessions', 'u', 'token_hash') });
     checks.push({
       name: 'family_audit_log.actor_family_member_id -> family_members.id',

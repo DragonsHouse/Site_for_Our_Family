@@ -231,14 +231,19 @@ export type DiscordAccountLink = {
 export type DiscordRoleMapping = {
   discordRoleId: string;
   discordRoleName: string;
-  familyRole: FamilyRole;
-  rank: number;
+  mappingType: DiscordRoleMappingType;
+  familyRole: FamilyRole | null;
+  rank: number | null;
   permissions: FamilyPermission[];
   priority: number;
+  grantsPermissions: boolean;
+  metadata: Record<string, unknown>;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
 };
+
+export type DiscordRoleMappingType = 'primary_hierarchy' | 'additional_functional' | 'ignored';
 
 export type NormalizedDiscordGuildMember = {
   discordUserId: string;
@@ -275,6 +280,18 @@ export type DiscordMemberSyncProposedRole = {
   priority: number;
 };
 
+export type DiscordMemberSyncAdditionalRole = {
+  discordRoleId: string;
+  discordRoleName: string;
+  permissions: FamilyPermission[];
+  priority: number;
+};
+
+export type DiscordMemberSyncIgnoredRole = {
+  discordRoleId: string;
+  discordRoleName: string;
+};
+
 export type DiscordMemberSyncDryRunItem = {
   action: DiscordMemberSyncAction;
   reason: string;
@@ -286,7 +303,15 @@ export type DiscordMemberSyncDryRunItem = {
     discordUserId?: string | null;
   };
   matchedBy: 'discord_user_id' | 'none' | 'not_applicable';
+  /** @deprecated Use primaryRank. Kept temporarily for existing dry-run consumers. */
   proposedRole?: DiscordMemberSyncProposedRole;
+  primaryRank?: DiscordMemberSyncProposedRole;
+  promotionRank?: number;
+  primaryDiscordRoleId?: string;
+  primaryDiscordRoleName?: string;
+  additionalRoles: DiscordMemberSyncAdditionalRole[];
+  effectivePermissions: FamilyPermission[];
+  matchedIgnoredRoles: DiscordMemberSyncIgnoredRole[];
   changes: DiscordMemberSyncChange[];
   warnings: string[];
   possibleManualLinkFamilyMemberIds: string[];

@@ -1,13 +1,16 @@
 import type pg from 'pg';
-import type { DiscordRoleMapping, FamilyPermission, FamilyRole } from '../types.js';
+import type { DiscordRoleMapping, DiscordRoleMappingType, FamilyPermission, FamilyRole } from '../types.js';
 
 export type SaveDiscordRoleMappingInput = {
   discordRoleId: string;
   discordRoleName: string;
-  familyRole: FamilyRole;
-  rank: number;
+  mappingType?: DiscordRoleMappingType;
+  familyRole?: FamilyRole | null;
+  rank?: number | null;
   permissions: FamilyPermission[];
   priority: number;
+  grantsPermissions?: boolean;
+  metadata?: Record<string, unknown>;
   enabled: boolean;
 };
 
@@ -36,7 +39,16 @@ export class InMemoryDiscordRoleMappingRepository implements DiscordRoleMappingR
     const now = new Date().toISOString();
     const existing = this.mappings.get(input.discordRoleId);
     const mapping: DiscordRoleMapping = {
-      ...input,
+      discordRoleId: input.discordRoleId,
+      discordRoleName: input.discordRoleName,
+      mappingType: input.mappingType ?? 'primary_hierarchy',
+      familyRole: input.familyRole ?? null,
+      rank: input.rank ?? null,
+      permissions: input.permissions,
+      priority: input.priority,
+      grantsPermissions: input.grantsPermissions ?? true,
+      metadata: input.metadata ?? {},
+      enabled: input.enabled,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -56,10 +68,13 @@ export class InMemoryDiscordRoleMappingRepository implements DiscordRoleMappingR
 type DiscordRoleMappingRow = {
   discord_role_id: string;
   discord_role_name: string;
-  family_role: FamilyRole;
-  rank: number;
+  mapping_type: DiscordRoleMappingType;
+  family_role: FamilyRole | null;
+  rank: number | null;
   permissions: FamilyPermission[];
   priority: number;
+  grants_permissions: boolean;
+  metadata: Record<string, unknown>;
   enabled: boolean;
   created_at: Date;
   updated_at: Date;
@@ -89,24 +104,31 @@ export class PgDiscordRoleMappingRepository implements DiscordRoleMappingReposit
   async save(input: SaveDiscordRoleMappingInput): Promise<DiscordRoleMapping> {
     const result = await this.pool.query<DiscordRoleMappingRow>(
       `insert into discord_role_mappings
-        (discord_role_id, discord_role_name, family_role, rank, permissions, priority, enabled)
-       values ($1, $2, $3, $4, $5, $6, $7)
+        (discord_role_id, discord_role_name, mapping_type, family_role, rank, permissions, priority,
+         grants_permissions, metadata, enabled)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        on conflict (discord_role_id) do update
        set discord_role_name = excluded.discord_role_name,
+           mapping_type = excluded.mapping_type,
            family_role = excluded.family_role,
            rank = excluded.rank,
            permissions = excluded.permissions,
            priority = excluded.priority,
+           grants_permissions = excluded.grants_permissions,
+           metadata = excluded.metadata,
            enabled = excluded.enabled,
            updated_at = now()
        returning *`,
       [
         input.discordRoleId,
         input.discordRoleName,
-        input.familyRole,
-        input.rank,
+        input.mappingType ?? 'primary_hierarchy',
+        input.familyRole ?? null,
+        input.rank ?? null,
         JSON.stringify(input.permissions),
         input.priority,
+        input.grantsPermissions ?? true,
+        JSON.stringify(input.metadata ?? {}),
         input.enabled,
       ],
     );
@@ -129,10 +151,13 @@ function mapDiscordRoleMapping(row: DiscordRoleMappingRow): DiscordRoleMapping {
   return {
     discordRoleId: row.discord_role_id,
     discordRoleName: row.discord_role_name,
+    mappingType: row.mapping_type,
     familyRole: row.family_role,
     rank: row.rank,
     permissions: row.permissions,
     priority: row.priority,
+    grantsPermissions: row.grants_permissions,
+    metadata: row.metadata,
     enabled: row.enabled,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
