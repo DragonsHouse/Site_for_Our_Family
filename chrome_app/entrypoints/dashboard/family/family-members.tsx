@@ -431,7 +431,7 @@ export function FamilyMembers({
   onUserCreate,
   onUserProfileChange,
   onUserDeactivate,
-  dataSourceMode = 'local'
+  dataSourceMode = 'api'
 }: {
   currentUser: FamilyUser;
   users: FamilyUser[];
@@ -487,6 +487,7 @@ export function FamilyMembers({
   const canViewStatic = canManage;
   const canViewAvatars = currentUser.role === 'owner' || currentUser.role === 'deputy';
   const ranks = Array.from(new Set(users.map((user) => user.rank)));
+  const isDevelopmentLocalData = dataSourceMode === 'local';
 
   const filteredUsers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -508,8 +509,14 @@ export function FamilyMembers({
             Список сім’ї з пошуком, ролями, сімейними рангами, статусом і доступами.
           </p>
         </div>
-        <div className="inline-flex rounded-full border border-slate-700 bg-black/30 px-2.5 py-1 text-xs text-slate-300 lg:ml-auto">
-          {dataSourceMode === 'api' ? 'Учасники: PostgreSQL API' : 'Учасники: локальне сховище'}
+        <div
+          className={
+            isDevelopmentLocalData
+              ? 'inline-flex rounded-full border border-amber-500/50 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-100 lg:ml-auto'
+              : 'inline-flex rounded-full border border-slate-700 bg-black/30 px-2.5 py-1 text-xs text-slate-300 lg:ml-auto'
+          }
+        >
+          {isDevelopmentLocalData ? 'DEVELOPMENT / LOCAL DATA' : 'Учасники: PostgreSQL API'}
         </div>
         {canManage ? (
           <button

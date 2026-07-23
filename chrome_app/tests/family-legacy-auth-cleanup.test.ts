@@ -36,6 +36,7 @@ describe('legacy local authentication cleanup', () => {
 
     assert.match(source, /export type FamilyMembersDataSourceMode = 'local' \| 'api';/u);
     assert.match(source, /window\.localStorage\.getItem\('dragon_house_family_members_data_source'\)/u);
-    assert.match(source, /mode === 'api' \? new ApiFamilyMemberDataSource\(\) : new LocalFamilyMemberDataSource\(\)/u);
+    assert.match(source, /isLocalFamilyMemberSourceAllowed/u);
+    assert.match(source, /if \(!isLocalFamilyMemberSourceAllowed\(env\)\) return 'api';/u);
   });
 });

@@ -10,6 +10,12 @@ import { FamilyMemberApiClient, type FamilyMemberDto } from './family-member-api
 import type { FamilyPermission, FamilyRole, FamilyUser } from './family-types';
 
 export type FamilyMembersDataSourceMode = 'local' | 'api';
+type FamilyMemberSourceEnvironment = {
+  mode?: string;
+  dev?: boolean;
+  prod?: boolean;
+  allowLocal?: string;
+};
 
 export type FamilyMemberCreateInput = Parameters<typeof createFamilyUser>[0];
 export type FamilyMemberUpdateInput = Parameters<typeof updateFamilyUserProfile>[1];
@@ -22,13 +28,46 @@ export interface FamilyMemberDataSource {
   deleteMember(nickname: string, signal?: AbortSignal): Promise<FamilyUser>;
 }
 
+function getImportMetaEnv(): FamilyMemberSourceEnvironment {
+  const env = (import.meta as { env?: Record<string, string | boolean | undefined> }).env;
+  return env
+    ? {
+        mode: String(env.MODE ?? ''),
+        dev: env.DEV === true,
+        prod: env.PROD === true,
+        allowLocal: String(env.FAMILY_MEMBERS_ALLOW_LOCAL_SOURCE ?? '')
+      }
+    : {};
+}
+
+export function isLocalFamilyMemberSourceAllowed(env: FamilyMemberSourceEnvironment = getImportMetaEnv()): boolean {
+  if (env.prod || env.mode === 'production') return false;
+  return env.dev === true && env.allowLocal === 'true';
+}
+
+export function resolveFamilyMembersDataSourceMode({
+  env = getImportMetaEnv(),
+  requestedMode,
+  storedMode
+}: {
+  env?: FamilyMemberSourceEnvironment;
+  requestedMode?: string | null;
+  storedMode?: string | null;
+} = {}): FamilyMembersDataSourceMode {
+  if (!isLocalFamilyMemberSourceAllowed(env)) return 'api';
+  return requestedMode === 'local' || storedMode === 'local' ? 'local' : 'api';
+}
+
 export function getFamilyMembersDataSourceMode(): FamilyMembersDataSourceMode {
-  const envMode = typeof import.meta !== 'undefined' ? import.meta.env.FAMILY_MEMBERS_DATA_SOURCE : undefined;
-  const localMode =
-    typeof window !== 'undefined'
-      ? window.localStorage.getItem('dragon_house_family_members_data_source')
-      : null;
-  return envMode === 'local' || localMode === 'local' ? 'local' : 'api';
+  const env = getImportMetaEnv();
+  const storedMode =
+    typeof window !== 'undefined' ? window.localStorage.getItem('dragon_house_family_members_data_source') : null;
+  return resolveFamilyMembersDataSourceMode({
+    env,
+    requestedMode: (import.meta as { env?: Record<string, string | boolean | undefined> }).env
+      ?.FAMILY_MEMBERS_DATA_SOURCE as string | undefined,
+    storedMode
+  });
 }
 
 export function createFamilyMemberDataSource(mode: FamilyMembersDataSourceMode = getFamilyMembersDataSourceMode()): FamilyMemberDataSource {

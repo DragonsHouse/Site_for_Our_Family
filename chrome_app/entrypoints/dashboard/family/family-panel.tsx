@@ -45,7 +45,7 @@ export function FamilyPanel({
   onUserCreate,
   onUserProfileChange,
   onUserDeactivate,
-  membersDataSourceMode = 'local',
+  membersDataSourceMode = 'api',
   initialSection = 'home'
 }: {
   currentUser: FamilyUser;
