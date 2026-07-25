@@ -392,4 +392,5 @@ export type DiscordAccountLinkErrorCode =
   | 'discord_guild_membership_required'
   | 'discord_account_already_linked'
   | 'discord_account_linked_elsewhere'
+  | 'family_member_inactive'
   | 'family_auth_required';

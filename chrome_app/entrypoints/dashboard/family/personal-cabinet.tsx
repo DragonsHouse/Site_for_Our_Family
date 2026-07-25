@@ -12,12 +12,14 @@ export function PersonalCabinet({
   user,
   posts,
   onOpenTab,
-  onAvatarChange
+  onAvatarChange,
+  onAuthenticatedUserRefresh
 }: {
   user: FamilyUser;
   posts: FamilyPost[];
   onOpenTab: (tab: FamilyTab) => void;
   onAvatarChange: (avatarDataUrl: string | null) => void;
+  onAuthenticatedUserRefresh: () => Promise<FamilyUser | null>;
 }) {
   const [showPremiumArchive, setShowPremiumArchive] = useState(false);
   const rankProgress = getMemberRankProgress(user);
@@ -31,7 +33,7 @@ export function PersonalCabinet({
   return (
     <div className="space-y-4">
       <ProfileCard user={user} onAvatarChange={onAvatarChange} />
-      <LinkedAccountsPanel />
+      <LinkedAccountsPanel user={user} onAuthenticatedUserRefresh={onAuthenticatedUserRefresh} />
 
       <section className="dh-reward-card rounded-3xl p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

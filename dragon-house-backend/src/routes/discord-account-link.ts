@@ -106,6 +106,7 @@ function userSafeMessage(code: DiscordAccountLinkErrorCode): string {
     discord_guild_membership_required: 'Ваш Discord-акаунт не є учасником сервера Dragon House.',
     discord_account_already_linked: 'Цей Family Hub користувач уже має прив’язаний Discord.',
     discord_account_linked_elsewhere: 'Цей Discord-акаунт уже прив’язаний до іншого користувача Family Hub.',
+    family_member_inactive: 'Цей Family Hub профіль зараз неактивний.',
     family_auth_required: 'Потрібна авторизація Family Hub.',
   };
   return messages[code];
@@ -135,14 +136,12 @@ function sendCallbackResult(
       main { width: min(92vw, 520px); border: 1px solid rgba(245, 158, 11, .32); border-radius: 18px; background: rgba(15, 23, 42, .84); padding: 24px; box-shadow: 0 24px 80px rgba(0, 0, 0, .45); }
       h1 { margin: 0 0 10px; font-size: 24px; }
       p { margin: 0; color: #cbd5e1; line-height: 1.55; }
-      code { display: inline-block; margin-top: 14px; color: #fbbf24; }
     </style>
   </head>
   <body>
     <main>
       <h1>${escapeHtml(result.title)}</h1>
       <p>${escapeHtml(result.message)}</p>
-      ${result.code ? `<code>${escapeHtml(result.code)}</code>` : ''}
     </main>
   </body>
 </html>`);

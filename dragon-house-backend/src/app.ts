@@ -90,7 +90,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
         : null;
   const accountLinkOAuthService =
     dependencies.accountLinkOAuthService ??
-    new DiscordAccountLinkOAuthService(config, accountLinks, oauthStates);
+    new DiscordAccountLinkOAuthService(config, accountLinks, oauthStates, fetch, authService ? memberRepository : null);
   const memberService =
     dependencies.memberService !== undefined
       ? dependencies.memberService

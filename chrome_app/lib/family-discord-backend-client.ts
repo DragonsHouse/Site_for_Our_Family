@@ -1,4 +1,4 @@
-import type { DiscordAccountLink, DiscordConnectionStatus } from './family-types';
+import type { DiscordAccountLink, DiscordConnectionStatus } from './family-types.ts';
 
 export type DiscordBackendHealthResponse = {
   status: 'ok';
@@ -31,6 +31,33 @@ export type DiscordBackendClient = {
   startDiscordAccountLink(): Promise<{ authorizationUrl: string; expiresAt: string }>;
   unlinkDiscordAccount(): Promise<void>;
 };
+
+export type DiscordBackendRequestErrorCode =
+  | 'discord_oauth_not_configured'
+  | 'discord_oauth_state_invalid'
+  | 'discord_oauth_state_expired'
+  | 'discord_oauth_state_consumed'
+  | 'discord_oauth_denied'
+  | 'discord_token_exchange_failed'
+  | 'discord_user_fetch_failed'
+  | 'discord_guild_membership_required'
+  | 'discord_account_already_linked'
+  | 'discord_account_linked_elsewhere'
+  | 'family_member_inactive'
+  | 'family_auth_required'
+  | 'discord_link_failed';
+
+export class DiscordBackendRequestError extends Error {
+  readonly name = 'DiscordBackendRequestError';
+  readonly status: number;
+  readonly code: DiscordBackendRequestErrorCode;
+
+  constructor(status: number, code: DiscordBackendRequestErrorCode, message: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
 
 function joinApiUrl(apiBaseUrl: string, path: string): string {
   return `${apiBaseUrl.replace(/\/+$/u, '')}${path}`;
@@ -86,11 +113,33 @@ async function deleteRequest(path: string, fetcher: Fetcher): Promise<void> {
 async function createBackendError(response: Response): Promise<Error> {
   try {
     const body = (await response.json()) as { error?: string; message?: string; status?: string };
+    const code = normalizeDiscordBackendErrorCode(body.error);
     const message = body.message ?? body.error ?? body.status ?? `Discord backend request failed: ${response.status}`;
-    return new Error(message);
+    return new DiscordBackendRequestError(response.status, code, message);
   } catch {
-    return new Error(`Discord backend request failed: ${response.status}`);
+    return new DiscordBackendRequestError(response.status, 'discord_link_failed', `Discord backend request failed: ${response.status}`);
   }
+}
+
+function normalizeDiscordBackendErrorCode(value: unknown): DiscordBackendRequestErrorCode {
+  const knownCodes: DiscordBackendRequestErrorCode[] = [
+    'discord_oauth_not_configured',
+    'discord_oauth_state_invalid',
+    'discord_oauth_state_expired',
+    'discord_oauth_state_consumed',
+    'discord_oauth_denied',
+    'discord_token_exchange_failed',
+    'discord_user_fetch_failed',
+    'discord_guild_membership_required',
+    'discord_account_already_linked',
+    'discord_account_linked_elsewhere',
+    'family_member_inactive',
+    'family_auth_required',
+    'discord_link_failed',
+  ];
+  return typeof value === 'string' && knownCodes.includes(value as DiscordBackendRequestErrorCode)
+    ? (value as DiscordBackendRequestErrorCode)
+    : 'discord_link_failed';
 }
 
 export function createDiscordBackendClient(apiBaseUrl: string, fetcher: Fetcher = createFetcher(apiBaseUrl)): DiscordBackendClient {

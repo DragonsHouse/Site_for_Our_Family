@@ -128,9 +128,17 @@ describe('Discord account link routes', () => {
     );
 
     expect(result.status).toBe(400);
-    expect(result.body).toContain('discord_oauth_denied');
+    expect(result.body).toContain('Discord');
+    expect(result.body).not.toContain('discord_oauth_denied');
     expect(result.body).not.toContain('access_token');
     expect(await repository.getByFamilyMemberId('family-1')).toBeNull();
+  });
+
+  it('start requires an authenticated family context', async () => {
+    const result = await requestJson('/api/discord/account-link/start', { method: 'POST' });
+
+    expect(result.status).toBe(401);
+    expect(result.body).toMatchObject({ error: 'missing_test_family_member' });
   });
 
   it('does not return secrets in account link responses', async () => {

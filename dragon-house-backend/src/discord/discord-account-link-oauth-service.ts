@@ -8,6 +8,7 @@ import {
 import type { DiscordAccountLinkRepository } from './account-link-repository.js';
 import { DuplicateDiscordAccountLinkError } from './account-link-repository.js';
 import type { DiscordOAuthStateRepository } from './oauth-state-repository.js';
+import type { FamilyMemberRepository } from '../members/member-repository.js';
 import type { DiscordAccountLink, DiscordAccountLinkErrorCode } from '../types.js';
 
 const DISCORD_API_BASE_URL = 'https://discord.com/api/v10';
@@ -56,10 +57,19 @@ export class DiscordAccountLinkOAuthService {
     private readonly accountLinks: DiscordAccountLinkRepository,
     private readonly oauthStates: DiscordOAuthStateRepository,
     private readonly fetchImpl: FetchLike = fetch,
+    private readonly memberRepository: FamilyMemberRepository | null = null,
   ) {}
 
   async start(familyMemberId: string, now = new Date()): Promise<StartDiscordAccountLinkResult> {
     this.assertOAuthConfigured();
+    await this.assertMemberCanLink(familyMemberId);
+    if (await this.accountLinks.getByFamilyMemberId(familyMemberId)) {
+      throw new DiscordAccountLinkOAuthError(
+        'discord_account_already_linked',
+        'Family member already has a linked Discord account',
+        409,
+      );
+    }
 
     const rawState = randomBytes(32).toString('base64url');
     const stateId = hashState(rawState);
@@ -127,8 +137,14 @@ export class DiscordAccountLinkOAuthService {
     if (!consumedState.familyMemberId) {
       throw new DiscordAccountLinkOAuthError('discord_oauth_state_invalid', 'OAuth state is not linked to a Family Hub member');
     }
+    await this.assertMemberCanLink(consumedState.familyMemberId);
+
+    const token = await this.exchangeCodeForAccessToken(input.code);
+    const discordUser = await this.fetchCurrentDiscordUser(token.accessToken);
+
     const existingFamilyLink = await this.accountLinks.getByFamilyMemberId(consumedState.familyMemberId);
     if (existingFamilyLink) {
+      if (existingFamilyLink.discordUserId === discordUser.discordUserId) return { link: existingFamilyLink };
       throw new DiscordAccountLinkOAuthError(
         'discord_account_already_linked',
         'Family member already has a linked Discord account',
@@ -136,8 +152,6 @@ export class DiscordAccountLinkOAuthService {
       );
     }
 
-    const token = await this.exchangeCodeForAccessToken(input.code);
-    const discordUser = await this.fetchCurrentDiscordUser(token.accessToken);
     await this.verifyGuildMembership(token.accessToken);
 
     const existingDiscordLink = await this.accountLinks.getByDiscordUserId(discordUser.discordUserId);
@@ -169,6 +183,18 @@ export class DiscordAccountLinkOAuthService {
         );
       }
       throw error;
+    }
+  }
+
+  private async assertMemberCanLink(familyMemberId: string): Promise<void> {
+    if (!this.memberRepository) return;
+    const member = await this.memberRepository.findById(familyMemberId);
+    if (!member || member.status !== 'active' || member.deletedAt) {
+      throw new DiscordAccountLinkOAuthError(
+        'family_member_inactive',
+        'Family member is not active for Discord account linking',
+        403,
+      );
     }
   }
 

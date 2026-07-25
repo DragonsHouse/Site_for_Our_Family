@@ -774,6 +774,7 @@ export function FamilyHubApp() {
       membersDataSourceMode={memberDataSource.mode}
       initialSection={initialSection}
       onLogout={handleLogout}
+      onAuthenticatedUserRefresh={reloadAuthenticatedUser}
     />
   ) : null;
 }

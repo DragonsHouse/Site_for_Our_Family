@@ -41,7 +41,8 @@ export function FamilyShell({
   onUserDeactivate,
   membersDataSourceMode,
   initialSection,
-  onLogout
+  onLogout,
+  onAuthenticatedUserRefresh
 }: {
   currentUser: FamilyUser;
   familyUsers: FamilyUser[];
@@ -92,6 +93,7 @@ export function FamilyShell({
   membersDataSourceMode?: 'local' | 'api';
   initialSection?: FamilySection;
   onLogout: () => void;
+  onAuthenticatedUserRefresh: () => Promise<FamilyUser | null>;
 }) {
   return (
     <main className="dh-shell px-4 py-6">
@@ -136,6 +138,7 @@ export function FamilyShell({
             posts={posts}
             onOpenTab={onTabChange}
             onAvatarChange={onAvatarChange}
+            onAuthenticatedUserRefresh={onAuthenticatedUserRefresh}
           />
         ) : null}
 

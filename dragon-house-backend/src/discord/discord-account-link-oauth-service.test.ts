@@ -5,7 +5,8 @@ import {
 } from './account-link-repository.js';
 import { DiscordAccountLinkOAuthError, DiscordAccountLinkOAuthService } from './discord-account-link-oauth-service.js';
 import { InMemoryDiscordOAuthStateRepository } from './oauth-state-repository.js';
-import type { DiscordAccountLink } from '../types.js';
+import { MemoryFamilyMemberRepository } from '../members/member-repository.js';
+import type { DiscordAccountLink, FamilyMember } from '../types.js';
 
 const configuredDiscord = {
   clientId: '1527643777554972709',
@@ -29,16 +30,46 @@ function createExistingLink(familyMemberId: string, discordUserId: string): Disc
   };
 }
 
-function createService(fetchImpl = createSuccessfulDiscordFetch()) {
+function createMember(input: Partial<FamilyMember> = {}): FamilyMember {
+  const now = new Date('2026-07-17T00:00:00.000Z').toISOString();
+  return {
+    id: input.id ?? 'family-1',
+    nickname: input.nickname ?? 'FamilyMember',
+    staticId: input.staticId ?? '1001',
+    role: input.role ?? 'member',
+    rank: input.rank ?? 1,
+    status: input.status ?? 'active',
+    avatarAssetId: input.avatarAssetId ?? null,
+    notes: input.notes ?? null,
+    joinedAt: input.joinedAt ?? null,
+    permissions: input.permissions ?? [],
+    permissionsOverride: input.permissionsOverride ?? [],
+    permissionsDiscord: input.permissionsDiscord ?? [],
+    permissionsDenied: input.permissionsDenied ?? [],
+    onboardingMetadata: input.onboardingMetadata ?? {},
+    profileMetadata: input.profileMetadata ?? {},
+    deletedAt: input.deletedAt ?? null,
+    version: input.version ?? 1,
+    createdByFamilyMemberId: input.createdByFamilyMemberId ?? 'owner',
+    updatedByFamilyMemberId: input.updatedByFamilyMemberId ?? 'owner',
+    createdAt: input.createdAt ?? now,
+    updatedAt: input.updatedAt ?? now,
+    discord: input.discord,
+  };
+}
+
+function createService(fetchImpl = createSuccessfulDiscordFetch(), members: FamilyMember[] | null = null) {
   const accountLinks = new InMemoryDiscordAccountLinkRepository();
   const oauthStates = new InMemoryDiscordOAuthStateRepository();
+  const memberRepository = members ? new MemoryFamilyMemberRepository(members) : null;
   const service = new DiscordAccountLinkOAuthService(
     createTestConfig({ discord: configuredDiscord }),
     accountLinks,
     oauthStates,
     fetchImpl as typeof fetch,
+    memberRepository,
   );
-  return { service, accountLinks, oauthStates, fetchImpl };
+  return { service, accountLinks, oauthStates, fetchImpl, memberRepository };
 }
 
 function createSuccessfulDiscordFetch(discordUserId = 'discord-1') {
@@ -164,10 +195,22 @@ describe('DiscordAccountLinkOAuthService', () => {
     expect(await accountLinks.getByFamilyMemberId('family-1')).toBeNull();
   });
 
+  it('treats a same-member repeat completion as idempotent success', async () => {
+    const { service, accountLinks } = createService(createSuccessfulDiscordFetch('discord-used'));
+    const first = await startAndGetState(service);
+    const second = await startAndGetState(service);
+
+    const created = await service.complete({ code: 'code', state: first.rawState, now: validCallbackTime });
+    const repeated = await service.complete({ code: 'code', state: second.rawState, now: validCallbackTime });
+
+    expect(repeated.link).toEqual(created.link);
+    expect(await accountLinks.getByFamilyMemberId('family-1')).toEqual(created.link);
+  });
+
   it('rejects duplicate familyMemberId and duplicate discordUserId', async () => {
     const { service, accountLinks } = createService(createSuccessfulDiscordFetch('discord-used'));
-    await accountLinks.save(createExistingLink('family-1', 'discord-old'));
     const existingFamilyState = await startAndGetState(service);
+    await accountLinks.save(createExistingLink('family-1', 'discord-old'));
 
     await expect(service.complete({ code: 'code', state: existingFamilyState.rawState, now: validCallbackTime })).rejects.toMatchObject({
       code: 'discord_account_already_linked',
@@ -180,6 +223,35 @@ describe('DiscordAccountLinkOAuthService', () => {
     await expect(other.service.complete({ code: 'code', state: existingDiscordState.rawState, now: validCallbackTime })).rejects.toMatchObject({
       code: 'discord_account_linked_elsewhere',
     });
+  });
+
+  it('rejects OAuth start when the family member is already linked', async () => {
+    const { service, accountLinks } = createService(createSuccessfulDiscordFetch('discord-used'));
+    await accountLinks.save(createExistingLink('family-1', 'discord-used'));
+
+    await expect(service.start('family-1')).rejects.toMatchObject({
+      code: 'discord_account_already_linked',
+    });
+  });
+
+  it('rejects completion when the bound member became inactive or deleted', async () => {
+    const inactive = createService(createSuccessfulDiscordFetch('discord-used'), [createMember()]);
+    const inactiveState = await startAndGetState(inactive.service);
+    await inactive.memberRepository?.update('family-1', { status: 'inactive' }, 1, 'owner');
+
+    await expect(inactive.service.complete({ code: 'code', state: inactiveState.rawState, now: validCallbackTime })).rejects.toMatchObject({
+      code: 'family_member_inactive',
+    });
+    expect(await inactive.accountLinks.getByFamilyMemberId('family-1')).toBeNull();
+
+    const deleted = createService(createSuccessfulDiscordFetch('discord-used'), [createMember()]);
+    const deletedState = await startAndGetState(deleted.service);
+    await deleted.memberRepository?.softDelete('family-1', 1, 'owner');
+
+    await expect(deleted.service.complete({ code: 'code', state: deletedState.rawState, now: validCallbackTime })).rejects.toMatchObject({
+      code: 'family_member_inactive',
+    });
+    expect(await deleted.accountLinks.getByFamilyMemberId('family-1')).toBeNull();
   });
 
   it('rejects OAuth start when config is incomplete', async () => {
