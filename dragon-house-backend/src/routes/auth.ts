@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { FamilyAuthError, authErrorMessage } from '../auth/auth-errors.js';
+import { familyAuthOutcomeCode, sendAuthOutcome } from '../auth/auth-outcomes.js';
 import type { FamilyAuthService } from '../auth/auth-service.js';
 import { readBearerToken, respondWithAuthError } from '../middleware/family-auth-context.js';
 import type { FamilyPermission } from '../types.js';
@@ -36,12 +37,12 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
 
   router.post('/auth/login', async (request, response) => {
     if (!authService) {
-      response.status(503).json({ error: 'database_unavailable', message: authErrorMessage('database_unavailable') });
+      sendFamilyAuthOutcome(response, 503, 'database_unavailable');
       return;
     }
     const parsed = LoginSchema.safeParse(request.body);
     if (!parsed.success) {
-      response.status(400).json({ error: 'invalid_credentials', message: authErrorMessage('invalid_credentials') });
+      sendFamilyAuthOutcome(response, 400, 'invalid_credentials');
       return;
     }
     try {
@@ -53,12 +54,12 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
 
   router.get('/auth/me', async (request, response) => {
     if (!authService) {
-      response.status(503).json({ error: 'database_unavailable', message: authErrorMessage('database_unavailable') });
+      sendFamilyAuthOutcome(response, 503, 'database_unavailable');
       return;
     }
     const token = readBearerToken(request);
     if (!token) {
-      response.status(401).json({ error: 'session_required', message: authErrorMessage('session_required') });
+      sendFamilyAuthOutcome(response, 401, 'session_required');
       return;
     }
     try {
@@ -70,12 +71,12 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
 
   router.post('/auth/logout', async (request, response) => {
     if (!authService) {
-      response.status(503).json({ error: 'database_unavailable', message: authErrorMessage('database_unavailable') });
+      sendFamilyAuthOutcome(response, 503, 'database_unavailable');
       return;
     }
     const token = readBearerToken(request);
     if (!token) {
-      response.status(401).json({ error: 'session_required', message: authErrorMessage('session_required') });
+      sendFamilyAuthOutcome(response, 401, 'session_required');
       return;
     }
     try {
@@ -92,17 +93,17 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
 
   router.post('/auth/change-password', async (request, response) => {
     if (!authService) {
-      response.status(503).json({ error: 'database_unavailable', message: authErrorMessage('database_unavailable') });
+      sendFamilyAuthOutcome(response, 503, 'database_unavailable');
       return;
     }
     const token = readBearerToken(request);
     if (!token) {
-      response.status(401).json({ error: 'session_required', message: authErrorMessage('session_required') });
+      sendFamilyAuthOutcome(response, 401, 'session_required');
       return;
     }
     const parsed = ChangePasswordSchema.safeParse(request.body);
     if (!parsed.success) {
-      response.status(400).json({ error: 'password_too_weak', message: authErrorMessage('password_too_weak') });
+      sendFamilyAuthOutcome(response, 400, 'password_too_weak');
       return;
     }
     try {
@@ -114,12 +115,12 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
 
   router.post('/auth/users', async (request, response) => {
     if (!authService) {
-      response.status(503).json({ error: 'database_unavailable', message: authErrorMessage('database_unavailable') });
+      sendFamilyAuthOutcome(response, 503, 'database_unavailable');
       return;
     }
     const token = readBearerToken(request);
     if (!token) {
-      response.status(401).json({ error: 'session_required', message: authErrorMessage('session_required') });
+      sendFamilyAuthOutcome(response, 401, 'session_required');
       return;
     }
     const parsed = CreateAuthUserSchema.safeParse(request.body);
@@ -147,4 +148,12 @@ function normalizeLoginError(error: unknown): unknown {
     return new FamilyAuthError('invalid_credentials', 'Invalid credentials');
   }
   return error;
+}
+
+function sendFamilyAuthOutcome(
+  response: import('express').Response,
+  status: number,
+  code: Parameters<typeof familyAuthOutcomeCode>[0],
+): void {
+  sendAuthOutcome(response, status, code, authErrorMessage(code), familyAuthOutcomeCode(code));
 }

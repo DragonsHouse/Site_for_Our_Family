@@ -93,8 +93,9 @@ export class FamilyAuthService {
     }
 
     const user = await this.repository.findUserByFamilyMemberId(session.familyMemberId);
-    if (!user || !user.isActive) throw new FamilyAuthError('session_invalid', 'Session invalid');
-    const member = await this.loadActiveMember(session.familyMemberId, 'session_invalid');
+    if (!user) throw new FamilyAuthError('session_invalid', 'Session invalid');
+    if (!user.isActive) throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
+    const member = await this.loadActiveMember(session.familyMemberId, 'account_disabled');
     if (user.mustChangePassword && !options.allowPasswordChangeRequired) {
       throw new FamilyAuthError('password_change_required', 'Password change required', 403);
     }

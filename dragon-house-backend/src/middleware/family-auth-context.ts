@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { AppConfig } from '../config/env.js';
 import { FamilyAuthError, authErrorMessage } from '../auth/auth-errors.js';
+import { familyAuthOutcomeCode, sendAuthOutcome } from '../auth/auth-outcomes.js';
 import type { FamilyAuthService } from '../auth/auth-service.js';
 import type { FamilyAuthContext } from '../types.js';
 
@@ -24,16 +25,25 @@ export function requireFamilyAuthContext(config: AppConfig, authService: FamilyA
         return;
       }
 
-      response.status(503).json({
-        error: 'database_unavailable',
-        message: authErrorMessage('database_unavailable'),
-      });
+      sendAuthOutcome(
+        response,
+        503,
+        'database_unavailable',
+        authErrorMessage('database_unavailable'),
+        familyAuthOutcomeCode('database_unavailable'),
+      );
       return;
     }
 
     const token = readBearerToken(request);
     if (!token) {
-      response.status(401).json({ error: 'session_required', message: authErrorMessage('session_required') });
+      sendAuthOutcome(
+        response,
+        401,
+        'session_required',
+        authErrorMessage('session_required'),
+        familyAuthOutcomeCode('session_required'),
+      );
       return;
     }
 
@@ -56,8 +66,20 @@ export function readBearerToken(request: Request): string | null {
 
 export function respondWithAuthError(response: Response, error: unknown): void {
   if (error instanceof FamilyAuthError) {
-    response.status(error.httpStatus).json({ error: error.code, message: authErrorMessage(error.code) });
+    sendAuthOutcome(
+      response,
+      error.httpStatus,
+      error.code,
+      authErrorMessage(error.code),
+      familyAuthOutcomeCode(error.code),
+    );
     return;
   }
-  response.status(500).json({ error: 'session_invalid', message: authErrorMessage('session_invalid') });
+  sendAuthOutcome(
+    response,
+    500,
+    'session_invalid',
+    authErrorMessage('session_invalid'),
+    familyAuthOutcomeCode('session_invalid'),
+  );
 }

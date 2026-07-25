@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { authOutcomeBody, discordLoginOutcomeCode } from '../auth/auth-outcomes.js';
 import type { AppConfig } from '../config/env.js';
 import { DiscordOAuthLoginError, type DiscordOAuthLoginService } from '../auth/discord-oauth-login-service.js';
 import { createLogger } from '../logging/logger.js';
@@ -93,8 +94,8 @@ function toSafeOAuthLoginError(error: unknown): { code: DiscordOAuthLoginError['
   return { code: 'SESSION_CREATION_FAILED', httpStatus: 500 };
 }
 
-function safeErrorBody(code: DiscordOAuthLoginError['code']): { error: string; message: string } {
-  return { error: code, message: userSafeMessage(code) };
+function safeErrorBody(code: DiscordOAuthLoginError['code']) {
+  return authOutcomeBody(code, userSafeMessage(code), discordLoginOutcomeCode(code));
 }
 
 function userSafeMessage(code: DiscordOAuthLoginError['code']): string {
