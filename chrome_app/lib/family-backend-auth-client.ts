@@ -2,6 +2,11 @@ import { createDiscordBackendClient } from './family-discord-backend-client';
 import { readDiscordFamilySettings } from './family-discord-integration';
 import type { FamilyPermission, FamilyRole } from './family-types';
 import { assertAuthenticatedMember, type AuthenticatedMember } from './family-authenticated-member';
+import {
+  AuthOutcomeError,
+  normalizeAuthFailure,
+  shouldClearAuthSessionForOutcome,
+} from './family-outcome';
 
 export type { AuthenticatedMember } from './family-authenticated-member';
 
@@ -142,14 +147,15 @@ export async function authenticatedFetch(path: string, init: RequestInit = {}): 
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    if (response.status === 401) await setSessionToken(null);
+    let body: unknown = null;
     try {
-      const body = (await response.json()) as { message?: string; error?: string };
-      throw new Error(body.message ?? body.error ?? `Family auth request failed: ${response.status}`);
-    } catch (error) {
-      if (error instanceof Error) throw error;
-      throw new Error(`Family auth request failed: ${response.status}`);
+      body = await response.json();
+    } catch {
+      body = null;
     }
+    const failure = normalizeAuthFailure(response.status, body);
+    if (response.status === 401 && shouldClearAuthSessionForOutcome(failure.outcome.code)) await setSessionToken(null);
+    throw new AuthOutcomeError(failure);
   }
   return (await response.json()) as T;
 }
@@ -244,7 +250,9 @@ export async function restoreCurrentAuthSession(): Promise<AuthenticatedMember |
   try {
     return await getCurrentUser();
   } catch (error) {
-    await clearAuthSession();
+    if (error instanceof AuthOutcomeError && shouldClearAuthSessionForOutcome(error.failure.outcome.code)) {
+      await clearAuthSession();
+    }
     throw error;
   }
 }

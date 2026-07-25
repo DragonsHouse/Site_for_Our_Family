@@ -44,7 +44,7 @@ describe('persistent Family Hub login source contract', () => {
   it('clears only authentication data when token validation fails', async () => {
     const source = await readSource('lib/family-backend-auth-client.ts');
 
-    assert.match(source, /catch \(error\) \{\s+await clearAuthSession\(\);\s+throw error;\s+\}/u);
+    assert.match(source, /catch \(error\) \{\s+if \(error instanceof AuthOutcomeError && shouldClearAuthSessionForOutcome\(error\.failure\.outcome\.code\)\) \{\s+await clearAuthSession\(\);\s+\}\s+throw error;\s+\}/u);
     assert.match(source, /await chrome\.storage\.session\.remove\(SESSION_TOKEN_KEY\)/u);
     assert.match(source, /await chrome\.storage\.local\.remove\(PERSISTENT_SESSION_TOKEN_KEY\)/u);
     assert.match(source, /await chrome\.storage\.local\.remove\(AUTH_SESSION_MODE_KEY\)/u);
@@ -55,8 +55,9 @@ describe('persistent Family Hub login source contract', () => {
   it('clears expired or unauthorized tokens through the authenticated response path', async () => {
     const source = await readSource('lib/family-backend-auth-client.ts');
 
-    assert.match(source, /if \(response\.status === 401\) await setSessionToken\(null\);/u);
-    assert.match(source, /throw new Error\(body\.message \?\? body\.error \?\? `Family auth request failed: \$\{response\.status\}`\)/u);
+    assert.match(source, /const failure = normalizeAuthFailure\(response\.status, body\);/u);
+    assert.match(source, /if \(response\.status === 401 && shouldClearAuthSessionForOutcome\(failure\.outcome\.code\)\) await setSessionToken\(null\);/u);
+    assert.match(source, /throw new AuthOutcomeError\(failure\);/u);
   });
 
   it('logout removes auth tokens while preserving UI preferences', async () => {

@@ -13,13 +13,20 @@ import {
   login as loginBackend,
   logout as logoutBackend
 } from '../../lib/family-backend-auth-client';
+import { AuthOutcomeError, normalizeAuthFailure } from '../../lib/family-outcome';
+import {
+  type FamilyHubAuthState,
+  routeDiscordLoginFailure,
+  routePasswordLoginFailure,
+  routeRestoreFailure,
+  stateForAuthenticatedUser,
+} from '../../lib/family-onboarding-state';
 import {
   createFamilyMemberDataSource,
   type FamilyMemberCreateInput,
   type FamilyMemberUpdateInput
 } from '../../lib/family-member-data-source';
 import { loadCurrentBackendFamilyUser, resolveBackendFamilyUser } from '../../lib/family-backend-user-session';
-import { translateDiscordLoginError } from '../../lib/family-discord-login-errors';
 import { readFamilyPosts } from '../../lib/family-data';
 import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../lib/family-types';
 import { AuthStartupGate } from './auth/AuthStartupGate';
@@ -28,8 +35,6 @@ import { DragonHouseCrest } from './family/dragon-house-crest';
 import { FamilyShell } from './family/family-shell';
 import { DragonLoadingScreen } from './loading/DragonLoadingScreen';
 import { useFamilyAssetUrl } from './family/use-family-asset-url';
-
-type AuthStep = 'checking' | 'login' | 'oauth-loading' | 'oauth-success' | 'change-password' | 'loading' | 'hub';
 
 const FAMILY_TABS: FamilyTab[] = ['cabinet', 'family', 'buyers', 'events', 'map', 'resources'];
 const FAMILY_SECTIONS: FamilySection[] = [
@@ -76,16 +81,6 @@ function AuthShell({ children }: { children: React.ReactNode }) {
       </div>
     </main>
   );
-}
-
-function translateAuthError(message: string) {
-  if (message === 'Wrong password or static ID') return 'Невірний пароль або static ID';
-  if (message === 'User not found') return 'Користувача не знайдено';
-  if (message === 'User is inactive') return 'Користувач деактивований';
-  if (message === 'New password must contain at least 6 characters') {
-    return 'Новий пароль має містити щонайменше 6 символів';
-  }
-  return message;
 }
 
 function LoginScreen({
@@ -275,6 +270,48 @@ function OAuthSuccessScreen({ user, onEnter }: { user: FamilyUser; onEnter: () =
   );
 }
 
+function AuthOutcomeScreen({
+  title,
+  message,
+  primaryLabel,
+  onPrimary,
+  secondaryLabel,
+  onSecondary,
+}: {
+  title: string;
+  message: string;
+  primaryLabel: string;
+  onPrimary: () => void;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+}) {
+  return (
+    <AuthShell>
+      <section className="dh-auth-card w-full max-w-md rounded-3xl p-6 text-center">
+        <div className="mx-auto flex justify-center">
+          <DragonHouseCrest slot="dragon_house_logo" size="lg" />
+        </div>
+        <h1 className="mt-5 text-2xl font-semibold text-white">{title}</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-300">{message}</p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <button type="button" className="dh-login-submit min-w-40 px-5" onClick={onPrimary}>
+            {primaryLabel}
+          </button>
+          {secondaryLabel && onSecondary ? (
+            <button
+              type="button"
+              className="rounded-xl border border-slate-700 bg-black/25 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-slate-500 focus:outline-none focus:ring focus:ring-amber-500/30"
+              onClick={onSecondary}
+            >
+              {secondaryLabel}
+            </button>
+          ) : null}
+        </div>
+      </section>
+    </AuthShell>
+  );
+}
+
 export function FamilyHubApp() {
   migrateDragonHouseLocalData();
 
@@ -282,7 +319,7 @@ export function FamilyHubApp() {
   const memberDataSource = useMemo(() => createFamilyMemberDataSource(), []);
   const [familyUsers, setFamilyUsers] = useState<FamilyUser[]>([]);
   const [posts, setPosts] = useState<FamilyPost[]>(() => readFamilyPosts());
-  const [step, setStep] = useState<AuthStep>('checking');
+  const [authState, setAuthState] = useState<FamilyHubAuthState>({ status: 'checking' });
   const [activeTab, setActiveTab] = useState<FamilyTab>(() => getInitialFamilyTab());
   const [initialSection] = useState<FamilySection>(() => getInitialFamilySection());
   const [nickname, setNickname] = useState('');
@@ -315,48 +352,65 @@ export function FamilyHubApp() {
     const loginError = new URL(window.location.href).searchParams.get('error');
 
     if (completionCode) {
-      setStep('oauth-loading');
+      setAuthState({ status: 'oauth_loading' });
       void completeDiscordLogin(completionCode)
         .then(async (result) => {
           window.history.replaceState(null, document.title, window.location.pathname);
           const user = resolveBackendFamilyUser(result.user);
           setCurrentUser(user);
           void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
-          setStep('oauth-success');
+          setAuthState(stateForAuthenticatedUser(user, 'discord'));
         })
         .catch((err) => {
           window.history.replaceState(null, document.title, window.location.pathname);
-          void clearAuthSession().catch(() => undefined);
           setCurrentUser(null);
-          setError(err instanceof Error ? translateDiscordLoginError(err.message) : 'Discord login failed');
-          setStep('login');
+          const route = routeDiscordLoginFailure(err);
+          if (route.kind === 'inline_error') {
+            setError(route.message);
+            setAuthState({ status: 'unauthenticated', message: route.message });
+          } else {
+            setError(null);
+            setAuthState(route.state);
+          }
         });
       return;
     }
 
     if (loginStatus === 'error') {
       window.history.replaceState(null, document.title, window.location.pathname);
-      setError(loginError ?? 'Discord login failed');
-      setStep('login');
+      const route = routeDiscordLoginFailure(new AuthOutcomeError(normalizeAuthFailure(null, { error: loginError ?? 'OAUTH_STATE_INVALID' })));
+      if (route.kind === 'inline_error') {
+        setError(route.message);
+        setAuthState({ status: 'unauthenticated', message: route.message });
+      } else {
+        setError(null);
+        setAuthState(route.state);
+      }
       return;
     }
 
-    void loadCurrentBackendFamilyUser()
-      .then(async (user) => {
-        setCurrentUser(user);
-        void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
-        setStep(user.mustChangePassword ? 'change-password' : 'hub');
-      })
-      .catch(() => {
-        void clearAuthSession().catch(() => undefined);
-        setCurrentUser(null);
-        setStep('login');
-      });
+    void restoreStoredSession();
   }, []);
+
+  async function restoreStoredSession() {
+    setAuthState({ status: 'checking' });
+    try {
+      const user = await loadCurrentBackendFamilyUser();
+      setCurrentUser(user);
+      void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
+      setAuthState(stateForAuthenticatedUser(user, 'restore'));
+    } catch (err) {
+      const route = routeRestoreFailure(err);
+      if (route.clearAuthSession) await clearAuthSession().catch(() => undefined);
+      setCurrentUser(null);
+      setAuthState(route.state);
+    }
+  }
 
   async function handleLogin() {
     setLoading(true);
     setError(null);
+    setAuthState({ status: 'authenticating' });
     try {
       const result = await loginBackend(nickname, password, rememberMe);
       const user = resolveBackendFamilyUser(result.user);
@@ -365,9 +419,16 @@ export function FamilyHubApp() {
       setPosts(readFamilyPosts());
       setCurrentPassword(user.mustChangePassword ? password : '');
       setPassword('');
-      setStep(user.mustChangePassword ? 'change-password' : 'loading');
+      setAuthState(stateForAuthenticatedUser(user, 'login'));
     } catch (err) {
-      setError(err instanceof Error ? translateAuthError(err.message) : 'Не вдалося увійти');
+      const route = routePasswordLoginFailure(err);
+      if (route.kind === 'inline_error') {
+        setError(route.message);
+        setAuthState({ status: 'unauthenticated', message: route.message });
+      } else {
+        setError(null);
+        setAuthState(route.state);
+      }
     } finally {
       setLoading(false);
     }
@@ -389,9 +450,15 @@ export function FamilyHubApp() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setStep('loading');
+      setAuthState(stateForAuthenticatedUser(user, 'password-change'));
     } catch (err) {
-      setError(err instanceof Error ? translateAuthError(err.message) : 'Не вдалося змінити пароль');
+      const route = routePasswordLoginFailure(err);
+      if (route.kind === 'inline_error') {
+        setError(route.message);
+      } else {
+        setError(null);
+        setAuthState(route.state);
+      }
     } finally {
       setLoading(false);
     }
@@ -411,18 +478,20 @@ export function FamilyHubApp() {
     setConfirmPassword('');
     setError(null);
     setActiveTab('cabinet');
-    setStep('login');
+    setAuthState({ status: 'unauthenticated' });
   }
 
   async function reloadAuthenticatedUser() {
     try {
       const user = await loadCurrentBackendFamilyUser();
       setCurrentUser(user);
+      setAuthState(stateForAuthenticatedUser(user, 'restore'));
       return user;
-    } catch {
-      await clearAuthSession().catch(() => undefined);
+    } catch (err) {
+      const route = routeRestoreFailure(err);
+      if (route.clearAuthSession) await clearAuthSession().catch(() => undefined);
       setCurrentUser(null);
-      setStep('login');
+      setAuthState(route.state);
       return null;
     }
   }
@@ -433,16 +502,22 @@ export function FamilyHubApp() {
     setLoading(true);
     setError(null);
     try {
-      setStep('oauth-loading');
+      setAuthState({ status: 'oauth_loading' });
       const result = await loginWithDiscord();
       const user = resolveBackendFamilyUser(result.user);
       setCurrentUser(user);
       await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
       setPosts(readFamilyPosts());
-      setStep('oauth-success');
+      setAuthState(stateForAuthenticatedUser(user, 'discord'));
     } catch (err) {
-      setError(err instanceof Error ? translateDiscordLoginError(err.message) : 'Discord login failed');
-      setStep('login');
+      const route = routeDiscordLoginFailure(err);
+      if (route.kind === 'inline_error') {
+        setError(route.message);
+        setAuthState({ status: 'unauthenticated', message: route.message });
+      } else {
+        setError(null);
+        setAuthState(route.state);
+      }
     } finally {
       discordLoginInFlightRef.current = false;
       setLoading(false);
@@ -532,16 +607,36 @@ export function FamilyHubApp() {
     if (currentUser?.nickname === nickname) {
       await clearAuthSession().catch(() => undefined);
       setCurrentUser(null);
-      setStep('login');
+      setAuthState({ status: 'unauthenticated' });
     }
     await refreshFamilyUsers();
   }
 
-  if (step === 'login') {
+  function returnToLogin() {
+    setCurrentUser(null);
+    setError(null);
+    setPassword('');
+    setAuthState({ status: 'unauthenticated' });
+  }
+
+  function retryAuthUnavailable() {
+    if (authState.status !== 'auth_unavailable') return;
+    if (authState.retryTarget === 'restore') {
+      void restoreStoredSession();
+      return;
+    }
+    if (authState.retryTarget === 'discord') {
+      void handleDiscordLogin();
+      return;
+    }
+    setAuthState({ status: 'unauthenticated' });
+  }
+
+  if (authState.status === 'unauthenticated' || authState.status === 'authenticating') {
     return (
       <LoginScreen
         error={error}
-        loading={loading}
+        loading={loading || authState.status === 'authenticating'}
         nickname={nickname}
         password={password}
         rememberMe={rememberMe}
@@ -554,7 +649,7 @@ export function FamilyHubApp() {
     );
   }
 
-  if (step === 'checking') {
+  if (authState.status === 'checking') {
     return (
       <AuthShell>
         <AuthStartupGate />
@@ -562,7 +657,7 @@ export function FamilyHubApp() {
     );
   }
 
-  if (step === 'change-password' && currentUser) {
+  if (authState.status === 'change_password_required' && currentUser) {
     return (
       <ChangePasswordScreen
         user={currentUser}
@@ -579,16 +674,88 @@ export function FamilyHubApp() {
     );
   }
 
-  if (step === 'oauth-loading') {
+  if (authState.status === 'change_password_required') {
+    return (
+      <AuthOutcomeScreen
+        title="Потрібно змінити пароль"
+        message={authState.message ?? 'Увійди знову, щоб безпечно змінити тимчасовий пароль.'}
+        primaryLabel="Повернутися до входу"
+        onPrimary={returnToLogin}
+      />
+    );
+  }
+
+  if (authState.status === 'oauth_loading') {
     return <OAuthLoadingScreen />;
   }
 
-  if (step === 'oauth-success' && currentUser) {
-    return <OAuthSuccessScreen user={currentUser} onEnter={() => setStep('hub')} />;
+  if (authState.status === 'oauth_success' && currentUser) {
+    return <OAuthSuccessScreen user={currentUser} onEnter={() => setAuthState({ status: 'authenticated', user: currentUser })} />;
   }
 
-  if (step === 'loading' && currentUser) {
-    return <DragonLoadingScreen active={true} onComplete={() => setStep('hub')} />;
+  if (authState.status === 'loading' && currentUser) {
+    return <DragonLoadingScreen active={true} onComplete={() => setAuthState({ status: 'authenticated', user: currentUser })} />;
+  }
+
+  if (authState.status === 'session_expired') {
+    return (
+      <AuthOutcomeScreen
+        title="Сесія завершилась"
+        message="Твій попередній вхід більше не активний. Увійди знову, щоб повернутися до Family Hub."
+        primaryLabel="Увійти знову"
+        onPrimary={() => {
+          void clearAuthSession().finally(returnToLogin);
+        }}
+      />
+    );
+  }
+
+  if (authState.status === 'discord_link_required') {
+    return (
+      <AuthOutcomeScreen
+        title="Discord не прив’язаний для входу"
+        message="Цей Discord акаунт не має активної прив’язки для входу у Family Hub. Можеш увійти через Static ID/password або звернутися до адміністратора."
+        primaryLabel="Увійти через Static ID"
+        onPrimary={returnToLogin}
+        secondaryLabel="Спробувати Discord ще раз"
+        onSecondary={() => void handleDiscordLogin()}
+      />
+    );
+  }
+
+  if (authState.status === 'account_deactivated') {
+    return (
+      <AuthOutcomeScreen
+        title="Доступ вимкнено"
+        message="Цей Family Hub профіль зараз неактивний. Звернися до адміністратора, якщо доступ потрібно відновити."
+        primaryLabel="Повернутися до входу"
+        onPrimary={returnToLogin}
+      />
+    );
+  }
+
+  if (authState.status === 'member_access_denied') {
+    return (
+      <AuthOutcomeScreen
+        title="Доступ недоступний"
+        message="Family Hub не може відкрити доступ для цього входу. Звернися до адміністратора або спробуй інший спосіб входу."
+        primaryLabel="Повернутися до входу"
+        onPrimary={returnToLogin}
+      />
+    );
+  }
+
+  if (authState.status === 'auth_unavailable') {
+    return (
+      <AuthOutcomeScreen
+        title="Family Hub тимчасово недоступний"
+        message="Не вдалося перевірити доступ через backend або мережу. Якщо в тебе був збережений вхід, він не очищений автоматично."
+        primaryLabel="Спробувати ще раз"
+        onPrimary={retryAuthUnavailable}
+        secondaryLabel="Повернутися до входу"
+        onSecondary={returnToLogin}
+      />
+    );
   }
 
   return currentUser ? (
