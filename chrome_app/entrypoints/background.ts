@@ -24,6 +24,7 @@ import { getNextSlotOccurrence } from '../lib/events-time';
 import { parseQuantBuyerPage } from '../lib/quantfun-buyer-parser';
 import { parseQuantEventsPage } from '../lib/quantfun-events-parser';
 import { getSettings } from '../lib/storage';
+import { restoreCurrentAuthSession } from '../lib/family-backend-auth-client';
 import type {
   BuyerPageRecord,
   BuyerWatchRule,
@@ -327,6 +328,10 @@ async function ensureEventScheduleSyncAlarm() {
   });
 }
 
+async function restoreAuthSessionOnExtensionStartup(): Promise<void> {
+  await restoreCurrentAuthSession().catch(() => undefined);
+}
+
 async function syncEventsSchedule(): Promise<void> {
   if (isEventScheduleSyncRunning) return;
   isEventScheduleSyncRunning = true;
@@ -553,6 +558,7 @@ async function runBuyerPollingCycle(
 
 export default defineBackground(() => {
   chrome.runtime.onInstalled.addListener(() => {
+    void restoreAuthSessionOnExtensionStartup();
     void ensureBuyerSocketTransportInitialized();
     void schedulePollingFromSettings();
     void ensureEventTickAlarm();
@@ -562,6 +568,7 @@ export default defineBackground(() => {
   });
 
   chrome.runtime.onStartup.addListener(() => {
+    void restoreAuthSessionOnExtensionStartup();
     void ensureBuyerSocketTransportInitialized();
     void schedulePollingFromSettings();
     void ensureEventTickAlarm();

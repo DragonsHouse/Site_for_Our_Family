@@ -7,10 +7,12 @@ export type { AuthenticatedMember } from './family-authenticated-member';
 
 const SESSION_TOKEN_KEY = 'dragon_house_family_backend_session_token_v1';
 const PERSISTENT_SESSION_TOKEN_KEY = 'dragon_house_family_backend_persistent_session_token_v1';
+const AUTH_SESSION_MODE_KEY = 'dragon_house_family_backend_session_mode_v1';
 const DEFAULT_BACKEND_API_BASE_URL = 'http://localhost:8787';
 const DISCORD_LOGIN_REDIRECT_PATH = 'dragon-house-discord-login';
 let memorySessionToken: string | null = null;
 let memoryPersistentSessionToken: string | null = null;
+let memoryAuthSessionMode: AuthSessionMode | null = null;
 
 export type LegacyCreatedAuthUser = {
   familyMemberId: string;
@@ -43,15 +45,47 @@ export async function getDiscordBackendRuntimeConfig() {
 }
 
 export async function getSessionToken(): Promise<string | null> {
+  const mode = await getAuthSessionMode();
+  if (mode === 'persistent') {
+    const token = await getPersistentSessionToken();
+    if (!token) await clearAuthSession();
+    return token;
+  }
+  if (mode === 'session') {
+    const token = await getSessionOnlyToken();
+    if (!token) await clearAuthSession();
+    return token;
+  }
+
+  const sessionToken = await getSessionOnlyToken();
+  if (sessionToken) return sessionToken;
+  return getPersistentSessionToken();
+}
+
+async function getAuthSessionMode(): Promise<AuthSessionMode | null> {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const result = await chrome.storage.local.get(AUTH_SESSION_MODE_KEY);
+    if (result[AUTH_SESSION_MODE_KEY] === 'session' || result[AUTH_SESSION_MODE_KEY] === 'persistent') {
+      return result[AUTH_SESSION_MODE_KEY];
+    }
+  }
+  return memoryAuthSessionMode;
+}
+
+async function getSessionOnlyToken(): Promise<string | null> {
   if (typeof chrome !== 'undefined' && chrome.storage?.session) {
     const result = await chrome.storage.session.get(SESSION_TOKEN_KEY);
     if (typeof result[SESSION_TOKEN_KEY] === 'string') return result[SESSION_TOKEN_KEY];
   }
+  return memorySessionToken;
+}
+
+async function getPersistentSessionToken(): Promise<string | null> {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     const result = await chrome.storage.local.get(PERSISTENT_SESSION_TOKEN_KEY);
     return typeof result[PERSISTENT_SESSION_TOKEN_KEY] === 'string' ? result[PERSISTENT_SESSION_TOKEN_KEY] : null;
   }
-  return memorySessionToken ?? memoryPersistentSessionToken;
+  return memoryPersistentSessionToken;
 }
 
 async function setSessionToken(token: string | null, mode: AuthSessionMode = 'session'): Promise<void> {
@@ -69,6 +103,11 @@ async function setSessionToken(token: string | null, mode: AuthSessionMode = 'se
     } else if (!token || mode === 'session') {
       await chrome.storage.local.remove(PERSISTENT_SESSION_TOKEN_KEY);
     }
+    if (token) {
+      await chrome.storage.local.set({ [AUTH_SESSION_MODE_KEY]: mode });
+    } else {
+      await chrome.storage.local.remove(AUTH_SESSION_MODE_KEY);
+    }
   }
   if (mode === 'session') {
     memorySessionToken = token;
@@ -77,9 +116,11 @@ async function setSessionToken(token: string | null, mode: AuthSessionMode = 'se
     memoryPersistentSessionToken = token;
     if (token) memorySessionToken = null;
   }
+  memoryAuthSessionMode = token ? mode : null;
   if (!token) {
     memorySessionToken = null;
     memoryPersistentSessionToken = null;
+    memoryAuthSessionMode = null;
   }
 }
 
@@ -195,6 +236,17 @@ export async function loginWithDiscord(): Promise<LoginResponse> {
 
 export async function getCurrentUser(): Promise<AuthenticatedMember> {
   return parseAuthenticatedMemberResponse(await authenticatedFetch('/api/auth/me', { method: 'GET' }));
+}
+
+export async function restoreCurrentAuthSession(): Promise<AuthenticatedMember | null> {
+  const token = await getSessionToken();
+  if (!token) return null;
+  try {
+    return await getCurrentUser();
+  } catch (error) {
+    await clearAuthSession();
+    throw error;
+  }
 }
 
 export async function logout(): Promise<void> {
