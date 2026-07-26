@@ -69,6 +69,15 @@ export function createFamilyMembersRouter(
     }
   });
 
+  router.get('/family/directory/:memberId', async (request, response) => {
+    if (!memberService || !request.familyAuth) return respondServiceUnavailable(response);
+    try {
+      response.json(await memberService.getDirectoryMember(String(request.params.memberId), request.familyAuth));
+    } catch (error) {
+      respondMemberError(response, error);
+    }
+  });
+
   const listMembers = async (request: import('express').Request, response: import('express').Response) => {
     if (!memberService || !request.familyAuth) return respondServiceUnavailable(response);
     try {

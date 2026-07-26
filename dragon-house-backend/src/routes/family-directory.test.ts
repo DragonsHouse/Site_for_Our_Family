@@ -252,6 +252,77 @@ describe('family member directory route', () => {
     expect(invalid.items.map((item) => item.memberId)).toEqual(['owner-id', 'alpha-id']);
   });
 
+  it('returns safe public details for active members and rejects unauthenticated requests', async () => {
+    const { baseUrl } = await createHarness();
+    const token = await login(baseUrl, 'Alpha_Dragons', '101');
+
+    const unauthenticated = await fetch(`${baseUrl}/api/family/directory/owner-id`);
+    const response = await fetch(`${baseUrl}/api/family/directory/owner-id`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await response.json() as Record<string, unknown>;
+
+    expect(unauthenticated.status).toBe(401);
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      memberId: 'owner-id',
+      displayName: 'Owner Server',
+      role: 'owner',
+      rank: { level: 10, title: null },
+      status: 'active',
+      avatarUrl: 'data:image/png;base64,owner',
+      joinedAt: '2026-01-01T00:00:00.000Z',
+      discord: {
+        linked: true,
+        displayName: 'Owner Server',
+        serverNickname: 'Owner Server',
+        avatarUrl: 'https://cdn.example.test/owner.png',
+      },
+      profile: { summary: null },
+    });
+    expect(JSON.stringify(body)).not.toContain('staticId');
+    expect(JSON.stringify(body)).not.toContain('discordUserId');
+    expect(JSON.stringify(body)).not.toContain('permissions');
+    expect(JSON.stringify(body)).not.toContain('notes');
+    expect(JSON.stringify(body)).not.toContain('Metadata');
+    expect(JSON.stringify(body)).not.toContain('version');
+    expect(JSON.stringify(body)).not.toContain('deletedAt');
+    expect(JSON.stringify(body)).not.toContain('session');
+    expect(JSON.stringify(body)).not.toContain('password');
+    expect(JSON.stringify(body)).not.toContain('oauth');
+  });
+
+  it('requires view_members for inactive public details and returns 404 for missing or deleted targets', async () => {
+    const { baseUrl } = await createHarness();
+    const ordinaryToken = await login(baseUrl, 'Alpha_Dragons', '101');
+    const privilegedToken = await login(baseUrl, 'Owner_Dragons', '100');
+
+    const inactiveDenied = await fetch(`${baseUrl}/api/family/directory/beta-id`, {
+      headers: { Authorization: `Bearer ${ordinaryToken}` },
+    });
+    const inactiveAllowed = await fetch(`${baseUrl}/api/family/directory/beta-id`, {
+      headers: { Authorization: `Bearer ${privilegedToken}` },
+    });
+    const missing = await fetch(`${baseUrl}/api/family/directory/missing-id`, {
+      headers: { Authorization: `Bearer ${privilegedToken}` },
+    });
+    const deleted = await fetch(`${baseUrl}/api/family/directory/deleted-id`, {
+      headers: { Authorization: `Bearer ${privilegedToken}` },
+    });
+    const inactiveBody = await inactiveAllowed.json() as Record<string, unknown>;
+
+    expect(inactiveDenied.status).toBe(403);
+    expect(inactiveAllowed.status).toBe(200);
+    expect(inactiveBody).toMatchObject({
+      memberId: 'beta-id',
+      status: 'inactive',
+      discord: { linked: false, displayName: null, serverNickname: null, avatarUrl: null },
+      profile: { summary: null },
+    });
+    expect(missing.status).toBe(404);
+    expect(deleted.status).toBe(404);
+  });
+
   it('keeps existing management list and legacy alias contracts unchanged', async () => {
     const { baseUrl } = await createHarness();
     const token = await login(baseUrl, 'Owner_Dragons', '100');

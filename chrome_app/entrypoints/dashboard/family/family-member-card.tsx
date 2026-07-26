@@ -13,12 +13,31 @@ function avatarLabel(member: FamilyMemberDirectoryItem): string {
   return `${member.displayName} avatar`;
 }
 
-export function FamilyMemberCard({ member }: { member: FamilyMemberDirectoryItem }) {
+export function FamilyMemberCard({
+  member,
+  onOpen,
+}: {
+  member: FamilyMemberDirectoryItem;
+  onOpen: (member: FamilyMemberDirectoryItem) => void;
+}) {
   const avatarUrl = member.avatarUrl ?? member.discord.avatarUrl;
   const statusLabel = member.status === 'inactive' ? 'Inactive' : 'Active';
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onOpen(member);
+  }
+
   return (
-    <article className="dh-card flex h-full min-h-[252px] flex-col gap-4 rounded-2xl p-4">
+    <article
+      role="button"
+      tabIndex={0}
+      aria-label={`Open public profile for ${member.displayName}`}
+      onClick={() => onOpen(member)}
+      onKeyDown={handleKeyDown}
+      className="dh-card flex h-full min-h-[252px] cursor-pointer flex-col gap-4 rounded-2xl p-4 outline-none transition hover:border-amber-500/40 focus-visible:ring focus-visible:ring-amber-500/40"
+    >
       <div className="flex items-start gap-3">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-amber-500/25 bg-black/35">
           {avatarUrl ? (
@@ -57,14 +76,9 @@ export function FamilyMemberCard({ member }: { member: FamilyMemberDirectoryItem
         </div>
       </dl>
 
-      <button
-        type="button"
-        disabled
-        aria-label={`Member details for ${member.displayName} are coming soon`}
-        className="mt-auto rounded-xl border border-slate-700 bg-black/20 px-3 py-2 text-sm text-slate-500 disabled:cursor-not-allowed"
-      >
-        Coming soon
-      </button>
+      <div className="mt-auto rounded-xl border border-slate-700 bg-black/20 px-3 py-2 text-center text-sm font-semibold text-slate-200">
+        View profile
+      </div>
     </article>
   );
 }

@@ -9,7 +9,9 @@ import {
   type FamilyMemberDirectoryStatusFilter,
   type FamilyMemberDirectoryResponse,
 } from '../../../lib/family-member-directory-client';
+import type { FamilyUser } from '../../../lib/family-types';
 import { FamilyMemberCard } from './family-member-card';
+import { FamilyMemberDetails } from './family-member-details';
 
 const PAGE_SIZE = 24;
 const ROLE_OPTIONS: Array<{ value: FamilyMemberDirectoryRoleFilter; label: string }> = [
@@ -49,6 +51,7 @@ type DirectoryUrlState = {
   status: FamilyMemberDirectoryStatusFilter;
   sort: FamilyMemberDirectorySort;
   order: FamilyMemberDirectoryOrder;
+  memberId: string | null;
 };
 
 const DEFAULT_DIRECTORY_URL_STATE: DirectoryUrlState = {
@@ -58,6 +61,7 @@ const DEFAULT_DIRECTORY_URL_STATE: DirectoryUrlState = {
   status: 'active',
   sort: 'rank',
   order: 'desc',
+  memberId: null,
 };
 
 function selectClassName() {
@@ -73,6 +77,7 @@ function readDirectoryUrlState(): DirectoryUrlState {
     status: parseOption(params.get('status'), STATUS_OPTIONS, DEFAULT_DIRECTORY_URL_STATE.status),
     sort: parseOption(params.get('sort'), SORT_OPTIONS, DEFAULT_DIRECTORY_URL_STATE.sort),
     order: parseOption(params.get('order'), ORDER_OPTIONS, DEFAULT_DIRECTORY_URL_STATE.order),
+    memberId: params.get('member')?.trim() || null,
   };
 }
 
@@ -98,6 +103,8 @@ function writeDirectoryUrlState(state: DirectoryUrlState, mode: 'push' | 'replac
   url.searchParams.set('status', state.status);
   url.searchParams.set('sort', state.sort);
   url.searchParams.set('order', state.order);
+  if (state.memberId) url.searchParams.set('member', state.memberId);
+  else url.searchParams.delete('member');
   if (url.href === window.location.href) return;
   if (mode === 'push') window.history.pushState(null, document.title, url);
   else window.history.replaceState(null, document.title, url);
@@ -126,17 +133,29 @@ function SkeletonCards() {
   );
 }
 
-function DirectoryGrid({ members }: { members: FamilyMemberDirectoryItem[] }) {
+function DirectoryGrid({
+  members,
+  onOpenMember,
+}: {
+  members: FamilyMemberDirectoryItem[];
+  onOpenMember: (member: FamilyMemberDirectoryItem) => void;
+}) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
       {members.map((member) => (
-        <FamilyMemberCard key={member.memberId} member={member} />
+        <FamilyMemberCard key={member.memberId} member={member} onOpen={onOpenMember} />
       ))}
     </div>
   );
 }
 
-export function FamilyMembersDirectory() {
+export function FamilyMembersDirectory({
+  currentUser,
+  onOpenOwnProfile,
+}: {
+  currentUser: FamilyUser;
+  onOpenOwnProfile: () => void;
+}) {
   const client = useMemo(() => new FamilyMemberDirectoryClient(), []);
   const initialUrlState = useMemo(() => readDirectoryUrlState(), []);
   const [searchDraft, setSearchDraft] = useState(initialUrlState.search);
@@ -146,6 +165,7 @@ export function FamilyMembersDirectory() {
   const [sort, setSort] = useState<FamilyMemberDirectorySort>(initialUrlState.sort);
   const [order, setOrder] = useState<FamilyMemberDirectoryOrder>(initialUrlState.order);
   const [page, setPage] = useState(initialUrlState.page);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(initialUrlState.memberId);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [state, setState] = useState<DirectoryState>({ status: 'loading', data: null });
   const didMountSearchRef = useRef(false);
@@ -170,6 +190,7 @@ export function FamilyMembersDirectory() {
       setSort(next.sort);
       setOrder(next.order);
       setPage(next.page);
+      setSelectedMemberId(next.memberId);
       writeDirectoryUrlState(next, 'replace');
     }
 
@@ -178,12 +199,12 @@ export function FamilyMembersDirectory() {
   }, []);
 
   useEffect(() => {
-    const next = { page, search: debouncedSearch.trim(), role, status, sort, order };
+    const next = { page, search: debouncedSearch.trim(), role, status, sort, order, memberId: selectedMemberId };
     const signature = directoryUrlSignature(next);
     if (signature === lastUrlSignatureRef.current) return;
     lastUrlSignatureRef.current = signature;
     writeDirectoryUrlState(next, 'push');
-  }, [debouncedSearch, order, page, role, sort, status]);
+  }, [debouncedSearch, order, page, role, selectedMemberId, sort, status]);
 
   useEffect(() => {
     if (!didMountSearchRef.current) {
@@ -202,6 +223,11 @@ export function FamilyMembersDirectory() {
   }, [searchDraft]);
 
   useEffect(() => {
+    if (selectedMemberId) {
+      requestAbortRef.current?.abort();
+      requestSequenceRef.current += 1;
+      return;
+    }
     requestAbortRef.current?.abort();
     const controller = new AbortController();
     requestAbortRef.current = controller;
@@ -241,7 +267,7 @@ export function FamilyMembersDirectory() {
       if (requestAbortRef.current === controller) requestAbortRef.current = null;
       controller.abort();
     };
-  }, [client, debouncedSearch, order, page, refreshNonce, role, sort, status]);
+  }, [client, debouncedSearch, order, page, refreshNonce, role, selectedMemberId, sort, status]);
 
   const data = 'data' in state ? state.data : null;
   const members = data?.items ?? [];
@@ -250,6 +276,31 @@ export function FamilyMembersDirectory() {
   function retry() {
     setRefreshNonce((current) => current + 1);
     setState({ status: 'loading', data });
+  }
+
+  function openMember(member: FamilyMemberDirectoryItem) {
+    setSelectedMemberId(member.memberId);
+  }
+
+  function backToMembers() {
+    setSelectedMemberId(null);
+  }
+
+  function openOwnProfile() {
+    setSelectedMemberId(null);
+    onOpenOwnProfile();
+  }
+
+  if (selectedMemberId) {
+    return (
+      <FamilyMemberDetails
+        memberId={selectedMemberId}
+        currentUser={currentUser}
+        client={client}
+        onBack={backToMembers}
+        onOpenOwnProfile={openOwnProfile}
+      />
+    );
   }
 
   return (
@@ -374,7 +425,7 @@ export function FamilyMembersDirectory() {
         <div className="dh-panel rounded-2xl p-8 text-center text-slate-400">No dragons found.</div>
       ) : null}
 
-      {state.status === 'ready' ? <DirectoryGrid members={members} /> : null}
+      {state.status === 'ready' ? <DirectoryGrid members={members} onOpenMember={openMember} /> : null}
 
       {pagination ? (
         <nav className="dh-panel flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Members pagination">

@@ -146,7 +146,7 @@ export function FamilyShell({
 
         {activeTab === 'profile' ? <FamilyProfile user={currentUser} /> : null}
 
-        {activeTab === 'members' ? <FamilyMembersDirectory /> : null}
+        {activeTab === 'members' ? <FamilyMembersDirectory currentUser={currentUser} onOpenOwnProfile={() => onTabChange('profile')} /> : null}
 
         {activeTab === 'family' ? (
           <FamilyPanel
@@ -172,7 +172,8 @@ export function FamilyShell({
 
         {activeTab === 'events' ? (
           <>
-            <ModuleIntro title="Івенти" description="Події, таймери й нагадування." />
+            {/* Future Calendar includes family events, meetings, quests/deadlines, tournaments, celebrations, Dragon House anniversaries and member birthdays. */}
+            <ModuleIntro title="Календар" description="Події, таймери й нагадування." />
             <DashboardApp familyTab="events" />
           </>
         ) : null}

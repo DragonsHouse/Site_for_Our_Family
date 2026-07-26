@@ -6,7 +6,7 @@ const TABS: Array<{ key: FamilyTab; label: string }> = [
   { key: 'cabinet', label: 'Мій кабінет' },
   { key: 'family', label: "Сім’я" },
   { key: 'buyers', label: 'Скупники' },
-  { key: 'events', label: 'Івенти' },
+  { key: 'events', label: 'Календар' },
   { key: 'map', label: 'Мапа' },
   { key: 'resources', label: 'Ресурси' }
 ];

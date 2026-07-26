@@ -38,6 +38,12 @@ export type FamilyMemberDirectoryResponse = {
   };
 };
 
+export type FamilyMemberPublicDetails = FamilyMemberDirectoryItem & {
+  profile: {
+    summary: string | null;
+  };
+};
+
 export type FamilyMemberDirectoryQuery = {
   page?: number;
   pageSize?: number;
@@ -63,7 +69,13 @@ export class FamilyMemberDirectoryClient {
   async listMembers(query: FamilyMemberDirectoryQuery = {}, signal?: AbortSignal): Promise<FamilyMemberDirectoryResponse> {
     const params = toDirectorySearchParams(query);
     const path = `/api/family/directory${params.size ? `?${params.toString()}` : ''}`;
-    return parseDirectoryResponse(await authenticatedFetch(path, { method: 'GET', signal }));
+    return parseDirectoryResponse<FamilyMemberDirectoryResponse>(await authenticatedFetch(path, { method: 'GET', signal }));
+  }
+
+  async getMember(memberId: string, signal?: AbortSignal): Promise<FamilyMemberPublicDetails> {
+    return parseDirectoryResponse<FamilyMemberPublicDetails>(
+      await authenticatedFetch(`/api/family/directory/${encodeURIComponent(memberId)}`, { method: 'GET', signal }),
+    );
   }
 }
 
@@ -80,7 +92,7 @@ export function toDirectorySearchParams(query: FamilyMemberDirectoryQuery): URLS
   return params;
 }
 
-async function parseDirectoryResponse(response: Response): Promise<FamilyMemberDirectoryResponse> {
+async function parseDirectoryResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let body: unknown = null;
     try {
@@ -95,7 +107,7 @@ async function parseDirectoryResponse(response: Response): Promise<FamilyMemberD
       typeof record.message === 'string' ? record.message : `Directory request failed: ${response.status}`,
     );
   }
-  return (await response.json()) as FamilyMemberDirectoryResponse;
+  return (await response.json()) as T;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

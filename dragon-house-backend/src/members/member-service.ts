@@ -12,8 +12,10 @@ import type {
 import { FamilyMemberError } from './member-errors.js';
 import {
   toFamilyMemberDirectoryItemDto,
+  toFamilyMemberPublicDetailsDto,
   type FamilyMemberDirectoryQuery,
   type FamilyMemberDirectoryResponseDto,
+  type FamilyMemberPublicDetailsDto,
 } from './member-directory-dto.js';
 import type { FamilyMemberAuditAction, FamilyMemberRepository } from './member-repository.js';
 
@@ -72,6 +74,18 @@ export class FamilyMemberService {
         hasPreviousPage: result.page > 1 && totalPages > 0,
       },
     };
+  }
+
+  async getDirectoryMember(id: string, auth: FamilyAuthContext): Promise<FamilyMemberPublicDetailsDto> {
+    if (auth.status !== 'active') {
+      throw new FamilyMemberError('MEMBER_PERMISSION_DENIED', 'Inactive members cannot view the directory', 403);
+    }
+    const member = await this.repository.findById(id);
+    if (!member || member.deletedAt) throw new FamilyMemberError('MEMBER_NOT_FOUND', 'Member not found', 404);
+    if (member.status === 'inactive' && !this.hasPermission(auth, 'view_members')) {
+      throw new FamilyMemberError('MEMBER_PERMISSION_DENIED', 'Permission denied', 403, { permission: 'view_members' });
+    }
+    return toFamilyMemberPublicDetailsDto(member);
   }
 
   async get(id: string, auth: FamilyAuthContext): Promise<FamilyMember> {

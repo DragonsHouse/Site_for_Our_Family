@@ -44,6 +44,28 @@ export type FamilyMemberDirectoryResponseDto = {
   };
 };
 
+export type FamilyMemberPublicDetailsDto = {
+  memberId: string;
+  displayName: string;
+  role: FamilyRole;
+  rank: {
+    level: number;
+    title: string | null;
+  };
+  status: FamilyMemberStatus;
+  avatarUrl: string | null;
+  joinedAt: string | null;
+  discord: {
+    linked: boolean;
+    displayName: string | null;
+    serverNickname: string | null;
+    avatarUrl: string | null;
+  };
+  profile: {
+    summary: string | null;
+  };
+};
+
 export function toFamilyMemberDirectoryItemDto(member: FamilyMember): FamilyMemberDirectoryItemDto {
   const serverNickname = stringOrNull(member.discord?.discordServerNickname);
   const discordDisplayName =
@@ -66,6 +88,31 @@ export function toFamilyMemberDirectoryItemDto(member: FamilyMember): FamilyMemb
       avatarUrl: safeUrl(member.discord?.discordAvatar),
     },
     joinedAt: member.joinedAt ?? null,
+  };
+}
+
+export function toFamilyMemberPublicDetailsDto(member: FamilyMember): FamilyMemberPublicDetailsDto {
+  const item = toFamilyMemberDirectoryItemDto(member);
+  return {
+    memberId: item.memberId,
+    displayName: item.displayName,
+    role: item.role,
+    rank: {
+      level: item.rank.level,
+      title: item.rank.title,
+    },
+    status: item.status,
+    avatarUrl: item.avatarUrl,
+    joinedAt: item.joinedAt,
+    discord: {
+      linked: item.discord.linked,
+      displayName: item.discord.displayName,
+      serverNickname: item.discord.serverNickname,
+      avatarUrl: item.discord.avatarUrl,
+    },
+    profile: {
+      summary: null,
+    },
   };
 }
 
