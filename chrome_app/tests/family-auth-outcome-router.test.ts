@@ -200,6 +200,7 @@ function familyUser(overrides: Partial<FamilyUser> = {}): FamilyUser {
     discordUserId: null,
     discordUsername: null,
     discordDisplayName: null,
+    discordServerNickname: null,
     discordAvatarUrl: null,
     discordLinkedAt: null,
     discordSyncedAt: null,

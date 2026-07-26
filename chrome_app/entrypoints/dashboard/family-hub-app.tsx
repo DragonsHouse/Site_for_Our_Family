@@ -38,7 +38,7 @@ import { FamilyShell } from './family/family-shell';
 import { DragonLoadingScreen } from './loading/DragonLoadingScreen';
 import { useFamilyAssetUrl } from './family/use-family-asset-url';
 
-const FAMILY_TABS: FamilyTab[] = ['cabinet', 'family', 'buyers', 'events', 'map', 'resources'];
+const FAMILY_TABS: FamilyTab[] = ['cabinet', 'profile', 'family', 'buyers', 'events', 'map', 'resources'];
 const FAMILY_SECTIONS: FamilySection[] = [
   'home',
   'feed',

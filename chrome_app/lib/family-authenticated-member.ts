@@ -45,6 +45,7 @@ export type AuthenticatedMember = {
     userId: string | null;
     username: string | null;
     displayName: string | null;
+    serverNickname: string | null;
     avatar: string | null;
     guildId: string | null;
     lastSyncedAt: string | null;
@@ -100,6 +101,7 @@ export function assertAuthenticatedMember(value: unknown): AuthenticatedMember {
     !isNullableString(discord.userId) ||
     !isNullableString(discord.username) ||
     !isNullableString(discord.displayName) ||
+    !isNullableString(discord.serverNickname) ||
     !isNullableString(discord.avatar) ||
     !isNullableString(discord.guildId) ||
     !isNullableString(discord.lastSyncedAt) ||

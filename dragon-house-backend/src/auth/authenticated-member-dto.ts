@@ -35,6 +35,7 @@ export type AuthenticatedMemberDto = {
     userId: string | null;
     username: string | null;
     displayName: string | null;
+    serverNickname: string | null;
     avatar: string | null;
     guildId: string | null;
     lastSyncedAt: string | null;
@@ -69,6 +70,7 @@ export function createAuthenticatedMemberDto(
       userId: member.discord?.discordUserId ?? null,
       username: member.discord?.discordUsername ?? null,
       displayName: discordDisplayName(member),
+      serverNickname: member.discord?.discordServerNickname?.trim() || null,
       avatar: member.discord?.discordAvatar ?? null,
       guildId: member.discord?.guildId ?? null,
       lastSyncedAt: member.discord?.lastSyncedAt ?? null,

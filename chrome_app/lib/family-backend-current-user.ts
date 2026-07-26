@@ -53,6 +53,7 @@ export function createBackendCurrentFamilyUser(member: AuthenticatedMember): Fam
     discordUserId: member.discord.userId,
     discordUsername: member.discord.username,
     discordDisplayName: member.discord.displayName,
+    discordServerNickname: member.discord.serverNickname,
     discordAvatarUrl: member.discord.avatar,
     discordLinkedAt: null,
     discordSyncedAt: member.discord.lastSyncedAt,

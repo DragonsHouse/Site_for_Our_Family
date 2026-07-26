@@ -646,6 +646,7 @@ export type FamilyUser = FamilySyncMetadata & {
   discordUserId?: string | null;
   discordUsername?: string | null;
   discordDisplayName?: string | null;
+  discordServerNickname?: string | null;
   discordAvatarUrl?: string | null;
   discordLinkedAt?: string | null;
   discordSyncedAt?: string | null;
@@ -878,7 +879,7 @@ export type QuantNewsAdapter = {
   loadLatest: () => Promise<QuantNewsItem[]>;
 };
 
-export type FamilyTab = 'cabinet' | 'family' | 'buyers' | 'events' | 'map' | 'resources';
+export type FamilyTab = 'cabinet' | 'profile' | 'family' | 'buyers' | 'events' | 'map' | 'resources';
 
 export type FamilySection =
   | 'home'

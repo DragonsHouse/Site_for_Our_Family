@@ -20,6 +20,7 @@ const canonicalMember: AuthenticatedMember = {
     userId: 'discord-1',
     username: 'backend_dragon',
     displayName: 'Discord Display',
+    serverNickname: 'Server Dragon',
     avatar: 'https://cdn.discordapp.com/avatar.png',
     guildId: 'guild-1',
     lastSyncedAt: '2026-07-22T00:00:00.000Z',
@@ -50,6 +51,7 @@ describe('assertAuthenticatedMember', () => {
         userId: null,
         username: null,
         displayName: null,
+        serverNickname: null,
         avatar: null,
         guildId: null,
         lastSyncedAt: null,
@@ -94,6 +96,7 @@ describe('createBackendCurrentFamilyUser', () => {
     assert.equal(user.passwordHash, null);
     assert.equal(user.discordUserId, 'discord-1');
     assert.equal(user.discordLinkStatus, 'linked');
+    assert.equal(user.discordServerNickname, 'Server Dragon');
     assert.equal(user.onboarding?.state, 'static_id_required');
   });
 

@@ -524,6 +524,7 @@ function createAuthenticatedMember(): AuthenticatedMemberDto {
       userId: 'discord-1',
       username: 'anastasia_dragons',
       displayName: 'Anastasia_Dragons',
+      serverNickname: 'Anastasia_Dragons',
       avatar: null,
       guildId: '936687501316354068',
       lastSyncedAt: null,

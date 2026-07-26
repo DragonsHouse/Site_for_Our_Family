@@ -5,6 +5,7 @@ import { FAMILY_MAP_REFERENCES } from '../../../lib/family-repositories';
 import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../../lib/family-types';
 import { DragonHouseCrest } from './dragon-house-crest';
 import { FamilyPanel } from './family-panel';
+import { FamilyProfile } from './family-profile';
 import { FamilyTabs } from './family-tabs';
 import { PersonalCabinet } from './personal-cabinet';
 import { ResourcesPanel } from './resources-panel';
@@ -141,6 +142,8 @@ export function FamilyShell({
             onAuthenticatedUserRefresh={onAuthenticatedUserRefresh}
           />
         ) : null}
+
+        {activeTab === 'profile' ? <FamilyProfile user={currentUser} /> : null}
 
         {activeTab === 'family' ? (
           <FamilyPanel
