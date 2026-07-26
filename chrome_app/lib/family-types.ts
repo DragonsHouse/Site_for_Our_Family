@@ -879,7 +879,7 @@ export type QuantNewsAdapter = {
   loadLatest: () => Promise<QuantNewsItem[]>;
 };
 
-export type FamilyTab = 'cabinet' | 'profile' | 'family' | 'buyers' | 'events' | 'map' | 'resources';
+export type FamilyTab = 'cabinet' | 'profile' | 'members' | 'family' | 'buyers' | 'events' | 'map' | 'resources';
 
 export type FamilySection =
   | 'home'

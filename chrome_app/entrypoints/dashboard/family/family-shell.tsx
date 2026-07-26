@@ -4,6 +4,7 @@ import { canManageFamilyMap } from '../../../lib/family-permissions';
 import { FAMILY_MAP_REFERENCES } from '../../../lib/family-repositories';
 import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../../lib/family-types';
 import { DragonHouseCrest } from './dragon-house-crest';
+import { FamilyMembersDirectory } from './family-members-directory';
 import { FamilyPanel } from './family-panel';
 import { FamilyProfile } from './family-profile';
 import { FamilyTabs } from './family-tabs';
@@ -144,6 +145,8 @@ export function FamilyShell({
         ) : null}
 
         {activeTab === 'profile' ? <FamilyProfile user={currentUser} /> : null}
+
+        {activeTab === 'members' ? <FamilyMembersDirectory /> : null}
 
         {activeTab === 'family' ? (
           <FamilyPanel

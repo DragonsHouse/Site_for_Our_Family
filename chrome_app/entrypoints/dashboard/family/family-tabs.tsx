@@ -2,6 +2,7 @@ import type { FamilyTab } from '../../../lib/family-types';
 
 const TABS: Array<{ key: FamilyTab; label: string }> = [
   { key: 'profile', label: 'Profile' },
+  { key: 'members', label: 'Members' },
   { key: 'cabinet', label: 'Мій кабінет' },
   { key: 'family', label: "Сім’я" },
   { key: 'buyers', label: 'Скупники' },
