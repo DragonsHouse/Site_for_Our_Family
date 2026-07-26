@@ -23,8 +23,8 @@ body {
 }
 
 :root {
-  --dh-bg: #090909;
-  --dh-bg-deep: #0d0d0d;
+  --dh-bg: #050403;
+  --dh-bg-deep: #0b0806;
   --dh-graphite: #151515;
   --dh-graphite-2: #191919;
   --dh-graphite-3: #1e1e1e;
@@ -36,13 +36,13 @@ body {
   --dh-text: #f4f1ec;
   --dh-text-soft: #aaa39a;
   --dh-text-muted: #77736d;
-  --dh-red-dark: #8f120c;
-  --dh-red: #b91c12;
-  --dh-red-hot: #d52a17;
-  --dh-orange: #f04a16;
-  --dh-orange-hot: #ff6a00;
-  --dh-gold: #d99a24;
-  --dh-gold-soft: #f2b84b;
+  --dh-red-dark: #4b0904;
+  --dh-red: #8b0000;
+  --dh-red-hot: #ff1a00;
+  --dh-orange: #ff5a00;
+  --dh-orange-hot: #ff5a00;
+  --dh-gold: #ff5a00;
+  --dh-gold-soft: #ff8b00;
   --dh-success: #8fa66a;
 }
 
@@ -97,8 +97,8 @@ body {
   background:
     radial-gradient(ellipse at 50% 42%, rgba(255, 122, 28, 0.15), transparent 31rem),
     radial-gradient(ellipse at 50% 76%, rgba(150, 44, 18, 0.15), transparent 44rem),
-    radial-gradient(ellipse at 9% 82%, rgba(255, 106, 0, 0.10), transparent 24rem),
-    radial-gradient(ellipse at 91% 84%, rgba(255, 106, 0, 0.09), transparent 24rem),
+    radial-gradient(ellipse at 9% 82%, rgba(255, 26, 0, 0.08), transparent 24rem),
+    radial-gradient(ellipse at 91% 84%, rgba(255, 26, 0, 0.07), transparent 24rem),
     linear-gradient(90deg, rgba(0, 0, 0, 0.74), rgba(9, 7, 6, 0.18) 34%, rgba(9, 7, 6, 0.18) 66%, rgba(0, 0, 0, 0.76)),
     linear-gradient(180deg, rgba(4, 3, 3, 0.22), rgba(7, 5, 4, 0.58));
   pointer-events: none;
@@ -129,7 +129,7 @@ body {
   border-radius: 50% 50% 8% 8%;
   border-top: 1px solid rgba(244, 151, 71, 0.10);
   background:
-    radial-gradient(ellipse at 50% 76%, rgba(255, 106, 0, 0.10), transparent 18rem),
+    radial-gradient(ellipse at 50% 76%, rgba(255, 26, 0, 0.08), transparent 18rem),
     linear-gradient(180deg, rgba(74, 48, 35, 0.13), rgba(8, 7, 6, 0));
   mask-image: radial-gradient(ellipse at 50% 22%, transparent 0 22%, #000 23% 55%, transparent 72%);
 }
@@ -140,10 +140,10 @@ body {
   height: auto;
   background:
     radial-gradient(ellipse at 28% 78%, rgba(167, 115, 82, 0.05), transparent 20rem),
-    radial-gradient(ellipse at 68% 88%, rgba(213, 42, 23, 0.055), transparent 22rem),
-    radial-gradient(circle at 22% 88%, rgba(255, 106, 0, 0.09) 0 0.07rem, transparent 0.11rem),
+    radial-gradient(ellipse at 68% 88%, rgba(143, 50, 23, 0.05), transparent 22rem),
+    radial-gradient(circle at 22% 88%, rgba(255, 26, 0, 0.07) 0 0.07rem, transparent 0.11rem),
     radial-gradient(circle at 82% 72%, rgba(242, 184, 75, 0.07) 0 0.06rem, transparent 0.10rem),
-    radial-gradient(circle at 57% 92%, rgba(255, 106, 0, 0.08) 0 0.055rem, transparent 0.095rem);
+    radial-gradient(circle at 57% 92%, rgba(255, 26, 0, 0.06) 0 0.055rem, transparent 0.095rem);
   filter: blur(8px);
   opacity: 0.68;
   pointer-events: none;
@@ -200,7 +200,7 @@ body {
   inset: 5rem -2rem -3rem -2rem;
   border-radius: 2.5rem;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(255, 106, 0, 0.13), transparent 32rem),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 26, 0, 0.10), transparent 32rem),
     radial-gradient(ellipse at 50% 74%, rgba(120, 48, 24, 0.14), transparent 38rem);
   filter: blur(18px);
   pointer-events: none;
@@ -211,7 +211,7 @@ body {
   position: relative;
   border: 1px solid rgba(242, 184, 75, 0.11);
   background:
-    radial-gradient(circle at 12% 0%, rgba(255, 106, 0, 0.075), transparent 20rem),
+    radial-gradient(circle at 12% 0%, rgba(255, 26, 0, 0.07), transparent 20rem),
     linear-gradient(145deg, rgba(24, 19, 17, 0.93), rgba(11, 10, 9, 0.90));
   box-shadow:
     0 24px 78px rgba(0, 0, 0, 0.48),
@@ -225,12 +225,12 @@ body {
   overflow: hidden;
   border: 1px solid rgba(242, 184, 75, 0.10);
   background:
-    radial-gradient(circle at 12% 0%, rgba(255, 106, 0, 0.06), transparent 16rem),
+    radial-gradient(circle at 12% 0%, rgba(255, 26, 0, 0.06), transparent 16rem),
     linear-gradient(145deg, rgba(24, 19, 17, 0.88), rgba(12, 10, 9, 0.93));
   box-shadow:
     inset 0 1px 0 rgba(255, 218, 161, 0.045),
     0 18px 54px rgba(0, 0, 0, 0.36),
-    0 0 28px rgba(213, 42, 23, 0.06);
+    0 0 28px rgba(143, 50, 23, 0.06);
   transition:
     border-color var(--dh-motion-base) var(--dh-ease-out),
     box-shadow var(--dh-motion-base) var(--dh-ease-out),
@@ -249,12 +249,12 @@ body {
 .dh-quest-card {
   border: 1px solid var(--dh-border-strong);
   background:
-    radial-gradient(circle at 8% 10%, rgba(255, 106, 0, 0.08), transparent 22rem),
+    radial-gradient(circle at 8% 10%, rgba(255, 26, 0, 0.08), transparent 22rem),
     linear-gradient(145deg, rgba(30, 30, 30, 0.94), rgba(17, 17, 17, 0.94));
   box-shadow:
-    inset 0 1px 0 rgba(251, 191, 36, 0.08),
+    inset 0 1px 0 rgba(255, 90, 0, 0.08),
     0 24px 70px rgba(0, 0, 0, 0.42),
-    0 0 34px rgba(213, 42, 23, 0.08);
+    0 0 34px rgba(143, 50, 23, 0.08);
 }
 
 .dh-quest-card::before {
@@ -263,7 +263,7 @@ body {
   inset: 0 auto 0 0;
   width: 4px;
   background: linear-gradient(to bottom, #7f1d1d, #f59e0b, #450a0a);
-  box-shadow: 0 0 24px rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 24px rgba(255, 26, 0, 0.30);
 }
 
 .dh-crest {
@@ -274,9 +274,9 @@ body {
 }
 
 .dh-fire-button {
-  border: 1px solid rgba(255, 106, 0, 0.40);
+  border: 1px solid rgba(255, 90, 0, 0.38);
   background: linear-gradient(135deg, var(--dh-red), var(--dh-red-hot) 45%, var(--dh-orange-hot));
-  box-shadow: 0 12px 32px rgba(213, 42, 23, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 32px rgba(139, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.16);
   transition:
     box-shadow var(--dh-motion-base) var(--dh-ease-out),
     transform var(--dh-motion-fast) var(--dh-ease-spring),
@@ -284,7 +284,7 @@ body {
 }
 
 .dh-fire-button:not(:disabled):hover {
-  box-shadow: 0 16px 42px rgba(213, 42, 23, 0.36), 0 0 30px rgba(255, 106, 0, 0.24);
+  box-shadow: 0 16px 42px rgba(139, 0, 0, 0.34), 0 0 30px rgba(255, 26, 0, 0.20);
   filter: brightness(1.05) saturate(1.04);
 }
 
@@ -309,10 +309,10 @@ body {
 }
 
 .dh-tab-active {
-  border: 1px solid rgba(255, 106, 0, 0.22);
+  border: 1px solid rgba(255, 26, 0, 0.24);
   background:
     linear-gradient(180deg, rgba(48, 48, 48, 0.88), rgba(25, 25, 25, 0.92)),
-    radial-gradient(circle at 50% 120%, rgba(255, 106, 0, 0.28), transparent 70%);
+    radial-gradient(circle at 50% 120%, rgba(255, 26, 0, 0.18), transparent 70%);
   color: var(--dh-text);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32), 0 0 20px rgba(240, 74, 22, 0.14);
   position: relative;
@@ -326,7 +326,7 @@ body {
   bottom: 0.28rem;
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--dh-orange-hot), var(--dh-gold-soft), transparent);
-  box-shadow: 0 0 14px rgba(255, 106, 0, 0.52);
+  box-shadow: 0 0 14px rgba(255, 90, 0, 0.38);
 }
 
 .dh-shell nav.dh-panel {
@@ -341,15 +341,15 @@ body {
 
 .dh-fire-progress {
   background: linear-gradient(90deg, var(--dh-red), var(--dh-orange-hot), var(--dh-gold-soft));
-  box-shadow: 0 0 18px rgba(255, 106, 0, 0.34);
+  box-shadow: 0 0 18px rgba(255, 26, 0, 0.24);
 }
 
 .dh-reward-card {
   border: 1px solid rgba(255, 255, 255, 0.09);
   background:
-    radial-gradient(circle at 12% 0%, rgba(255, 106, 0, 0.14), transparent 20rem),
+    radial-gradient(circle at 12% 0%, rgba(255, 26, 0, 0.12), transparent 20rem),
     linear-gradient(145deg, rgba(36, 36, 36, 0.92), rgba(13, 13, 13, 0.95));
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42), 0 0 28px rgba(213, 42, 23, 0.08);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42), 0 0 28px rgba(143, 50, 23, 0.08);
 }
 
 .dh-news-card {
@@ -369,11 +369,11 @@ body {
 }
 
 .dh-news-card-urgent {
-  border-color: rgba(213, 42, 23, 0.34);
+  border-color: rgba(143, 50, 23, 0.34);
   background:
-    radial-gradient(circle at 8% 0%, rgba(213, 42, 23, 0.20), transparent 18rem),
+    radial-gradient(circle at 8% 0%, rgba(143, 50, 23, 0.18), transparent 18rem),
     linear-gradient(145deg, rgba(35, 12, 10, 0.96), rgba(17, 17, 17, 0.96));
-  box-shadow: 0 20px 62px rgba(0, 0, 0, 0.36), 0 0 32px rgba(213, 42, 23, 0.16);
+  box-shadow: 0 20px 62px rgba(0, 0, 0, 0.36), 0 0 32px rgba(143, 50, 23, 0.14);
 }
 
 .dh-news-card-urgent::before {
@@ -515,7 +515,7 @@ body {
 
 .dh-login-kicker {
   margin: 0;
-  color: #f2b84b;
+  color: #ff8b00;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.18em;
@@ -756,7 +756,7 @@ body {
 
 .dh-loading-heading p {
   margin: 0;
-  color: #f2b84b;
+  color: #ff8b00;
   font-weight: 800;
 }
 

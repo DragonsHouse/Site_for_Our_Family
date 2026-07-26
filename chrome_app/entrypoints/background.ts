@@ -25,6 +25,7 @@ import { parseQuantBuyerPage } from '../lib/quantfun-buyer-parser';
 import { parseQuantEventsPage } from '../lib/quantfun-events-parser';
 import { getSettings } from '../lib/storage';
 import { restoreCurrentAuthSession } from '../lib/family-backend-auth-client';
+import { openOrFocusFamilyHubTab } from '../lib/extension-tabs';
 import type {
   BuyerPageRecord,
   BuyerWatchRule,
@@ -38,7 +39,7 @@ const POLL_ALARM_NAME = 'quant-buyer-poll';
 const EVENT_TICK_ALARM_NAME = 'quant-event-local-tick';
 const EVENT_SCHEDULE_SYNC_ALARM_NAME = 'quant-event-schedule-sync';
 const EVENTS_SOURCE_URL = QUANTFUN_EVENTS_URL;
-const DRAGON_HOUSE_NOTIFICATION_ICON = DRAGON_HOUSE_ASSETS.crest.replace(/^\//, '');
+const DRAGON_HOUSE_NOTIFICATION_ICON = DRAGON_HOUSE_ASSETS.appIcon128.replace(/^\//, '');
 let isPollingNow = false;
 let isEventTickRunning = false;
 let isEventScheduleSyncRunning = false;
@@ -94,7 +95,7 @@ async function notify(result: ParseResult) {
   await chrome.notifications.create({
     type: 'basic',
     iconUrl: chrome.runtime.getURL(DRAGON_HOUSE_NOTIFICATION_ICON),
-    title: 'Dragon House Family Hub',
+    title: 'Dragon House Hub',
     message: `Знайдено дані: чисел ${result.totalNumbersFound}, keyword=${result.hasKeyword ? 'так' : 'ні'}`
   });
 }
@@ -148,10 +149,11 @@ function parseBuyerNotificationTarget(notificationId: string): {
 }
 
 async function openDashboardForBuyerNotification(pageUrl: string, productName: string) {
-  const dashboardUrl = chrome.runtime.getURL(
-    `dashboard.html?tab=buyers&page=${encodeURIComponent(pageUrl)}&product=${encodeURIComponent(productName)}`
-  );
-  await chrome.tabs.create({ url: dashboardUrl });
+  await openOrFocusFamilyHubTab({
+    tab: 'buyers',
+    page: pageUrl,
+    product: productName
+  });
 }
 
 function eventStyleTitlePrefix(style: EventNotificationStyle): string {
@@ -196,10 +198,10 @@ function parseEventNotificationTarget(notificationId: string): { eventKey: strin
 }
 
 async function openDashboardForEventNotification(eventKey: string) {
-  const dashboardUrl = chrome.runtime.getURL(
-    `dashboard.html?tab=events&event=${encodeURIComponent(eventKey)}`
-  );
-  await chrome.tabs.create({ url: dashboardUrl });
+  await openOrFocusFamilyHubTab({
+    tab: 'events',
+    event: eventKey
+  });
 }
 
 function normalizeBuyerPageRecords(navPages: ReturnType<typeof parseQuantBuyerPage>['navLinks']): BuyerPageRecord[] {

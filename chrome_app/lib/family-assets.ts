@@ -2,9 +2,12 @@ import type { FamilyAssetDefinition, FamilyAssetSlot } from './family-types';
 
 export const DRAGON_HOUSE_ASSETS = {
   crest: '/assets/dragon-house/dragon-house-logo.png',
-  appIcon16: '/assets/dragon-house/dragon-house-logo.png',
-  appIcon48: '/assets/dragon-house/dragon-house-logo.png',
-  appIcon128: '/assets/dragon-house/dragon-house-logo.png',
+  appIcon16: '/icon/16.png',
+  appIcon32: '/icon/32.png',
+  appIcon48: '/icon/48.png',
+  appIcon128: '/icon/128.png',
+  appIcon256: '/icon/256.png',
+  appIcon512: '/icon/512.png',
   hallBackground: '/assets/dragon-house/dragon-hall-bg.png',
   futureDragonLayer: '/assets/dragon-house/dragon-3d-placeholder.png',
   questImageBase: '/assets/dragon-house/quests'

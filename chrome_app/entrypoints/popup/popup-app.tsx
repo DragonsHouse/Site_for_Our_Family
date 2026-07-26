@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { DRAGON_HOUSE_HUB_PRODUCT_NAME, DRAGON_HOUSE_LABEL } from '../../lib/extension-branding';
 import { readFamilyPosts } from '../../lib/family-data';
 import {
   getFamilyNotificationsForUser,
@@ -16,6 +17,7 @@ import { getSettings } from '../../lib/storage';
 import { loginWithDiscord } from '../../lib/family-backend-auth-client';
 import { loadCurrentBackendFamilyUser } from '../../lib/family-backend-user-session';
 import { translateDiscordLoginError } from '../../lib/family-discord-login-errors';
+import { openOrFocusFamilyHubTab } from '../../lib/extension-tabs';
 import type { BuyerWatchRule, PollState } from '../../lib/types';
 import type { FamilyNotification, FamilyPost, FamilySection, FamilyUser } from '../../lib/family-types';
 import { useFamilyAssetUrl } from '../dashboard/family/use-family-asset-url';
@@ -47,30 +49,26 @@ type EventsPopupSummary = {
 };
 
 function fmtDateTime(value: string | null) {
-  if (!value) return '—';
+  if (!value) return 'немає даних';
   return new Date(value).toLocaleString('uk-UA');
 }
 
 function fmtMoney(value: number | null) {
-  return value == null ? '—' : `${value.toLocaleString('uk-UA')} $`;
+  return value == null ? 'немає ціни' : `${value.toLocaleString('uk-UA')} $`;
 }
 
 function fmtPercent(value: number | null) {
   return value == null
-    ? '—'
+    ? 'немає %'
     : `${value.toLocaleString('uk-UA', { maximumFractionDigits: 2 })}%`;
 }
 
-function dashboardUrl(params: Record<string, string>) {
-  const url = new URL(chrome.runtime.getURL('/dashboard.html'));
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
-  }
-  return url.toString();
+function popupAssetUrl(path: string, fallbackUrl: string) {
+  return typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL(path) : fallbackUrl;
 }
 
 function openDashboard(params: Record<string, string>) {
-  void chrome.tabs.create({ url: dashboardUrl(params) });
+  void openOrFocusFamilyHubTab(params);
 }
 
 function sectionForNotification(notification: FamilyNotification): FamilySection {
@@ -102,6 +100,7 @@ function importantNewsRank(post: FamilyPost) {
 
 export function PopupApp() {
   const logoUrl = useFamilyAssetUrl('dragon_house_logo');
+  const crestUrl = popupAssetUrl('icon/128.png', logoUrl);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsText, setSettingsText] = useState('Статус: завантаження...');
@@ -179,7 +178,7 @@ export function PopupApp() {
           : null;
       const nextText = nextDate
         ? `~${Math.max(0, Math.ceil((nextDate.getTime() - Date.now()) / 60_000))} хв`
-        : '—';
+        : 'немає даних';
 
       setPollStatusText(
         [
@@ -311,7 +310,11 @@ export function PopupApp() {
       openDashboard({ tab: 'cabinet' });
       window.close();
     } catch (err) {
-      setError(err instanceof Error ? translateDiscordLoginError(err.message) : 'Не вдалося завершити Discord-вхід.');
+      setError(
+        err instanceof Error
+          ? translateDiscordLoginError(err.message)
+          : 'Не вдалося завершити Discord-вхід.'
+      );
     } finally {
       discordLoginInFlightRef.current = false;
       setLoading(false);
@@ -319,119 +322,183 @@ export function PopupApp() {
   }
 
   return (
-    <main className="dh-popup max-h-[600px] w-[min(380px,100vw)] overflow-x-hidden overflow-y-auto p-3 text-[#f4f1ec]">
-      <header className="mb-3 rounded-2xl border border-white/10 bg-[#191919]/95 p-3 shadow-xl shadow-black/30">
+    <main
+      className="dh-popup max-h-[600px] w-[min(384px,100vw)] overflow-x-hidden overflow-y-auto p-3 text-[#f7f1e7]"
+      aria-label={DRAGON_HOUSE_HUB_PRODUCT_NAME}
+    >
+      <header className="dh-popup-hero">
         <button
           type="button"
           onClick={() => openDashboard({ tab: 'cabinet' })}
-          className="flex w-full items-center gap-3 text-left"
-          title="Відкрити Dragon House Family Hub"
+          className="dh-brand-lockup"
+          title="Відкрити Dragon House Hub"
+          aria-label="Відкрити Dragon House Hub"
         >
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-amber-400/35 bg-black/40">
-            <img src={logoUrl} alt="Dragon House" className="h-full w-full object-cover" />
+          <span className="dh-crest-frame" aria-hidden="true">
+            <img src={crestUrl} alt="" className="dh-crest-image" />
           </span>
-          <span>
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.26em] text-[#d99a24]">
-              Dragon House
-            </span>
-            <span className="mt-0.5 block text-lg font-semibold text-white">Dragon House Family</span>
-            <span className="mt-0.5 block text-xs text-[#aaa39a]">
-              {currentUser ? currentUser.nickname : 'Увійди у Family Hub'}
+          <span className="min-w-0">
+            <span className="dh-kicker">{DRAGON_HOUSE_LABEL}</span>
+            <span className="dh-title">{DRAGON_HOUSE_HUB_PRODUCT_NAME}</span>
+            <span className="dh-member-line">
+              {currentUser ? currentUser.displayName || currentUser.nickname : 'Вхід потрібен для приватних даних'}
             </span>
           </span>
         </button>
       </header>
 
-      <section className="mb-3 rounded-2xl border border-white/10 bg-[#151515]/95 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-white">Мої повідомлення</h2>
-          <span className="rounded-full border border-orange-500/40 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-100">
+      <section className="dh-primary-card" aria-labelledby="dh-primary-action-title">
+        <div>
+          <p id="dh-primary-action-title" className="dh-section-eyebrow">
+            Family Hub
+          </p>
+          <p className="dh-section-copy">
+            {currentUser
+              ? `Поточний профіль: ${currentUser.nickname}`
+              : 'Відкрий Hub, щоб увійти й побачити особисті дані.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => openDashboard({ tab: 'family' })}
+          className="dh-open-hub-button"
+          aria-label="Open Family Hub in Dragon House Hub"
+        >
+          Open Family Hub
+          <span aria-hidden="true">→</span>
+        </button>
+      </section>
+
+      {!currentUser ? (
+        <section className="dh-card dh-signin-card" aria-labelledby="dh-signin-title">
+          <div>
+            <h2 id="dh-signin-title" className="dh-card-title">
+              Приватний доступ
+            </h2>
+            <p className="dh-muted-text">
+              Увійди через Discord, щоб відкрити персональні повідомлення й кабінет Dragon House.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleDiscordLogin()}
+            disabled={loading}
+            className="dh-secondary-button"
+          >
+            {loading ? 'Відкриваємо Discord...' : 'Увійти через Discord'}
+          </button>
+        </section>
+      ) : null}
+
+      <section className="dh-card" aria-labelledby="dh-notifications-title">
+        <div className="dh-card-heading">
+          <div>
+            <p className="dh-section-eyebrow">Особисте</p>
+            <h2 id="dh-notifications-title" className="dh-card-title">
+              Мої повідомлення
+            </h2>
+          </div>
+          <span className="dh-count-badge" aria-label={`Непрочитаних повідомлень: ${unreadCount}`}>
             {unreadCount}
           </span>
         </div>
+
         {!currentUser ? (
-          <div className="space-y-2">
-            <p className="text-xs text-[#77736d]">Увійди через Discord, щоб відкрити Family Hub і персональні повідомлення.</p>
-            <button
-              type="button"
-              onClick={() => void handleDiscordLogin()}
-              disabled={loading}
-              className="w-full rounded-xl border border-indigo-400/40 bg-indigo-500/10 px-3 py-2 text-sm font-semibold text-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? 'Відкриваємо ворота...' : 'Увійти через Discord'}
-            </button>
-          </div>
+          <p className="dh-empty-text">Особисті повідомлення зʼявляться після входу.</p>
         ) : notifications.length ? (
-          <div className="space-y-2">
+          <div className="dh-stack">
             {notifications.slice(0, 5).map((notification) => (
               <button
                 key={notification.id}
                 type="button"
                 onClick={() => void handleNotificationClick(notification)}
-                className={`w-full rounded-xl border px-3 py-2 text-left text-xs ${
-                  notification.readAt
-                    ? 'border-white/10 bg-black/20 text-[#aaa39a]'
-                    : 'border-orange-500/35 bg-[rgba(240,74,22,0.10)] text-[#f4f1ec] shadow-[0_0_18px_rgba(240,74,22,0.10)]'
-                }`}
+                className={`dh-list-button ${notification.readAt ? 'dh-list-button-read' : 'dh-list-button-unread'}`}
               >
-                <span className="block font-semibold text-white">{notification.title}</span>
-                <span className="mt-1 block leading-5">{notification.message}</span>
-                <span className="mt-1 block text-[11px] text-[#77736d]">
-                  {new Date(notification.createdAt).toLocaleString('uk-UA')}
+                <span className="dh-item-main">
+                  <span className="dh-item-title">{notification.title}</span>
+                  <span className="dh-item-preview">{notification.message}</span>
+                  <span className="dh-item-meta">
+                    {new Date(notification.createdAt).toLocaleString('uk-UA')}
+                  </span>
+                </span>
+                <span className="dh-item-arrow" aria-hidden="true">
+                  →
                 </span>
               </button>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-[#77736d]">Нових персональних повідомлень немає.</p>
+          <p className="dh-empty-text">Нових персональних повідомлень немає.</p>
         )}
       </section>
 
-      <section className="mb-3 rounded-2xl border border-white/10 bg-[#151515]/95 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-white">Важливе від Dragon House</h2>
-          <button type="button" onClick={() => openFamilySection('feed')} className="text-xs text-[#f2b84b]">
+      <section className="dh-card" aria-labelledby="dh-news-title">
+        <div className="dh-card-heading">
+          <div>
+            <p className="dh-section-eyebrow">Оголошення</p>
+            <h2 id="dh-news-title" className="dh-card-title">
+              Важливе від Dragon House
+            </h2>
+          </div>
+          <button type="button" onClick={() => openFamilySection('feed')} className="dh-link-button">
             Новини
           </button>
         </div>
+
         {importantPosts.length ? (
-          <div className="space-y-2">
+          <div className="dh-stack">
             {importantPosts.map((post) => (
               <button
                 key={post.id}
                 type="button"
                 onClick={() => openFamilySection('feed', post.id)}
-                className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-left text-xs hover:border-orange-500/35"
+                className="dh-list-button"
               >
-                <span className="block font-semibold text-white">{post.title}</span>
-                <span className="mt-1 block truncate text-[#aaa39a]">{post.body}</span>
+                <span className="dh-news-rune" aria-hidden="true">
+                  {post.type === 'urgent' ? '!' : '◆'}
+                </span>
+                <span className="dh-item-main">
+                  <span className="dh-item-title">{post.title}</span>
+                  <span className="dh-item-preview">{post.body}</span>
+                </span>
+                <span className="dh-item-arrow" aria-hidden="true">
+                  →
+                </span>
               </button>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-[#77736d]">Важливих новин поки немає.</p>
+          <p className="dh-empty-text">Важливих новин поки немає.</p>
         )}
       </section>
 
-      <section className="mb-3 rounded-2xl border border-white/10 bg-[#151515]/95 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-white">Скупники</h2>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => openDashboard({ tab: 'buyers' })} className="text-xs text-[#f2b84b]">
+      <section className="dh-card" aria-labelledby="dh-buyers-title">
+        <div className="dh-card-heading">
+          <div>
+            <p className="dh-section-eyebrow">Скарбниця</p>
+            <h2 id="dh-buyers-title" className="dh-card-title">
+              Скупники
+            </h2>
+          </div>
+          <div className="dh-heading-actions">
+            <button type="button" onClick={() => openDashboard({ tab: 'buyers' })} className="dh-link-button">
               Всі скупники
             </button>
             <button
               type="button"
               onClick={handleRunBuyerPollNow}
               disabled={loading}
-              className="rounded-md border border-white/10 px-2 py-1 text-[11px] text-[#aaa39a] disabled:opacity-60"
+              className="dh-icon-action"
+              aria-label="Оновити скупників зараз"
+              title="Оновити скупників зараз"
             >
-              Sync now
+              ↻
             </button>
           </div>
         </div>
+
         {buyerRows.length ? (
-          <div className="space-y-1.5">
+          <div className="dh-buyers-grid">
             {buyerRows.slice(0, 5).map((row, index) => (
               <button
                 key={`${row.pageUrl}-${row.productName}-${index}`}
@@ -443,63 +510,69 @@ export function PopupApp() {
                     product: row.productName
                   })
                 }
-                className="grid w-full grid-cols-[1fr_auto] gap-2 rounded-xl bg-black/25 px-3 py-2 text-left text-xs"
+                className="dh-buyer-row"
               >
-                <span className="min-w-0">
-                  <span className="block truncate text-white">{row.pageTitle}</span>
-                  <span className="block truncate text-[#aaa39a]">{row.productName}</span>
+                <span className="dh-item-main">
+                  <span className="dh-item-title">{row.pageTitle}</span>
+                  <span className="dh-item-preview">{row.productName}</span>
                 </span>
-                <span className="text-right">
-                  <span className="block text-[#f2b84b]">{fmtMoney(row.currentPrice)}</span>
-                  <span className="block text-[#aaa39a]">{fmtPercent(row.percentValue)}</span>
+                <span className="dh-buyer-value">
+                  <span>{fmtMoney(row.currentPrice)}</span>
+                  <span>{fmtPercent(row.percentValue)}</span>
                 </span>
               </button>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-[#77736d]">Ще немає збережених рядків.</p>
+          <p className="dh-empty-text">Даних скупників ще немає.</p>
         )}
       </section>
 
-      <section className="mb-3 rounded-2xl border border-white/10 bg-[#151515]/95 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-white">Івенти</h2>
-          <button type="button" onClick={() => openDashboard({ tab: 'events' })} className="text-xs text-[#f2b84b]">
-            Всі івенти
-          </button>
-        </div>
-        {eventsSummary ? (
-          <div className="space-y-2 text-xs text-[#aaa39a]">
-            <p>
-              <span className="text-[#77736d]">Зараз:</span> {eventsSummary.activeEventText}
-            </p>
-            <p>
-              <span className="text-[#77736d]">Далі:</span> {eventsSummary.nextEventText}
-            </p>
-            <p className="text-[#77736d]">
-              Івентів: {eventsSummary.totalEvents} · Відстежується: {eventsSummary.trackedEvents}
-            </p>
-            <p className="text-[#77736d]">Оновлено: {fmtDateTime(eventsSummary.fetchedAt)}</p>
-          </div>
-        ) : (
-          <p className="text-xs text-[#77736d]">Завантаження...</p>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-white/10 bg-[#151515]/95 p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Статус</h2>
-          <button type="button" onClick={() => void refreshAll()} className="text-xs text-[#f2b84b]">
+      <section className="dh-card dh-status-card" aria-labelledby="dh-status-title">
+        <div className="dh-card-heading">
+          <h2 id="dh-status-title" className="dh-card-title">
+            Статус
+          </h2>
+          <button type="button" onClick={() => void refreshAll()} className="dh-link-button">
             Оновити
           </button>
         </div>
-        <p className="text-xs text-[#aaa39a]" role="status" aria-live="polite">{settingsText}</p>
-        <p className="mt-1 text-xs text-[#77736d]" role="status" aria-live="polite">{pollStatusText}</p>
+        {eventsSummary ? (
+          <div className="dh-status-grid">
+            <p>
+              <span>Зараз</span>
+              {eventsSummary.activeEventText}
+            </p>
+            <p>
+              <span>Далі</span>
+              {eventsSummary.nextEventText}
+            </p>
+            <p>
+              <span>Івенти</span>
+              {eventsSummary.totalEvents} · відстежується {eventsSummary.trackedEvents}
+            </p>
+            <p>
+              <span>Оновлено</span>
+              {fmtDateTime(eventsSummary.fetchedAt)}
+            </p>
+          </div>
+        ) : (
+          <p className="dh-empty-text" role="status" aria-live="polite">
+            Завантаження статусу...
+          </p>
+        )}
+        <p className="dh-status-line" role="status" aria-live="polite">
+          {settingsText}
+        </p>
+        <p className="dh-status-line dh-status-line-muted" role="status" aria-live="polite">
+          {pollStatusText}
+        </p>
       </section>
 
       {error ? (
-        <div className="mt-3 rounded-xl border border-red-500/40 bg-red-950/40 p-2 text-sm text-red-100" role="alert">
-          {error}
+        <div className="dh-error" role="alert">
+          <strong>Dragon House Hub тимчасово недоступний.</strong>
+          <span>{error}</span>
         </div>
       ) : null}
     </main>

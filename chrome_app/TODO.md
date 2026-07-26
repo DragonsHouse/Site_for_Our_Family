@@ -108,8 +108,7 @@
 - `[x]` Виправлено зайвий горизонтальний скрол від tooltip у таблиці:
   - custom popover вимкнено для кнопок таблиці та drag-handle
   - лишено native `title`
-- `[x]` Toolbar-friendly іконка (`Q`) для `16/48/128`
-- `[x]` Обрізано зайві прозорі поля в `logo6.png` (джерело)
+- `[x]` Dragon House Hub approved logo exported for `16/32/48/128/256/512`
 
 ### 1.9 Multi-browser build (що вже можемо)
 
