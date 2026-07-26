@@ -41,6 +41,23 @@ export class StaticIdSelfServiceError extends Error {
   }
 }
 
+export type BirthdaySelfServiceErrorCode =
+  | 'birthday_required'
+  | 'birthday_invalid'
+  | 'birthday_future'
+  | 'birthday_update_conflict';
+
+export class BirthdaySelfServiceError extends Error {
+  constructor(
+    readonly code: BirthdaySelfServiceErrorCode,
+    message: string,
+    readonly httpStatus = 400,
+  ) {
+    super(message);
+    this.name = 'BirthdaySelfServiceError';
+  }
+}
+
 export class FamilyAuthService {
   private readonly loginAttempts = new Map<string, LoginAttempt>();
 
@@ -208,6 +225,17 @@ export class FamilyAuthService {
     return createAuthenticatedMemberDto(updatedMember, session, updatedUser);
   }
 
+  async updateCurrentMemberBirthday(token: string, input: string): Promise<AuthenticatedMemberDto> {
+    const dateOfBirth = normalizeDateOfBirth(input);
+    const { session, user, member } = await this.authenticateToken(token);
+    const updatedMember = await this.members.update(member.id, { dateOfBirth }, member.version, member.id);
+    if (!updatedMember) {
+      throw new BirthdaySelfServiceError('birthday_update_conflict', 'Birthday update conflict', 409);
+    }
+
+    return createAuthenticatedMemberDto(updatedMember, session, user);
+  }
+
   async createAuthUser(
     token: string,
     input: {
@@ -306,6 +334,26 @@ function normalizeStaticId(input: string): string {
     throw new StaticIdSelfServiceError('static_id_too_long', 'Static ID is too long');
   }
   return staticId;
+}
+
+function normalizeDateOfBirth(input: string): string {
+  const dateOfBirth = input.trim();
+  if (!dateOfBirth) throw new BirthdaySelfServiceError('birthday_required', 'Date of birth is required');
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(dateOfBirth);
+  if (!match) throw new BirthdaySelfServiceError('birthday_invalid', 'Date of birth is invalid');
+
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month - 1 || utc.getUTCDate() !== day) {
+    throw new BirthdaySelfServiceError('birthday_invalid', 'Date of birth is invalid');
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (dateOfBirth > today) throw new BirthdaySelfServiceError('birthday_future', 'Date of birth cannot be in the future');
+  return dateOfBirth;
 }
 
 export function sanitizeAuthUser(user: FamilyAuthUser, loginProvider?: 'password' | 'discord'): SanitizedFamilyAuthUser {

@@ -37,6 +37,16 @@ const canonicalMember: AuthenticatedMember = {
     requirements: {
       staticId: { satisfied: false },
       discordLink: { satisfied: true },
+      inGameNickname: { satisfied: true },
+      birthday: { satisfied: true, required: false },
+    },
+  },
+  profileCompletion: {
+    complete: false,
+    state: 'birthday_required',
+    legacyAccessAllowed: true,
+    requirements: {
+      birthday: { satisfied: false, required: true },
     },
   },
 };
@@ -98,6 +108,7 @@ describe('createBackendCurrentFamilyUser', () => {
     assert.equal(user.discordLinkStatus, 'linked');
     assert.equal(user.discordServerNickname, 'Server Dragon');
     assert.equal(user.onboarding?.state, 'static_id_required');
+    assert.equal(user.profileCompletion?.state, 'birthday_required');
   });
 
   it('preserves password-change state from canonical session metadata', () => {

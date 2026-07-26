@@ -656,6 +656,7 @@ export type FamilyUser = FamilySyncMetadata & {
     state:
       | 'complete'
       | 'static_id_required'
+      | 'birthday_required'
       | 'discord_link_required'
       | 'member_access_denied'
       | 'account_deactivated';
@@ -666,6 +667,24 @@ export type FamilyUser = FamilySyncMetadata & {
       };
       discordLink: {
         satisfied: boolean;
+      };
+      inGameNickname: {
+        satisfied: boolean;
+      };
+      birthday: {
+        satisfied: boolean;
+        required: boolean;
+      };
+    };
+  };
+  profileCompletion?: {
+    complete: boolean;
+    state: 'complete' | 'birthday_required';
+    legacyAccessAllowed: boolean;
+    requirements: {
+      birthday: {
+        satisfied: boolean;
+        required: boolean;
       };
     };
   };

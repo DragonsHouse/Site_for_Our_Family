@@ -74,6 +74,8 @@ describe('frontend auth state router', () => {
           requirements: {
             staticId: { satisfied: false },
             discordLink: { satisfied: true },
+            inGameNickname: { satisfied: true },
+            birthday: { satisfied: true, required: false },
           },
         },
       }),
@@ -87,6 +89,23 @@ describe('frontend auth state router', () => {
           requirements: {
             staticId: { satisfied: true, value: '41384' },
             discordLink: { satisfied: false },
+            inGameNickname: { satisfied: true },
+            birthday: { satisfied: true, required: false },
+          },
+        },
+      }),
+      'restore',
+    );
+    const missingBirthday = stateForAuthenticatedUser(
+      familyUser({
+        onboarding: {
+          complete: false,
+          state: 'birthday_required',
+          requirements: {
+            staticId: { satisfied: true, value: '41384' },
+            discordLink: { satisfied: true },
+            inGameNickname: { satisfied: true },
+            birthday: { satisfied: false, required: true },
           },
         },
       }),
@@ -96,7 +115,27 @@ describe('frontend auth state router', () => {
 
     assert.equal(missingStaticId.status, 'static_id_required');
     assert.equal(missingDiscord.status, 'discord_link_required');
+    assert.equal(missingBirthday.status, 'birthday_required');
     assert.equal(complete.status, 'authenticated');
+  });
+
+  it('routes legacy missing birthday to a completion prompt without blocking Hub access permanently', () => {
+    const state = stateForAuthenticatedUser(
+      familyUser({
+        profileCompletion: {
+          complete: false,
+          state: 'birthday_required',
+          legacyAccessAllowed: true,
+          requirements: {
+            birthday: { satisfied: false, required: true },
+          },
+        },
+      }),
+      'restore',
+    );
+
+    assert.equal(state.status, 'birthday_required');
+    if (state.status === 'birthday_required') assert.equal(state.legacyAccessAllowed, true);
   });
 
   it('routes restore failures and preserves tokens on network/auth unavailable', () => {
@@ -136,7 +175,10 @@ describe('FamilyHubApp auth routing source contract', () => {
     assert.match(source, /status === 'session_expired'/u);
     assert.match(source, /status === 'discord_link_required'/u);
     assert.match(source, /status === 'static_id_required'/u);
+    assert.match(source, /status === 'birthday_required'/u);
     assert.match(source, /updateCurrentStaticId/u);
+    assert.match(source, /updateCurrentBirthday/u);
+    assert.match(source, /Дата народження потрібна для сімейного календаря/u);
     assert.match(source, /status === 'account_deactivated'/u);
     assert.match(source, /status === 'member_access_denied'/u);
     assert.match(source, /status === 'auth_unavailable'/u);
@@ -149,6 +191,7 @@ describe('FamilyHubApp auth routing source contract', () => {
 
     assert.match(source, /throw new AuthOutcomeError\(failure\)/u);
     assert.match(source, /\/api\/family\/me\/static-id/u);
+    assert.match(source, /\/api\/family\/me\/birthday/u);
     assert.match(source, /shouldClearAuthSessionForOutcome\(failure\.outcome\.code\)/u);
     assert.match(source, /error instanceof AuthOutcomeError && shouldClearAuthSessionForOutcome\(error\.failure\.outcome\.code\)/u);
     assert.doesNotMatch(source, /localStorage\.clear/u);
@@ -211,6 +254,16 @@ function familyUser(overrides: Partial<FamilyUser> = {}): FamilyUser {
       requirements: {
         staticId: { satisfied: true, value: '41384' },
         discordLink: { satisfied: true },
+        inGameNickname: { satisfied: true },
+        birthday: { satisfied: true, required: false },
+      },
+    },
+    profileCompletion: {
+      complete: true,
+      state: 'complete',
+      legacyAccessAllowed: false,
+      requirements: {
+        birthday: { satisfied: true, required: true },
       },
     },
     externalSource: 'family_hub',

@@ -16,6 +16,7 @@ export type FamilyHubAuthState =
   | { status: 'session_expired'; message: string }
   | { status: 'discord_link_required'; message: string }
   | { status: 'static_id_required'; user: FamilyUser; message?: string }
+  | { status: 'birthday_required'; user: FamilyUser; legacyAccessAllowed: boolean; message?: string }
   | { status: 'account_deactivated'; message: string }
   | { status: 'member_access_denied'; message: string }
   | { status: 'auth_unavailable'; message: string; retryTarget: AuthUnavailableRetryTarget };
@@ -46,6 +47,12 @@ export function stateForAuthenticatedUser(user: FamilyUser, entry: 'restore' | '
   }
   if (user.onboarding?.state === 'static_id_required') {
     return { status: 'static_id_required', user, message: 'Static ID is required before Family Hub access.' };
+  }
+  if (user.onboarding?.state === 'birthday_required') {
+    return { status: 'birthday_required', user, legacyAccessAllowed: false, message: 'Date of birth is required before Family Hub access.' };
+  }
+  if (user.profileCompletion?.state === 'birthday_required') {
+    return { status: 'birthday_required', user, legacyAccessAllowed: user.profileCompletion.legacyAccessAllowed, message: 'Date of birth is required for the family calendar.' };
   }
   if (entry === 'login' || entry === 'password-change') return { status: 'loading', user };
   if (entry === 'discord') return { status: 'oauth_success', user };

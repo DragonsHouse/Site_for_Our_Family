@@ -13,7 +13,7 @@ import type { FamilyMember, FamilySession } from '../types.js';
 const servers: Array<{ close: (callback?: (error?: Error) => void) => void }> = [];
 const ANASTASIA_MEMBER_ID = 'a0b1c2d3-0001-4a00-8000-000000000001';
 
-async function createServerHarness(overrides: TestConfigOverrides = {}) {
+async function createServerHarness(overrides: TestConfigOverrides = {}, extraMembers: FamilyMember[] = []) {
   const config = createTestConfig({
     ...overrides,
     bcryptCost: 10,
@@ -35,6 +35,7 @@ async function createServerHarness(overrides: TestConfigOverrides = {}) {
       rank: 10,
       permissions: ['manage_discord_integration'],
     }),
+    ...extraMembers,
   ]);
   await authRepository.createUser({
     familyMemberId: ANASTASIA_MEMBER_ID,
@@ -296,6 +297,179 @@ describe('auth routes', { timeout: 20_000 }, () => {
     expect(owner?.staticId).toBe('41384');
   });
 
+  it('requires birthday for new onboarding members but allows legacy members to keep Hub access with a prompt', async () => {
+    const { baseUrl, authRepository } = await createServerHarness({}, [
+      createMember({
+        id: 'birthday-new-member',
+        nickname: 'Birthday_New',
+        staticId: '81001',
+        createdAt: '2026-07-27T00:00:00.000Z',
+        updatedAt: '2026-07-27T00:00:00.000Z',
+        discord: {
+          linked: true,
+          discordUserId: 'discord-birthday-new',
+          discordUsername: 'birthday_new',
+        },
+      }),
+      createMember({
+        id: 'birthday-legacy-member',
+        nickname: 'Birthday_Legacy',
+        staticId: '81002',
+        createdAt: '2026-07-26T23:59:59.000Z',
+        updatedAt: '2026-07-26T23:59:59.000Z',
+        discord: {
+          linked: true,
+          discordUserId: 'discord-birthday-legacy',
+          discordUsername: 'birthday_legacy',
+        },
+      }),
+    ]);
+    for (const member of [
+      { id: 'birthday-new-member', login: 'Birthday_New', staticId: '81001' },
+      { id: 'birthday-legacy-member', login: 'Birthday_Legacy', staticId: '81002' },
+    ]) {
+      await authRepository.createUser({
+        familyMemberId: member.id,
+        login: member.login,
+        staticId: member.staticId,
+        passwordHash: await hashPassword('41384', 10),
+        isActive: true,
+        mustChangePassword: false,
+        role: 'member',
+        rank: 1,
+        permissions: [],
+      });
+    }
+
+    const newLogin = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginOrStaticId: 'Birthday_New', password: '41384' }),
+    });
+    const legacyLogin = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginOrStaticId: 'Birthday_Legacy', password: '41384' }),
+    });
+
+    expect((await newLogin.json()) as Record<string, unknown>).toMatchObject({
+      user: {
+        onboarding: {
+          complete: false,
+          state: 'birthday_required',
+          requirements: { birthday: { satisfied: false, required: true } },
+        },
+        profileCompletion: {
+          complete: false,
+          state: 'birthday_required',
+          legacyAccessAllowed: false,
+        },
+      },
+    });
+    expect((await legacyLogin.json()) as Record<string, unknown>).toMatchObject({
+      user: {
+        onboarding: {
+          complete: true,
+          state: 'complete',
+          requirements: { birthday: { satisfied: true, required: false } },
+        },
+        profileCompletion: {
+          complete: false,
+          state: 'birthday_required',
+          legacyAccessAllowed: true,
+        },
+      },
+    });
+  });
+
+  it('updates only the authenticated member birthday with date-only validation and returns safe onboarding state', async () => {
+    const { baseUrl, authRepository, memberRepository } = await createServerHarness({}, [
+      createMember({
+        id: 'birthday-self-member',
+        nickname: 'Birthday_Self',
+        staticId: '82001',
+        createdAt: '2026-07-27T00:00:00.000Z',
+        updatedAt: '2026-07-27T00:00:00.000Z',
+        discord: {
+          linked: true,
+          discordUserId: 'discord-birthday-self',
+          discordUsername: 'birthday_self',
+        },
+      }),
+    ]);
+    await authRepository.createUser({
+      familyMemberId: 'birthday-self-member',
+      login: 'Birthday_Self',
+      staticId: '82001',
+      passwordHash: await hashPassword('41384', 10),
+      isActive: true,
+      mustChangePassword: false,
+      role: 'member',
+      rank: 1,
+      permissions: [],
+    });
+    const login = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginOrStaticId: 'Birthday_Self', password: '41384' }),
+    });
+    const loginBody = (await login.json()) as { token: string };
+
+    const invalid = await fetch(`${baseUrl}/api/family/me/birthday`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dateOfBirth: '2025-02-29' }),
+    });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({
+      error: 'invalid_birthday',
+      code: 'birthday_invalid',
+      fields: { dateOfBirth: 'Date of birth is invalid' },
+    });
+
+    const blank = await fetch(`${baseUrl}/api/family/me/birthday`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dateOfBirth: '    ' }),
+    });
+    expect(blank.status).toBe(400);
+    expect(await blank.json()).toMatchObject({ code: 'birthday_required' });
+
+    const futureYear = new Date().getUTCFullYear() + 1;
+    const future = await fetch(`${baseUrl}/api/family/me/birthday`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dateOfBirth: `${futureYear}-01-01` }),
+    });
+    expect(future.status).toBe(400);
+    expect(await future.json()).toMatchObject({ code: 'birthday_future' });
+
+    const response = await fetch(`${baseUrl}/api/family/me/birthday`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dateOfBirth: '2000-02-29' }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+    const updatedSelf = await memberRepository.findById('birthday-self-member');
+    const owner = await memberRepository.findById(ANASTASIA_MEMBER_ID);
+
+    expect(response.status).toBe(200);
+    expect(body).not.toHaveProperty('dateOfBirth');
+    expect(body).toMatchObject({
+      onboarding: {
+        complete: true,
+        state: 'complete',
+        requirements: { birthday: { satisfied: true, required: true } },
+      },
+      profileCompletion: {
+        complete: true,
+        state: 'complete',
+      },
+    });
+    expect(updatedSelf?.dateOfBirth).toBe('2000-02-29');
+    expect(owner?.dateOfBirth).toBeUndefined();
+  });
+
   it('returns structured Static ID validation errors without clearing auth state', async () => {
     const { baseUrl, authRepository, memberRepository } = await createServerHarness();
     await memberRepository.create(createMember({ id: 'duplicate-route-member', nickname: 'Duplicate_Route', staticId: '73001' }), ANASTASIA_MEMBER_ID);
@@ -541,6 +715,16 @@ function createAuthenticatedMember(): AuthenticatedMemberDto {
       requirements: {
         staticId: { satisfied: true, value: '41384' },
         discordLink: { satisfied: true },
+        inGameNickname: { satisfied: true },
+        birthday: { satisfied: true, required: false },
+      },
+    },
+    profileCompletion: {
+      complete: false,
+      state: 'birthday_required',
+      legacyAccessAllowed: true,
+      requirements: {
+        birthday: { satisfied: false, required: true },
       },
     },
   };

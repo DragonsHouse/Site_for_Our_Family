@@ -40,7 +40,8 @@ export class FamilyMemberService {
     if (query.includeDeleted && !this.hasPermission(auth, 'restore_members')) {
       throw new FamilyMemberError('MEMBER_PERMISSION_DENIED', 'Missing restore_members', 403);
     }
-    return this.repository.list(query);
+    const result = await this.repository.list(query);
+    return { ...result, items: result.items.map(stripPrivateBirthdayFields) };
   }
 
   async listDirectory(query: FamilyMemberDirectoryQuery, auth: FamilyAuthContext): Promise<FamilyMemberDirectoryResponseDto> {
@@ -241,9 +242,16 @@ export class FamilyMemberService {
   }
 
   private toSafeDto(member: FamilyMember, auth: FamilyAuthContext): FamilyMember {
-    if (this.hasPermission(auth, 'view_member_private_fields')) return member;
-    return { ...member, notes: auth.familyMemberId === member.id ? member.notes : null };
+    const publicMember = stripPrivateBirthdayFields(member);
+    if (this.hasPermission(auth, 'view_member_private_fields')) return publicMember;
+    return { ...publicMember, notes: auth.familyMemberId === member.id ? member.notes : null };
   }
+}
+
+function stripPrivateBirthdayFields(member: FamilyMember): FamilyMember {
+  const publicMember = { ...member };
+  delete publicMember.dateOfBirth;
+  return publicMember;
 }
 
 function uniquePermissions(permissions: FamilyPermission[]): FamilyPermission[] {

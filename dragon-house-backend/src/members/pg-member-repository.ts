@@ -20,6 +20,7 @@ type MemberRow = {
   rank: number;
   permissions: FamilyPermission[];
   status: FamilyMemberStatus;
+  date_of_birth?: Date | string | null;
   avatar_asset_id: string | null;
   notes: string | null;
   joined_at: Date | null;
@@ -172,6 +173,7 @@ export class PgFamilyMemberRepository implements FamilyMemberRepository {
     if (input.role !== undefined) add('role', input.role);
     if (input.rank !== undefined) add('rank', input.rank);
     if (input.status !== undefined) add('status', input.status);
+    if (input.dateOfBirth !== undefined) add('date_of_birth', input.dateOfBirth);
     if (input.avatarAssetId !== undefined) add('avatar_asset_id', input.avatarAssetId);
     if (input.notes !== undefined) add('notes', input.notes);
     if (input.joinedAt !== undefined) add('joined_at', input.joinedAt);
@@ -280,6 +282,7 @@ function mapMember(row: MemberRow): FamilyMember {
     permissionsDiscord: row.permissions_discord,
     permissionsDenied: row.permissions_denied,
     status: row.status,
+    dateOfBirth: dateOnly(row.date_of_birth),
     avatarAssetId: row.avatar_asset_id,
     notes: row.notes,
     joinedAt: row.joined_at?.toISOString() ?? null,
@@ -309,6 +312,12 @@ function mapMember(row: MemberRow): FamilyMember {
         }
       : { linked: false },
   };
+}
+
+function dateOnly(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return value.slice(0, 10);
 }
 
 function sanitizeAuditData(value: unknown): unknown {

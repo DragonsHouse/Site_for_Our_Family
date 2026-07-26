@@ -48,6 +48,16 @@ export class StaticIdValidationError extends Error {
   }
 }
 
+export class BirthdayValidationError extends Error {
+  constructor(
+    message: string,
+    readonly fields: { dateOfBirth?: string } = {},
+  ) {
+    super(message);
+    this.name = 'BirthdayValidationError';
+  }
+}
+
 export function getBackendApiBaseUrl(): string {
   return readDiscordFamilySettings().backend.apiBaseUrl ?? DEFAULT_BACKEND_API_BASE_URL;
 }
@@ -300,6 +310,29 @@ export async function updateCurrentStaticId(staticId: string): Promise<Authentic
   if (isRecord(body) && body.error === 'invalid_static_id') {
     const fields = isRecord(body.fields) && typeof body.fields.staticId === 'string' ? { staticId: body.fields.staticId } : {};
     throw new StaticIdValidationError(typeof body.message === 'string' ? body.message : 'Static ID is invalid', fields);
+  }
+
+  const failure = normalizeAuthFailure(response.status, body);
+  if (response.status === 401 && shouldClearAuthSessionForOutcome(failure.outcome.code)) await clearAuthSession();
+  throw new AuthOutcomeError(failure);
+}
+
+export async function updateCurrentBirthday(dateOfBirth: string): Promise<AuthenticatedMember> {
+  const response = await authenticatedFetch('/api/family/me/birthday', {
+    method: 'PATCH',
+    body: JSON.stringify({ dateOfBirth }),
+  });
+  if (response.ok) return assertAuthenticatedMember(await response.json());
+
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+  if (isRecord(body) && body.error === 'invalid_birthday') {
+    const fields = isRecord(body.fields) && typeof body.fields.dateOfBirth === 'string' ? { dateOfBirth: body.fields.dateOfBirth } : {};
+    throw new BirthdayValidationError(typeof body.message === 'string' ? body.message : 'Date of birth is invalid', fields);
   }
 
   const failure = normalizeAuthFailure(response.status, body);

@@ -113,6 +113,7 @@ async function runChecks() {
     checks.push({ name: 'family_members.static_id nullable for Discord-created members', ok: !(await columnNotNull(pool, 'family_members', 'static_id')) });
     for (const column of [
       'status',
+      'date_of_birth',
       'avatar_asset_id',
       'notes',
       'joined_at',

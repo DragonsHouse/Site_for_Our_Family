@@ -39,6 +39,11 @@ export type FamilyMember = {
   role: FamilyRole;
   rank: number;
   status: FamilyMemberStatus;
+  /**
+   * Private full date of birth in YYYY-MM-DD form. Do not expose through public
+   * directory/details or generic member-management frontend DTOs.
+   */
+  dateOfBirth?: string | null;
   avatarAssetId: string | null;
   notes: string | null;
   joinedAt: string | null;
@@ -78,6 +83,7 @@ export type CreateFamilyMemberInput = {
   role: FamilyRole;
   rank: number;
   status?: FamilyMemberStatus;
+  dateOfBirth?: string | null;
   avatarAssetId?: string | null;
   notes?: string | null;
   joinedAt?: string | null;

@@ -12,7 +12,9 @@ import {
   loginWithDiscord,
   login as loginBackend,
   logout as logoutBackend,
+  BirthdayValidationError,
   StaticIdValidationError,
+  updateCurrentBirthday,
   updateCurrentStaticId
 } from '../../lib/family-backend-auth-client';
 import { AuthOutcomeError, normalizeAuthFailure } from '../../lib/family-outcome';
@@ -293,6 +295,102 @@ function StaticIdOnboardingScreen({
   );
 }
 
+function BirthdayOnboardingScreen({
+  user,
+  value,
+  error,
+  loading,
+  legacyAccessAllowed,
+  onChange,
+  onSubmit,
+  onContinue,
+}: {
+  user: FamilyUser;
+  value: string;
+  error: string | null;
+  loading: boolean;
+  legacyAccessAllowed: boolean;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <AuthShell>
+      <section className="dh-auth-card w-full max-w-md rounded-3xl p-6">
+        <div className="mx-auto flex justify-center">
+          <DragonHouseCrest slot="dragon_house_logo" size="lg" />
+        </div>
+        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">DRAGON HOUSE HUB</p>
+        <h1 className="mt-2 text-2xl font-semibold text-white">Заверши профіль</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          {user.displayName}, додай дату народження, щоб сімейний календар міг показувати важливі дати.
+        </p>
+
+        <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm">
+          <div className="flex items-center justify-between gap-3 text-slate-200">
+            <span>Discord linked</span>
+            <span className="font-semibold text-emerald-300">✓</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3 text-slate-200">
+            <span>Static ID</span>
+            <span className="font-semibold text-emerald-300">✓</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3 text-slate-200">
+            <span>Дата народження</span>
+            <span className="font-semibold text-rose-300">✕</span>
+          </div>
+        </div>
+
+        <p className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-50">
+          Дата народження потрібна для сімейного календаря. Іншим учасникам буде видно лише день і місяць. Рік народження та вік не публікуються без окремого дозволу.
+        </p>
+
+        <form
+          className="mt-5 space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit();
+          }}
+        >
+          <label className="block">
+            <span className="mb-1 block text-sm text-slate-300">Дата народження</span>
+            <input
+              className={inputClassName()}
+              type="date"
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+              autoComplete="bday"
+            />
+          </label>
+
+          {error ? (
+            <div className="rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-100">
+              {error}
+            </div>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={loading || !value.trim()}
+            className="w-full rounded-xl bg-gradient-to-r from-red-700 to-amber-500 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? 'Зберігаю...' : 'Зберегти дату народження'}
+          </button>
+          {legacyAccessAllowed ? (
+            <button
+              type="button"
+              className="w-full rounded-xl border border-slate-700 bg-black/25 px-4 py-3 text-sm font-semibold text-slate-100 hover:border-slate-500 focus:outline-none focus:ring focus:ring-amber-500/30"
+              onClick={onContinue}
+            >
+              Продовжити в Hub
+            </button>
+          ) : null}
+        </form>
+      </section>
+    </AuthShell>
+  );
+}
+
 function OAuthLoadingScreen() {
   return (
     <AuthShell>
@@ -407,6 +505,7 @@ export function FamilyHubApp() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [staticIdDraft, setStaticIdDraft] = useState('');
+  const [birthdayDraft, setBirthdayDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const authCheckStartedRef = useRef(false);
@@ -559,6 +658,7 @@ export function FamilyHubApp() {
     setNewPassword('');
     setConfirmPassword('');
     setStaticIdDraft('');
+    setBirthdayDraft('');
     setError(null);
     setActiveTab('cabinet');
     setAuthState({ status: 'unauthenticated' });
@@ -622,6 +722,29 @@ export function FamilyHubApp() {
     } catch (err) {
       if (err instanceof StaticIdValidationError) {
         setError(err.fields.staticId ?? err.message);
+        return;
+      }
+      const route = routeRestoreFailure(err);
+      if (route.clearAuthSession) await clearAuthSession().catch(() => undefined);
+      setAuthState(route.state);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleBirthdaySubmit() {
+    if (!currentUser) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const user = resolveBackendFamilyUser(await updateCurrentBirthday(birthdayDraft));
+      setCurrentUser(user);
+      setBirthdayDraft('');
+      await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
+      setAuthState(stateForAuthenticatedUser(user, 'restore'));
+    } catch (err) {
+      if (err instanceof BirthdayValidationError) {
+        setError(err.fields.dateOfBirth ?? err.message);
         return;
       }
       const route = routeRestoreFailure(err);
@@ -841,6 +964,21 @@ export function FamilyHubApp() {
         loading={loading}
         onChange={setStaticIdDraft}
         onSubmit={() => void handleStaticIdSubmit()}
+      />
+    );
+  }
+
+  if (authState.status === 'birthday_required' && currentUser) {
+    return (
+      <BirthdayOnboardingScreen
+        user={currentUser}
+        value={birthdayDraft}
+        error={error}
+        loading={loading}
+        legacyAccessAllowed={authState.legacyAccessAllowed}
+        onChange={setBirthdayDraft}
+        onSubmit={() => void handleBirthdaySubmit()}
+        onContinue={() => setAuthState({ status: 'authenticated', user: currentUser })}
       />
     );
   }

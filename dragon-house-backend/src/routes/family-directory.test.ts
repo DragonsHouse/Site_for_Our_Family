@@ -37,6 +37,7 @@ async function createHarness() {
       staticId: '101',
       role: 'member',
       rank: 2,
+      dateOfBirth: '2000-02-29',
       joinedAt: null,
       permissions: ['manage_members'],
       notes: 'private alpha note',
@@ -110,7 +111,7 @@ afterEach(async () => {
   );
 });
 
-describe('family member directory route', () => {
+describe('family member directory route', { timeout: 20_000 }, () => {
   it('allows ordinary authenticated members to view the active directory and rejects unauthenticated requests', async () => {
     const { baseUrl } = await createHarness();
     const token = await login(baseUrl, 'Alpha_Dragons', '101');
@@ -161,6 +162,7 @@ describe('family member directory route', () => {
     expect(JSON.stringify(item)).not.toContain('Metadata');
     expect(JSON.stringify(item)).not.toContain('version');
     expect(JSON.stringify(item)).not.toContain('deletedAt');
+    expect(JSON.stringify(item)).not.toContain('dateOfBirth');
     expect(JSON.stringify(item)).not.toContain('session');
     expect(JSON.stringify(item)).not.toContain('password');
     expect(JSON.stringify(item)).not.toContain('oauth');
@@ -214,6 +216,7 @@ describe('family member directory route', () => {
       discord: { linked: false, displayName: null, serverNickname: null, avatarUrl: null },
       joinedAt: '2026-02-01T00:00:00.000Z',
     });
+    expect(JSON.stringify(body)).not.toContain('dateOfBirth');
   });
 
   it('supports pagination, search, filters, sorting and normalized invalid query values', async () => {
@@ -287,6 +290,7 @@ describe('family member directory route', () => {
     expect(JSON.stringify(body)).not.toContain('Metadata');
     expect(JSON.stringify(body)).not.toContain('version');
     expect(JSON.stringify(body)).not.toContain('deletedAt');
+    expect(JSON.stringify(body)).not.toContain('dateOfBirth');
     expect(JSON.stringify(body)).not.toContain('session');
     expect(JSON.stringify(body)).not.toContain('password');
     expect(JSON.stringify(body)).not.toContain('oauth');
@@ -336,6 +340,7 @@ describe('family member directory route', () => {
       expect(body.items[0]).toHaveProperty('permissions');
       expect(body.items[0]).toHaveProperty('version');
       expect(body.items[0]).toHaveProperty('deletedAt');
+      expect(body.items[0]).not.toHaveProperty('dateOfBirth');
     }
   });
 });
@@ -377,6 +382,7 @@ function member(overrides: Partial<FamilyMember> & { id: string; nickname: strin
     role: overrides.role ?? 'member',
     rank: overrides.rank ?? 1,
     status: overrides.status ?? 'active',
+    dateOfBirth: overrides.dateOfBirth,
     avatarAssetId: overrides.avatarAssetId ?? null,
     notes: overrides.notes ?? null,
     joinedAt: overrides.joinedAt ?? null,

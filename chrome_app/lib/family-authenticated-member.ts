@@ -57,11 +57,13 @@ export type AuthenticatedMember = {
     mustChangePassword: boolean;
   };
   onboarding: FamilyOnboardingStatus;
+  profileCompletion: FamilyProfileCompletionStatus;
 };
 
 export type FamilyOnboardingState =
   | 'complete'
   | 'static_id_required'
+  | 'birthday_required'
   | 'discord_link_required'
   | 'member_access_denied'
   | 'account_deactivated';
@@ -77,6 +79,25 @@ export type FamilyOnboardingStatus = {
     discordLink: {
       satisfied: boolean;
     };
+    inGameNickname: {
+      satisfied: boolean;
+    };
+    birthday: {
+      satisfied: boolean;
+      required: boolean;
+    };
+  };
+};
+
+export type FamilyProfileCompletionStatus = {
+  complete: boolean;
+  state: 'complete' | 'birthday_required';
+  legacyAccessAllowed: boolean;
+  requirements: {
+    birthday: {
+      satisfied: boolean;
+      required: boolean;
+    };
   };
 };
 
@@ -85,6 +106,7 @@ export function assertAuthenticatedMember(value: unknown): AuthenticatedMember {
   const discord = value.discord;
   const session = value.session;
   const onboarding = value.onboarding;
+  const profileCompletion = value.profileCompletion;
   if (
     typeof value.memberId !== 'string' ||
     typeof value.nickname !== 'string' ||
@@ -110,7 +132,8 @@ export function assertAuthenticatedMember(value: unknown): AuthenticatedMember {
     typeof session.expiresAt !== 'string' ||
     !isNullableString(session.lastUsedAt) ||
     typeof session.mustChangePassword !== 'boolean' ||
-    !isOnboardingStatus(onboarding)
+    !isOnboardingStatus(onboarding) ||
+    !isProfileCompletionStatus(profileCompletion)
   ) {
     throw new Error('Family auth response was malformed');
   }
@@ -129,13 +152,35 @@ function isOnboardingStatus(value: unknown): value is FamilyOnboardingStatus {
   }
   const staticId = requirements.staticId;
   const discordLink = requirements.discordLink;
+  const inGameNickname = requirements.inGameNickname;
+  const birthday = requirements.birthday;
   return (
     isRecord(staticId) &&
     typeof staticId.satisfied === 'boolean' &&
     (staticId.value === undefined || typeof staticId.value === 'string') &&
     isRecord(discordLink) &&
-    typeof discordLink.satisfied === 'boolean'
+    typeof discordLink.satisfied === 'boolean' &&
+    isRecord(inGameNickname) &&
+    typeof inGameNickname.satisfied === 'boolean' &&
+    isRecord(birthday) &&
+    typeof birthday.satisfied === 'boolean' &&
+    typeof birthday.required === 'boolean'
   );
+}
+
+function isProfileCompletionStatus(value: unknown): value is FamilyProfileCompletionStatus {
+  if (!isRecord(value)) return false;
+  const requirements = value.requirements;
+  if (
+    typeof value.complete !== 'boolean' ||
+    (value.state !== 'complete' && value.state !== 'birthday_required') ||
+    typeof value.legacyAccessAllowed !== 'boolean' ||
+    !isRecord(requirements)
+  ) {
+    return false;
+  }
+  const birthday = requirements.birthday;
+  return isRecord(birthday) && typeof birthday.satisfied === 'boolean' && typeof birthday.required === 'boolean';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -154,6 +199,7 @@ function isFamilyOnboardingState(value: unknown): value is FamilyOnboardingState
   return (
     value === 'complete' ||
     value === 'static_id_required' ||
+    value === 'birthday_required' ||
     value === 'discord_link_required' ||
     value === 'member_access_denied' ||
     value === 'account_deactivated'

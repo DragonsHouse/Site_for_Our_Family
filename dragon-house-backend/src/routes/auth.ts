@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { FamilyAuthError, authErrorMessage } from '../auth/auth-errors.js';
 import { familyAuthOutcomeCode, sendAuthOutcome } from '../auth/auth-outcomes.js';
-import { StaticIdSelfServiceError, type FamilyAuthService } from '../auth/auth-service.js';
+import { BirthdaySelfServiceError, StaticIdSelfServiceError, type FamilyAuthService } from '../auth/auth-service.js';
 import { readBearerToken, respondWithAuthError } from '../middleware/family-auth-context.js';
 import type { FamilyPermission } from '../types.js';
 
@@ -29,6 +29,10 @@ const CreateAuthUserSchema = z.object({
 
 const StaticIdSelfServiceSchema = z.object({
   staticId: z.string(),
+});
+
+const BirthdaySelfServiceSchema = z.object({
+  dateOfBirth: z.string(),
 });
 
 export function createAuthRouter(authService: FamilyAuthService | null): Router {
@@ -143,6 +147,32 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
     }
   });
 
+  router.patch('/family/me/birthday', async (request, response) => {
+    if (!authService) {
+      sendFamilyAuthOutcome(response, 503, 'database_unavailable');
+      return;
+    }
+    const token = readBearerToken(request);
+    if (!token) {
+      sendFamilyAuthOutcome(response, 401, 'session_required');
+      return;
+    }
+    const parsed = BirthdaySelfServiceSchema.safeParse(request.body);
+    if (!parsed.success) {
+      sendBirthdayValidationError(response, new BirthdaySelfServiceError('birthday_required', 'Date of birth is required'));
+      return;
+    }
+    try {
+      response.json(await authService.updateCurrentMemberBirthday(token, parsed.data.dateOfBirth));
+    } catch (error) {
+      if (error instanceof BirthdaySelfServiceError) {
+        sendBirthdayValidationError(response, error);
+        return;
+      }
+      respondWithAuthError(response, error);
+    }
+  });
+
   router.post('/auth/users', async (request, response) => {
     if (!authService) {
       sendFamilyAuthOutcome(response, 503, 'database_unavailable');
@@ -183,6 +213,20 @@ function sendStaticIdValidationError(
     message: error.message,
     fields: {
       staticId: error.message,
+    },
+  });
+}
+
+function sendBirthdayValidationError(
+  response: import('express').Response,
+  error: BirthdaySelfServiceError,
+): void {
+  response.status(error.httpStatus).json({
+    error: 'invalid_birthday',
+    code: error.code,
+    message: error.message,
+    fields: {
+      dateOfBirth: error.message,
     },
   });
 }
