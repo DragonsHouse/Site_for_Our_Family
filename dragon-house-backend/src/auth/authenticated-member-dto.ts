@@ -1,5 +1,26 @@
 import type { FamilyAuthUser, FamilyMember, FamilyMemberStatus, FamilyPermission, FamilyRole, FamilySession } from '../types.js';
 
+export type MemberOnboardingState =
+  | 'complete'
+  | 'static_id_required'
+  | 'discord_link_required'
+  | 'member_access_denied'
+  | 'account_deactivated';
+
+export type MemberOnboardingStatus = {
+  complete: boolean;
+  state: MemberOnboardingState;
+  requirements: {
+    staticId: {
+      satisfied: boolean;
+      value?: string;
+    };
+    discordLink: {
+      satisfied: boolean;
+    };
+  };
+};
+
 export type AuthenticatedMemberDto = {
   memberId: string;
   nickname: string;
@@ -24,6 +45,7 @@ export type AuthenticatedMemberDto = {
     lastUsedAt: string | null;
     mustChangePassword: boolean;
   };
+  onboarding: MemberOnboardingStatus;
 };
 
 export function createAuthenticatedMemberDto(
@@ -31,6 +53,8 @@ export function createAuthenticatedMemberDto(
   session: Pick<FamilySession, 'loginProvider' | 'expiresAt' | 'lastUsedAt'>,
   authUser: Pick<FamilyAuthUser, 'mustChangePassword'>,
 ): AuthenticatedMemberDto {
+  const discordLinked = member.discord?.linked === true && Boolean(member.discord.discordUserId);
+  const onboarding = createMemberOnboardingStatus(member, discordLinked);
   return {
     memberId: member.id,
     nickname: member.nickname,
@@ -41,7 +65,7 @@ export function createAuthenticatedMemberDto(
     status: member.status,
     permissions: member.permissions,
     discord: {
-      linked: member.discord?.linked === true && Boolean(member.discord.discordUserId),
+      linked: discordLinked,
       userId: member.discord?.discordUserId ?? null,
       username: member.discord?.discordUsername ?? null,
       displayName: discordDisplayName(member),
@@ -54,6 +78,31 @@ export function createAuthenticatedMemberDto(
       expiresAt: session.expiresAt,
       lastUsedAt: session.lastUsedAt,
       mustChangePassword: authUser.mustChangePassword,
+    },
+    onboarding,
+  };
+}
+
+export function createMemberOnboardingStatus(member: FamilyMember, discordLinked = member.discord?.linked === true && Boolean(member.discord.discordUserId)): MemberOnboardingStatus {
+  const staticId = member.staticId?.trim() || null;
+  const staticIdSatisfied = Boolean(staticId);
+  let state: MemberOnboardingState = 'complete';
+
+  if (member.status !== 'active' || member.deletedAt) state = 'account_deactivated';
+  else if (!discordLinked) state = 'discord_link_required';
+  else if (!staticIdSatisfied) state = 'static_id_required';
+
+  return {
+    complete: state === 'complete',
+    state,
+    requirements: {
+      staticId: {
+        satisfied: staticIdSatisfied,
+        ...(staticId ? { value: staticId } : {}),
+      },
+      discordLink: {
+        satisfied: discordLinked,
+      },
     },
   };
 }

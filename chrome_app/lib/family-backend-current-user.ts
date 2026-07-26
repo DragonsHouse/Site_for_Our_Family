@@ -57,6 +57,7 @@ export function createBackendCurrentFamilyUser(member: AuthenticatedMember): Fam
     discordLinkedAt: null,
     discordSyncedAt: member.discord.lastSyncedAt,
     discordLinkStatus: member.discord.linked ? 'linked' : 'not_linked',
+    onboarding: member.onboarding,
     externalSource: member.discord.linked ? 'discord' : 'family_hub',
     externalId: member.discord.userId ?? member.memberId,
     externalRevision: null,

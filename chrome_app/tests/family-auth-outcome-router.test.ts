@@ -63,6 +63,42 @@ describe('frontend auth state router', () => {
     assert.equal(stateForAuthenticatedUser(user, 'login').status, 'change_password_required');
   });
 
+  it('routes backend-derived onboarding states before Hub access', () => {
+    const missingStaticId = stateForAuthenticatedUser(
+      familyUser({
+        staticId: '',
+        discordLinkStatus: 'linked',
+        onboarding: {
+          complete: false,
+          state: 'static_id_required',
+          requirements: {
+            staticId: { satisfied: false },
+            discordLink: { satisfied: true },
+          },
+        },
+      }),
+      'restore',
+    );
+    const missingDiscord = stateForAuthenticatedUser(
+      familyUser({
+        onboarding: {
+          complete: false,
+          state: 'discord_link_required',
+          requirements: {
+            staticId: { satisfied: true, value: '41384' },
+            discordLink: { satisfied: false },
+          },
+        },
+      }),
+      'restore',
+    );
+    const complete = stateForAuthenticatedUser(familyUser(), 'restore');
+
+    assert.equal(missingStaticId.status, 'static_id_required');
+    assert.equal(missingDiscord.status, 'discord_link_required');
+    assert.equal(complete.status, 'authenticated');
+  });
+
   it('routes restore failures and preserves tokens on network/auth unavailable', () => {
     const expired = routeRestoreFailure(new AuthOutcomeError(normalizeAuthFailure(401, { error: 'session_expired', message: 'Сесія застаріла.' })));
     const invalid = routeRestoreFailure(new AuthOutcomeError(normalizeAuthFailure(401, { error: 'session_invalid', message: 'Сесія недійсна.' })));
@@ -99,6 +135,8 @@ describe('FamilyHubApp auth routing source contract', () => {
     assert.match(source, /routeDiscordLoginFailure/u);
     assert.match(source, /status === 'session_expired'/u);
     assert.match(source, /status === 'discord_link_required'/u);
+    assert.match(source, /status === 'static_id_required'/u);
+    assert.match(source, /updateCurrentStaticId/u);
     assert.match(source, /status === 'account_deactivated'/u);
     assert.match(source, /status === 'member_access_denied'/u);
     assert.match(source, /status === 'auth_unavailable'/u);
@@ -110,6 +148,7 @@ describe('FamilyHubApp auth routing source contract', () => {
     const source = await readSource('lib/family-backend-auth-client.ts');
 
     assert.match(source, /throw new AuthOutcomeError\(failure\)/u);
+    assert.match(source, /\/api\/family\/me\/static-id/u);
     assert.match(source, /shouldClearAuthSessionForOutcome\(failure\.outcome\.code\)/u);
     assert.match(source, /error instanceof AuthOutcomeError && shouldClearAuthSessionForOutcome\(error\.failure\.outcome\.code\)/u);
     assert.doesNotMatch(source, /localStorage\.clear/u);
@@ -165,6 +204,14 @@ function familyUser(overrides: Partial<FamilyUser> = {}): FamilyUser {
     discordLinkedAt: null,
     discordSyncedAt: null,
     discordLinkStatus: 'not_linked',
+    onboarding: {
+      complete: true,
+      state: 'complete',
+      requirements: {
+        staticId: { satisfied: true, value: '41384' },
+        discordLink: { satisfied: true },
+      },
+    },
     externalSource: 'family_hub',
     externalId: 'member-1',
     externalRevision: null,

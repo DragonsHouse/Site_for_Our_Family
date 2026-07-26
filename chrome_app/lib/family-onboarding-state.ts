@@ -15,6 +15,7 @@ export type FamilyHubAuthState =
   | { status: 'loading'; user: FamilyUser }
   | { status: 'session_expired'; message: string }
   | { status: 'discord_link_required'; message: string }
+  | { status: 'static_id_required'; user: FamilyUser; message?: string }
   | { status: 'account_deactivated'; message: string }
   | { status: 'member_access_denied'; message: string }
   | { status: 'auth_unavailable'; message: string; retryTarget: AuthUnavailableRetryTarget };
@@ -34,6 +35,18 @@ export function userFromAuthState(state: FamilyHubAuthState): FamilyUser | null 
 
 export function stateForAuthenticatedUser(user: FamilyUser, entry: 'restore' | 'login' | 'discord' | 'password-change'): FamilyHubAuthState {
   if (user.mustChangePassword) return { status: 'change_password_required', user };
+  if (user.onboarding?.state === 'account_deactivated') {
+    return { status: 'account_deactivated', message: 'Account is deactivated.' };
+  }
+  if (user.onboarding?.state === 'member_access_denied') {
+    return { status: 'member_access_denied', message: 'Member access is denied.' };
+  }
+  if (user.onboarding?.state === 'discord_link_required') {
+    return { status: 'discord_link_required', message: 'Discord account must be linked before Family Hub access.' };
+  }
+  if (user.onboarding?.state === 'static_id_required') {
+    return { status: 'static_id_required', user, message: 'Static ID is required before Family Hub access.' };
+  }
   if (entry === 'login' || entry === 'password-change') return { status: 'loading', user };
   if (entry === 'discord') return { status: 'oauth_success', user };
   return { status: 'authenticated', user };

@@ -55,12 +55,35 @@ export type AuthenticatedMember = {
     lastUsedAt: string | null;
     mustChangePassword: boolean;
   };
+  onboarding: FamilyOnboardingStatus;
+};
+
+export type FamilyOnboardingState =
+  | 'complete'
+  | 'static_id_required'
+  | 'discord_link_required'
+  | 'member_access_denied'
+  | 'account_deactivated';
+
+export type FamilyOnboardingStatus = {
+  complete: boolean;
+  state: FamilyOnboardingState;
+  requirements: {
+    staticId: {
+      satisfied: boolean;
+      value?: string;
+    };
+    discordLink: {
+      satisfied: boolean;
+    };
+  };
 };
 
 export function assertAuthenticatedMember(value: unknown): AuthenticatedMember {
   if (!isRecord(value)) throw new Error('Family auth response was malformed');
   const discord = value.discord;
   const session = value.session;
+  const onboarding = value.onboarding;
   if (
     typeof value.memberId !== 'string' ||
     typeof value.nickname !== 'string' ||
@@ -84,11 +107,33 @@ export function assertAuthenticatedMember(value: unknown): AuthenticatedMember {
     !['password', 'discord'].includes(String(session.loginProvider)) ||
     typeof session.expiresAt !== 'string' ||
     !isNullableString(session.lastUsedAt) ||
-    typeof session.mustChangePassword !== 'boolean'
+    typeof session.mustChangePassword !== 'boolean' ||
+    !isOnboardingStatus(onboarding)
   ) {
     throw new Error('Family auth response was malformed');
   }
   return value as AuthenticatedMember;
+}
+
+function isOnboardingStatus(value: unknown): value is FamilyOnboardingStatus {
+  if (!isRecord(value)) return false;
+  const requirements = value.requirements;
+  if (
+    typeof value.complete !== 'boolean' ||
+    !isFamilyOnboardingState(value.state) ||
+    !isRecord(requirements)
+  ) {
+    return false;
+  }
+  const staticId = requirements.staticId;
+  const discordLink = requirements.discordLink;
+  return (
+    isRecord(staticId) &&
+    typeof staticId.satisfied === 'boolean' &&
+    (staticId.value === undefined || typeof staticId.value === 'string') &&
+    isRecord(discordLink) &&
+    typeof discordLink.satisfied === 'boolean'
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -101,6 +146,16 @@ function isNullableString(value: unknown): value is string | null {
 
 function isFamilyRole(value: unknown): value is FamilyRole {
   return value === 'owner' || value === 'deputy' || value === 'moderator' || value === 'member';
+}
+
+function isFamilyOnboardingState(value: unknown): value is FamilyOnboardingState {
+  return (
+    value === 'complete' ||
+    value === 'static_id_required' ||
+    value === 'discord_link_required' ||
+    value === 'member_access_denied' ||
+    value === 'account_deactivated'
+  );
 }
 
 function isFamilyPermission(value: unknown): value is FamilyPermission {

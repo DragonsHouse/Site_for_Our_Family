@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import type { CreateFamilyAuthUserInput, FamilyAuthRepository } from './auth-repository.js';
+import { DuplicateFamilyAuthUserError, type CreateFamilyAuthUserInput, type FamilyAuthRepository } from './auth-repository.js';
 import type { FamilyAuthUser, FamilyPermission, FamilyRole, FamilySession } from '../types.js';
 
 type AuthUserRow = {
@@ -77,6 +77,16 @@ export class PgFamilyAuthRepository implements FamilyAuthRepository {
     return memberResult.rows[0] ? mapUser(memberResult.rows[0]) : null;
   }
 
+  async existsByStaticId(staticId: string, excludingFamilyMemberId?: string): Promise<boolean> {
+    const result = await this.pool.query<{ exists: boolean }>(
+      `select exists (
+        select 1 from family_auth_users where lower(static_id) = lower($1) and ($2::text is null or family_member_id <> $2)
+      )`,
+      [staticId, excludingFamilyMemberId ?? null],
+    );
+    return result.rows[0]?.exists ?? false;
+  }
+
   async createUser(input: CreateFamilyAuthUserInput): Promise<FamilyAuthUser> {
     const client = await this.pool.connect();
     try {
@@ -109,6 +119,59 @@ export class PgFamilyAuthRepository implements FamilyAuthRepository {
       return mapUser(result.rows[0]);
     } catch (error) {
       await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateStaticIdForFamilyMember(familyMemberId: string, staticId: string): Promise<FamilyAuthUser | null> {
+    const result = await this.pool.query<AuthUserRow>(
+      `update family_auth_users
+       set static_id = $2, updated_at = now()
+       where family_member_id = $1
+       returning *`,
+      [familyMemberId, staticId],
+    );
+    return result.rows[0] ? mapUser(result.rows[0]) : null;
+  }
+
+  async updateMemberAndAuthStaticId(
+    familyMemberId: string,
+    staticId: string,
+    expectedMemberVersion: number,
+  ): Promise<{ user: FamilyAuthUser | null; memberUpdated: boolean }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      const memberResult = await client.query<{ id: string }>(
+        `update family_members
+         set static_id = $2,
+             updated_by_family_member_id = $1,
+             updated_at = now(),
+             version = version + 1
+         where id = $1 and version = $3
+         returning id`,
+        [familyMemberId, staticId, expectedMemberVersion],
+      );
+      if (!memberResult.rows[0]) {
+        await client.query('rollback');
+        return { user: null, memberUpdated: false };
+      }
+      const userResult = await client.query<AuthUserRow>(
+        `update family_auth_users
+         set static_id = $2, updated_at = now()
+         where family_member_id = $1
+         returning *`,
+        [familyMemberId, staticId],
+      );
+      await client.query('commit');
+      return { user: userResult.rows[0] ? mapUser(userResult.rows[0]) : null, memberUpdated: true };
+    } catch (error) {
+      await client.query('rollback').catch(() => undefined);
+      if (isUniqueViolation(error)) {
+        throw new DuplicateFamilyAuthUserError('Static ID already exists');
+      }
       throw error;
     } finally {
       client.release();
@@ -188,6 +251,10 @@ export class PgFamilyAuthRepository implements FamilyAuthRepository {
       [familyMemberId, revokedAt],
     );
   }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === '23505');
 }
 
 function mapUser(row: AuthUserRow): FamilyAuthUser {

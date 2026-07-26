@@ -11,7 +11,9 @@ import {
   createAuthUser,
   loginWithDiscord,
   login as loginBackend,
-  logout as logoutBackend
+  logout as logoutBackend,
+  StaticIdValidationError,
+  updateCurrentStaticId
 } from '../../lib/family-backend-auth-client';
 import { AuthOutcomeError, normalizeAuthFailure } from '../../lib/family-outcome';
 import {
@@ -215,6 +217,82 @@ function ChangePasswordScreen({
   );
 }
 
+function StaticIdOnboardingScreen({
+  user,
+  value,
+  error,
+  loading,
+  onChange,
+  onSubmit,
+}: {
+  user: FamilyUser;
+  value: string;
+  error: string | null;
+  loading: boolean;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <AuthShell>
+      <section className="dh-auth-card w-full max-w-md rounded-3xl p-6">
+        <div className="mx-auto flex justify-center">
+          <DragonHouseCrest slot="dragon_house_logo" size="lg" />
+        </div>
+        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">DRAGON HOUSE HUB</p>
+        <h1 className="mt-2 text-2xl font-semibold text-white">Welcome to Dragon House Hub</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          {user.displayName}, заверши коротку перевірку профілю, щоб відкрити Hub.
+        </p>
+
+        <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm">
+          <div className="flex items-center justify-between gap-3 text-slate-200">
+            <span>Discord linked</span>
+            <span className="font-semibold text-emerald-300">✓</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3 text-slate-200">
+            <span>Static ID missing</span>
+            <span className="font-semibold text-rose-300">✕</span>
+          </div>
+        </div>
+
+        <form
+          className="mt-5 space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit();
+          }}
+        >
+          <label className="block">
+            <span className="mb-1 block text-sm text-slate-300">Static ID</span>
+            <input
+              className={inputClassName()}
+              type="text"
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+              autoComplete="off"
+              maxLength={80}
+            />
+          </label>
+
+          {error ? (
+            <div className="rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-100">
+              {error}
+            </div>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={loading || !value.trim()}
+            className="w-full rounded-xl bg-gradient-to-r from-red-700 to-amber-500 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? 'Saving...' : 'Save Static ID'}
+          </button>
+        </form>
+      </section>
+    </AuthShell>
+  );
+}
+
 function OAuthLoadingScreen() {
   return (
     <AuthShell>
@@ -328,6 +406,7 @@ export function FamilyHubApp() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [staticIdDraft, setStaticIdDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const authCheckStartedRef = useRef(false);
@@ -358,6 +437,7 @@ export function FamilyHubApp() {
           window.history.replaceState(null, document.title, window.location.pathname);
           const user = resolveBackendFamilyUser(result.user);
           setCurrentUser(user);
+          setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
           void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
           setAuthState(stateForAuthenticatedUser(user, 'discord'));
         })
@@ -397,6 +477,7 @@ export function FamilyHubApp() {
     try {
       const user = await loadCurrentBackendFamilyUser();
       setCurrentUser(user);
+      setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
       void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
       setAuthState(stateForAuthenticatedUser(user, 'restore'));
     } catch (err) {
@@ -418,6 +499,7 @@ export function FamilyHubApp() {
       await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
       setPosts(readFamilyPosts());
       setCurrentPassword(user.mustChangePassword ? password : '');
+      setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
       setPassword('');
       setAuthState(stateForAuthenticatedUser(user, 'login'));
     } catch (err) {
@@ -476,6 +558,7 @@ export function FamilyHubApp() {
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
+    setStaticIdDraft('');
     setError(null);
     setActiveTab('cabinet');
     setAuthState({ status: 'unauthenticated' });
@@ -485,6 +568,7 @@ export function FamilyHubApp() {
     try {
       const user = await loadCurrentBackendFamilyUser();
       setCurrentUser(user);
+      setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
       setAuthState(stateForAuthenticatedUser(user, 'restore'));
       return user;
     } catch (err) {
@@ -506,6 +590,7 @@ export function FamilyHubApp() {
       const result = await loginWithDiscord();
       const user = resolveBackendFamilyUser(result.user);
       setCurrentUser(user);
+      setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
       await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
       setPosts(readFamilyPosts());
       setAuthState(stateForAuthenticatedUser(user, 'discord'));
@@ -520,6 +605,29 @@ export function FamilyHubApp() {
       }
     } finally {
       discordLoginInFlightRef.current = false;
+      setLoading(false);
+    }
+  }
+
+  async function handleStaticIdSubmit() {
+    if (!currentUser) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const user = resolveBackendFamilyUser(await updateCurrentStaticId(staticIdDraft));
+      setCurrentUser(user);
+      setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? user.staticId);
+      await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
+      setAuthState(stateForAuthenticatedUser(user, 'restore'));
+    } catch (err) {
+      if (err instanceof StaticIdValidationError) {
+        setError(err.fields.staticId ?? err.message);
+        return;
+      }
+      const route = routeRestoreFailure(err);
+      if (route.clearAuthSession) await clearAuthSession().catch(() => undefined);
+      setAuthState(route.state);
+    } finally {
       setLoading(false);
     }
   }
@@ -616,6 +724,7 @@ export function FamilyHubApp() {
     setCurrentUser(null);
     setError(null);
     setPassword('');
+    setStaticIdDraft('');
     setAuthState({ status: 'unauthenticated' });
   }
 
@@ -719,6 +828,19 @@ export function FamilyHubApp() {
         onPrimary={returnToLogin}
         secondaryLabel="Спробувати Discord ще раз"
         onSecondary={() => void handleDiscordLogin()}
+      />
+    );
+  }
+
+  if (authState.status === 'static_id_required' && currentUser) {
+    return (
+      <StaticIdOnboardingScreen
+        user={currentUser}
+        value={staticIdDraft}
+        error={error}
+        loading={loading}
+        onChange={setStaticIdDraft}
+        onSubmit={() => void handleStaticIdSubmit()}
       />
     );
   }

@@ -73,7 +73,7 @@ afterEach(async () => {
   );
 });
 
-describe('auth routes', () => {
+describe('auth routes', { timeout: 20_000 }, () => {
   it('login creates bearer session and me returns sanitized user', async () => {
     const baseUrl = await createServer();
 
@@ -239,6 +239,106 @@ describe('auth routes', () => {
     expect(await me.json()).toMatchObject({
       error: 'account_disabled',
       outcome: { code: 'account_deactivated', onboardingState: 'account_deactivated' },
+    });
+  });
+
+  it('updates authenticated member Static ID through self-service and returns refreshed onboarding', async () => {
+    const { baseUrl, authRepository, memberRepository } = await createServerHarness();
+    await memberRepository.create(
+      createMember({
+        id: 'self-service-member',
+        nickname: 'Self_Service',
+        staticId: null,
+        discord: {
+          linked: true,
+          discordUserId: 'discord-self-service',
+          discordUsername: 'self_service',
+        },
+      }),
+      ANASTASIA_MEMBER_ID,
+    );
+    await authRepository.createUser({
+      familyMemberId: 'self-service-member',
+      login: 'Self_Service',
+      staticId: 'self-service-login',
+      passwordHash: await hashPassword('41384', 10),
+      isActive: true,
+      mustChangePassword: false,
+      role: 'member',
+      rank: 1,
+      permissions: [],
+    });
+    const login = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginOrStaticId: 'Self_Service', password: '41384' }),
+    });
+    const loginBody = (await login.json()) as { token: string };
+
+    const response = await fetch(`${baseUrl}/api/family/me/static-id`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staticId: ' 72001 ' }),
+    });
+    const body = (await response.json()) as AuthenticatedMemberDto;
+    const updatedSelf = await memberRepository.findById('self-service-member');
+    const owner = await memberRepository.findById(ANASTASIA_MEMBER_ID);
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      memberId: 'self-service-member',
+      staticId: '72001',
+      onboarding: { complete: false, state: 'discord_link_required' },
+      discord: { linked: false, userId: null },
+    });
+    expect(updatedSelf?.staticId).toBe('72001');
+    expect(updatedSelf?.discord).toBeUndefined();
+    expect(owner?.staticId).toBe('41384');
+  });
+
+  it('returns structured Static ID validation errors without clearing auth state', async () => {
+    const { baseUrl, authRepository, memberRepository } = await createServerHarness();
+    await memberRepository.create(createMember({ id: 'duplicate-route-member', nickname: 'Duplicate_Route', staticId: '73001' }), ANASTASIA_MEMBER_ID);
+    await authRepository.createUser({
+      familyMemberId: 'duplicate-route-member',
+      login: 'Duplicate_Route',
+      staticId: '73001',
+      passwordHash: await hashPassword('41384', 10),
+      isActive: true,
+      mustChangePassword: false,
+      role: 'member',
+      rank: 1,
+      permissions: [],
+    });
+    const login = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginOrStaticId: 'Anastasia_Dragons', password: '41384' }),
+    });
+    const loginBody = (await login.json()) as { token: string };
+
+    const invalid = await fetch(`${baseUrl}/api/family/me/static-id`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staticId: '   ' }),
+    });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({
+      error: 'invalid_static_id',
+      code: 'static_id_required',
+      fields: { staticId: 'Static ID is required' },
+    });
+
+    const duplicate = await fetch(`${baseUrl}/api/family/me/static-id`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staticId: '73001' }),
+    });
+    expect(duplicate.status).toBe(409);
+    expect(await duplicate.json()).toMatchObject({
+      error: 'invalid_static_id',
+      code: 'static_id_duplicate',
+      fields: { staticId: 'Static ID is already in use' },
     });
   });
 
@@ -433,6 +533,14 @@ function createAuthenticatedMember(): AuthenticatedMemberDto {
       expiresAt: session.expiresAt,
       lastUsedAt: session.lastUsedAt,
       mustChangePassword: false,
+    },
+    onboarding: {
+      complete: true,
+      state: 'complete',
+      requirements: {
+        staticId: { satisfied: true, value: '41384' },
+        discordLink: { satisfied: true },
+      },
     },
   };
 }

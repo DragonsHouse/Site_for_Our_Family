@@ -38,6 +38,16 @@ export type LoginResponse = {
 
 export type AuthSessionMode = 'session' | 'persistent';
 
+export class StaticIdValidationError extends Error {
+  constructor(
+    message: string,
+    readonly fields: { staticId?: string } = {},
+  ) {
+    super(message);
+    this.name = 'StaticIdValidationError';
+  }
+}
+
 export function getBackendApiBaseUrl(): string {
   return readDiscordFamilySettings().backend.apiBaseUrl ?? DEFAULT_BACKEND_API_BASE_URL;
 }
@@ -272,6 +282,29 @@ export async function changePassword(currentPassword: string, newPassword: strin
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
   );
+}
+
+export async function updateCurrentStaticId(staticId: string): Promise<AuthenticatedMember> {
+  const response = await authenticatedFetch('/api/family/me/static-id', {
+    method: 'POST',
+    body: JSON.stringify({ staticId }),
+  });
+  if (response.ok) return assertAuthenticatedMember(await response.json());
+
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+  if (isRecord(body) && body.error === 'invalid_static_id') {
+    const fields = isRecord(body.fields) && typeof body.fields.staticId === 'string' ? { staticId: body.fields.staticId } : {};
+    throw new StaticIdValidationError(typeof body.message === 'string' ? body.message : 'Static ID is invalid', fields);
+  }
+
+  const failure = normalizeAuthFailure(response.status, body);
+  if (response.status === 401 && shouldClearAuthSessionForOutcome(failure.outcome.code)) await clearAuthSession();
+  throw new AuthOutcomeError(failure);
 }
 
 export async function createAuthUser(input: {

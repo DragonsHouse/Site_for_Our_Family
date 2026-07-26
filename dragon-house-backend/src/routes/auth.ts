@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { FamilyAuthError, authErrorMessage } from '../auth/auth-errors.js';
 import { familyAuthOutcomeCode, sendAuthOutcome } from '../auth/auth-outcomes.js';
-import type { FamilyAuthService } from '../auth/auth-service.js';
+import { StaticIdSelfServiceError, type FamilyAuthService } from '../auth/auth-service.js';
 import { readBearerToken, respondWithAuthError } from '../middleware/family-auth-context.js';
 import type { FamilyPermission } from '../types.js';
 
@@ -25,6 +25,10 @@ const CreateAuthUserSchema = z.object({
   rank: z.number().int().min(1).max(10),
   permissions: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
+});
+
+const StaticIdSelfServiceSchema = z.object({
+  staticId: z.string(),
 });
 
 export function createAuthRouter(authService: FamilyAuthService | null): Router {
@@ -113,6 +117,32 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
     }
   });
 
+  router.post('/family/me/static-id', async (request, response) => {
+    if (!authService) {
+      sendFamilyAuthOutcome(response, 503, 'database_unavailable');
+      return;
+    }
+    const token = readBearerToken(request);
+    if (!token) {
+      sendFamilyAuthOutcome(response, 401, 'session_required');
+      return;
+    }
+    const parsed = StaticIdSelfServiceSchema.safeParse(request.body);
+    if (!parsed.success) {
+      sendStaticIdValidationError(response, new StaticIdSelfServiceError('static_id_required', 'Static ID is required'));
+      return;
+    }
+    try {
+      response.json(await authService.updateCurrentMemberStaticId(token, parsed.data.staticId));
+    } catch (error) {
+      if (error instanceof StaticIdSelfServiceError) {
+        sendStaticIdValidationError(response, error);
+        return;
+      }
+      respondWithAuthError(response, error);
+    }
+  });
+
   router.post('/auth/users', async (request, response) => {
     if (!authService) {
       sendFamilyAuthOutcome(response, 503, 'database_unavailable');
@@ -141,6 +171,20 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
   });
 
   return router;
+}
+
+function sendStaticIdValidationError(
+  response: import('express').Response,
+  error: StaticIdSelfServiceError,
+): void {
+  response.status(error.httpStatus).json({
+    error: 'invalid_static_id',
+    code: error.code,
+    message: error.message,
+    fields: {
+      staticId: error.message,
+    },
+  });
 }
 
 function normalizeLoginError(error: unknown): unknown {

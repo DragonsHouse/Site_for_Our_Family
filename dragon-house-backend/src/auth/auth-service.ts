@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { AppConfig } from '../config/env.js';
 import type { FamilyMemberRepository } from '../members/member-repository.js';
-import type { FamilyAuthRepository } from './auth-repository.js';
+import { DuplicateFamilyAuthUserError, type FamilyAuthRepository } from './auth-repository.js';
 import { FamilyAuthError } from './auth-errors.js';
 import { createAuthenticatedMemberDto, type AuthenticatedMemberDto } from './authenticated-member-dto.js';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from './password.js';
@@ -17,11 +17,29 @@ import type {
 } from '../types.js';
 
 const LAST_USED_UPDATE_INTERVAL_MS = 60_000;
+const STATIC_ID_MAX_LENGTH = 80;
 
 type LoginAttempt = {
   count: number;
   resetAt: number;
 };
+
+export type StaticIdSelfServiceErrorCode =
+  | 'static_id_required'
+  | 'static_id_too_long'
+  | 'static_id_duplicate'
+  | 'static_id_update_conflict';
+
+export class StaticIdSelfServiceError extends Error {
+  constructor(
+    readonly code: StaticIdSelfServiceErrorCode,
+    message: string,
+    readonly httpStatus = 400,
+  ) {
+    super(message);
+    this.name = 'StaticIdSelfServiceError';
+  }
+}
 
 export class FamilyAuthService {
   private readonly loginAttempts = new Map<string, LoginAttempt>();
@@ -174,6 +192,22 @@ export class FamilyAuthService {
     return createAuthenticatedMemberDto(member, session, nextUser);
   }
 
+  async updateCurrentMemberStaticId(token: string, input: string): Promise<AuthenticatedMemberDto> {
+    const staticId = normalizeStaticId(input);
+    const { session, user, member } = await this.authenticateToken(token);
+
+    if (await this.members.existsByStaticId(staticId, member.id)) {
+      throw new StaticIdSelfServiceError('static_id_duplicate', 'Static ID is already in use', 409);
+    }
+    if (await this.repository.existsByStaticId(staticId, member.id)) {
+      throw new StaticIdSelfServiceError('static_id_duplicate', 'Static ID is already in use', 409);
+    }
+
+    const { updatedMember, updatedUser } = await this.updateCanonicalStaticId(member, user, staticId);
+
+    return createAuthenticatedMemberDto(updatedMember, session, updatedUser);
+  }
+
   async createAuthUser(
     token: string,
     input: {
@@ -227,6 +261,51 @@ export class FamilyAuthService {
     if (errorCode === 'account_disabled') throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
     throw new FamilyAuthError('session_invalid', 'Session invalid');
   }
+
+  private async updateCanonicalStaticId(
+    member: FamilyMember,
+    user: FamilyAuthUser,
+    staticId: string,
+  ): Promise<{ updatedMember: FamilyMember; updatedUser: FamilyAuthUser }> {
+    try {
+      if (this.repository.updateMemberAndAuthStaticId) {
+        const result = await this.repository.updateMemberAndAuthStaticId(member.id, staticId, member.version);
+        if (!result.memberUpdated) {
+          throw new StaticIdSelfServiceError('static_id_update_conflict', 'Static ID update conflict', 409);
+        }
+        const updatedMember = await this.members.findById(member.id);
+        if (!updatedMember) {
+          throw new StaticIdSelfServiceError('static_id_update_conflict', 'Static ID update conflict', 409);
+        }
+        return { updatedMember, updatedUser: result.user ?? { ...user, staticId } };
+      }
+
+      const updatedMember = await this.members.update(member.id, { staticId }, member.version, member.id);
+      if (!updatedMember) {
+        throw new StaticIdSelfServiceError('static_id_update_conflict', 'Static ID update conflict', 409);
+      }
+      const updatedUser = (await this.repository.updateStaticIdForFamilyMember(user.familyMemberId, staticId)) ?? {
+        ...user,
+        staticId,
+      };
+      return { updatedMember, updatedUser };
+    } catch (error) {
+      if (error instanceof StaticIdSelfServiceError) throw error;
+      if (error instanceof DuplicateFamilyAuthUserError) {
+        throw new StaticIdSelfServiceError('static_id_duplicate', 'Static ID is already in use', 409);
+      }
+      throw error;
+    }
+  }
+}
+
+function normalizeStaticId(input: string): string {
+  const staticId = input.trim();
+  if (!staticId) throw new StaticIdSelfServiceError('static_id_required', 'Static ID is required');
+  if (staticId.length > STATIC_ID_MAX_LENGTH) {
+    throw new StaticIdSelfServiceError('static_id_too_long', 'Static ID is too long');
+  }
+  return staticId;
 }
 
 export function sanitizeAuthUser(user: FamilyAuthUser, loginProvider?: 'password' | 'discord'): SanitizedFamilyAuthUser {

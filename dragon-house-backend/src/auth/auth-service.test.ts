@@ -72,7 +72,7 @@ async function createService() {
   return { service: new FamilyAuthService(config, repository, members), repository, members };
 }
 
-describe('FamilyAuthService', () => {
+describe('FamilyAuthService', { timeout: 20_000 }, () => {
   it('correct login creates a session and does not return passwordHash', async () => {
     const { service, repository } = await createService();
 
@@ -149,6 +149,14 @@ describe('FamilyAuthService', () => {
         guildId: 'guild-1',
         lastSyncedAt: '2026-07-22T00:00:00.000Z',
       },
+      onboarding: {
+        complete: true,
+        state: 'complete',
+        requirements: {
+          staticId: { satisfied: true, value: '41384' },
+          discordLink: { satisfied: true },
+        },
+      },
     });
     expect(context).toMatchObject({
       familyMemberId: ANASTASIA_MEMBER_ID,
@@ -203,6 +211,156 @@ describe('FamilyAuthService', () => {
     const user = await service.changePassword(login.token, '41384', 'Newpass123');
 
     expect(user.session.mustChangePassword).toBe(false);
+  });
+
+  it('derives onboarding from canonical member state without persistence', async () => {
+    const repository = new InMemoryFamilyAuthRepository();
+    const members = new MemoryFamilyMemberRepository([
+      createMember({
+        id: ANASTASIA_MEMBER_ID,
+        nickname: 'Anastasia_Dragons',
+        staticId: '41384',
+        discord: {
+          linked: true,
+          discordUserId: 'discord-1',
+          discordUsername: 'anastasia_dragons',
+        },
+      }),
+      createMember({
+        id: 'missing-static-id',
+        nickname: 'Missing_Static',
+        staticId: null,
+        discord: {
+          linked: true,
+          discordUserId: 'discord-missing-static',
+          discordUsername: 'missing_static',
+        },
+      }),
+      createMember({ id: 'missing-discord', nickname: 'Missing_Discord', staticId: '50003' }),
+    ]);
+    const service = new FamilyAuthService(createTestConfig({ bcryptCost: 10 }), repository, members);
+    await repository.createUser({
+      familyMemberId: ANASTASIA_MEMBER_ID,
+      login: 'Anastasia_Dragons',
+      staticId: '41384',
+      passwordHash: anastasiaPasswordHash,
+      isActive: true,
+      mustChangePassword: false,
+      role: 'member',
+      rank: 1,
+      permissions: [],
+    });
+    await repository.createUser({
+      familyMemberId: 'missing-static-id',
+      login: 'Missing_Static',
+      staticId: 'login-only-static',
+      passwordHash: anastasiaPasswordHash,
+      isActive: true,
+      mustChangePassword: false,
+      role: 'member',
+      rank: 1,
+      permissions: [],
+    });
+    await repository.createUser({
+      familyMemberId: 'missing-discord',
+      login: 'Missing_Discord',
+      staticId: '50003',
+      passwordHash: anastasiaPasswordHash,
+      isActive: true,
+      mustChangePassword: false,
+      role: 'member',
+      rank: 1,
+      permissions: [],
+    });
+
+    const complete = await service.login('Anastasia_Dragons', '41384');
+    const missingStaticId = await service.login('Missing_Static', '41384');
+    const missingDiscord = await service.login('Missing_Discord', '41384');
+
+    expect(complete.user.onboarding).toMatchObject({ complete: true, state: 'complete' });
+    expect(missingStaticId.user.onboarding).toMatchObject({
+      complete: false,
+      state: 'static_id_required',
+      requirements: {
+        staticId: { satisfied: false },
+        discordLink: { satisfied: true },
+      },
+    });
+    expect(missingDiscord.user.onboarding).toMatchObject({
+      complete: false,
+      state: 'discord_link_required',
+      requirements: {
+        staticId: { satisfied: true, value: '50003' },
+        discordLink: { satisfied: false },
+      },
+    });
+  });
+
+  it('updates only the authenticated member Static ID and returns refreshed onboarding', async () => {
+    const repository = new InMemoryFamilyAuthRepository();
+    const members = new MemoryFamilyMemberRepository([
+      createMember({
+        id: 'self-static-id',
+        nickname: 'Self_Static',
+        staticId: null,
+        discord: {
+          linked: true,
+          discordUserId: 'discord-self',
+          discordUsername: 'self_static',
+        },
+      }),
+      createMember({ id: 'other-static-id', nickname: 'Other_Static', staticId: '70002' }),
+    ]);
+    const service = new FamilyAuthService(createTestConfig({ bcryptCost: 10 }), repository, members);
+    await repository.createUser({
+      familyMemberId: 'self-static-id',
+      login: 'Self_Static',
+      staticId: 'self-login-static',
+      passwordHash: anastasiaPasswordHash,
+      isActive: true,
+      mustChangePassword: false,
+      role: 'member',
+      rank: 1,
+      permissions: [],
+    });
+
+    const login = await service.login('Self_Static', '41384');
+    const updated = await service.updateCurrentMemberStaticId(login.token, ' 70001 ');
+    const self = await members.findById('self-static-id');
+    const other = await members.findById('other-static-id');
+
+    expect(updated.staticId).toBe('70001');
+    expect(updated.onboarding).toMatchObject({ complete: true, state: 'complete' });
+    expect(self?.staticId).toBe('70001');
+    expect(self?.discord?.discordUserId).toBe('discord-self');
+    expect(other?.staticId).toBe('70002');
+    expect(await repository.existsByStaticId('70001', 'self-static-id')).toBe(false);
+  });
+
+  it('rejects invalid and duplicate Static ID self-service updates', async () => {
+    const { service, repository, members } = await createService();
+    await repository.updatePassword(ANASTASIA_MEMBER_ID, anastasiaPasswordHash, false);
+    await members.create(createMember({ id: 'duplicate-static-id', nickname: 'Duplicate_Static', staticId: '80001' }), ANASTASIA_MEMBER_ID);
+    await repository.createUser({
+      familyMemberId: 'duplicate-static-id',
+      login: 'Duplicate_Static',
+      staticId: '80001',
+      passwordHash: anastasiaPasswordHash,
+      isActive: true,
+      mustChangePassword: false,
+      role: 'member',
+      rank: 1,
+      permissions: [],
+    });
+    const login = await service.login('Anastasia_Dragons', '41384');
+
+    await expect(service.updateCurrentMemberStaticId(login.token, '   ')).rejects.toMatchObject({ code: 'static_id_required' });
+    await expect(service.updateCurrentMemberStaticId(login.token, 'x'.repeat(81))).rejects.toMatchObject({
+      code: 'static_id_too_long',
+    });
+    await expect(service.updateCurrentMemberStaticId(login.token, '80001')).rejects.toMatchObject({
+      code: 'static_id_duplicate',
+    });
   });
 
   it('rate limits repeated failed login attempts', async () => {

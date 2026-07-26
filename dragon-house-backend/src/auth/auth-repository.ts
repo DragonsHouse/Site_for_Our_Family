@@ -15,7 +15,14 @@ export type CreateFamilyAuthUserInput = {
 export interface FamilyAuthRepository {
   findUserByLoginOrStaticId(loginOrStaticId: string): Promise<FamilyAuthUser | null>;
   findUserByFamilyMemberId(familyMemberId: string): Promise<FamilyAuthUser | null>;
+  existsByStaticId(staticId: string, excludingFamilyMemberId?: string): Promise<boolean>;
   createUser(input: CreateFamilyAuthUserInput): Promise<FamilyAuthUser>;
+  updateStaticIdForFamilyMember(familyMemberId: string, staticId: string): Promise<FamilyAuthUser | null>;
+  updateMemberAndAuthStaticId?(
+    familyMemberId: string,
+    staticId: string,
+    expectedMemberVersion: number,
+  ): Promise<{ user: FamilyAuthUser | null; memberUpdated: boolean }>;
   updatePassword(familyMemberId: string, passwordHash: string, mustChangePassword: boolean): Promise<FamilyAuthUser>;
   createSession(session: FamilySession): Promise<FamilySession>;
   findSessionByTokenHash(tokenHash: string): Promise<FamilySession | null>;
@@ -53,6 +60,11 @@ export class InMemoryFamilyAuthRepository implements FamilyAuthRepository {
     return this.users.get(familyMemberId) ?? null;
   }
 
+  async existsByStaticId(staticId: string, excludingFamilyMemberId?: string): Promise<boolean> {
+    const familyMemberId = this.staticIdIndex.get(staticId.toLowerCase());
+    return Boolean(familyMemberId && familyMemberId !== excludingFamilyMemberId);
+  }
+
   async createUser(input: CreateFamilyAuthUserInput): Promise<FamilyAuthUser> {
     if (this.users.has(input.familyMemberId)) {
       throw new DuplicateFamilyAuthUserError('Family member ID already exists');
@@ -71,6 +83,21 @@ export class InMemoryFamilyAuthRepository implements FamilyAuthRepository {
     this.loginIndex.set(loginKey, user.familyMemberId);
     this.staticIdIndex.set(staticIdKey, user.familyMemberId);
     return user;
+  }
+
+  async updateStaticIdForFamilyMember(familyMemberId: string, staticId: string): Promise<FamilyAuthUser | null> {
+    const user = this.users.get(familyMemberId);
+    if (!user) return null;
+    const staticIdKey = staticId.toLowerCase();
+    const existingFamilyMemberId = this.staticIdIndex.get(staticIdKey);
+    if (existingFamilyMemberId && existingFamilyMemberId !== familyMemberId) {
+      throw new DuplicateFamilyAuthUserError('Static ID already exists');
+    }
+    this.staticIdIndex.delete(user.staticId.toLowerCase());
+    const nextUser = { ...user, staticId, updatedAt: new Date().toISOString() };
+    this.users.set(familyMemberId, nextUser);
+    this.staticIdIndex.set(staticIdKey, familyMemberId);
+    return nextUser;
   }
 
   async updatePassword(familyMemberId: string, passwordHash: string, mustChangePassword: boolean): Promise<FamilyAuthUser> {

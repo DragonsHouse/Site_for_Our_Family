@@ -650,6 +650,24 @@ export type FamilyUser = FamilySyncMetadata & {
   discordLinkedAt?: string | null;
   discordSyncedAt?: string | null;
   discordLinkStatus?: 'not_linked' | 'pending' | 'linked' | 'error';
+  onboarding?: {
+    complete: boolean;
+    state:
+      | 'complete'
+      | 'static_id_required'
+      | 'discord_link_required'
+      | 'member_access_denied'
+      | 'account_deactivated';
+    requirements: {
+      staticId: {
+        satisfied: boolean;
+        value?: string;
+      };
+      discordLink: {
+        satisfied: boolean;
+      };
+    };
+  };
 };
 
 export type FamilyPostType =

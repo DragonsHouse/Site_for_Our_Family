@@ -30,6 +30,14 @@ const canonicalMember: AuthenticatedMember = {
     lastUsedAt: null,
     mustChangePassword: false,
   },
+  onboarding: {
+    complete: false,
+    state: 'static_id_required',
+    requirements: {
+      staticId: { satisfied: false },
+      discordLink: { satisfied: true },
+    },
+  },
 };
 
 describe('assertAuthenticatedMember', () => {
@@ -86,6 +94,7 @@ describe('createBackendCurrentFamilyUser', () => {
     assert.equal(user.passwordHash, null);
     assert.equal(user.discordUserId, 'discord-1');
     assert.equal(user.discordLinkStatus, 'linked');
+    assert.equal(user.onboarding?.state, 'static_id_required');
   });
 
   it('preserves password-change state from canonical session metadata', () => {
