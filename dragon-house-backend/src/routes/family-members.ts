@@ -9,6 +9,9 @@ import type { FamilyMemberListQuery, FamilyPermission } from '../types.js';
 
 const roleSchema = z.enum(['owner', 'deputy', 'moderator', 'member']);
 const statusSchema = z.enum(['active', 'inactive']);
+const directoryRoleSchema = z.enum(['owner', 'deputy', 'moderator', 'member', 'all']);
+const directoryStatusSchema = z.enum(['active', 'inactive', 'all']);
+const directorySortSchema = z.enum(['displayName', 'rank', 'role', 'joinedAt']);
 const sortBySchema = z.enum(['nickname', 'staticId', 'role', 'rank', 'status', 'joinedAt', 'createdAt', 'updatedAt']);
 const sortOrderSchema = z.enum(['asc', 'desc']);
 const permissionSchema = z.string().min(1).max(80).transform((value) => value as FamilyPermission);
@@ -47,7 +50,24 @@ export function createFamilyMembersRouter(
 ): Router {
   const router = Router();
   const requireAuth = requireFamilyAuthContext(config, authService);
-  router.use(['/family/members', '/members'], requireAuth);
+  router.use(['/family/directory', '/family/members', '/members'], requireAuth);
+
+  router.get('/family/directory', async (request, response) => {
+    if (!memberService || !request.familyAuth) return respondServiceUnavailable(response);
+    try {
+      response.json(await memberService.listDirectory({
+        page: positiveInt(request.query.page, 1, 1, 100_000),
+        pageSize: positiveInt(request.query.pageSize, 24, 1, 50),
+        search: stringQuery(request.query.search),
+        status: directoryStatusSchema.safeParse(request.query.status).success ? request.query.status as 'active' | 'inactive' | 'all' : 'active',
+        role: directoryRoleSchema.safeParse(request.query.role).success ? request.query.role as 'owner' | 'deputy' | 'moderator' | 'member' | 'all' : 'all',
+        sort: directorySortSchema.safeParse(request.query.sort).success ? request.query.sort as 'displayName' | 'rank' | 'role' | 'joinedAt' : 'rank',
+        order: sortOrderSchema.safeParse(request.query.order).success ? request.query.order as 'asc' | 'desc' : 'desc',
+      }, request.familyAuth));
+    } catch (error) {
+      respondMemberError(response, error);
+    }
+  });
 
   const listMembers = async (request: import('express').Request, response: import('express').Response) => {
     if (!memberService || !request.familyAuth) return respondServiceUnavailable(response);

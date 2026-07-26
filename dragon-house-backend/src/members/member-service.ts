@@ -10,6 +10,11 @@ import type {
   UpdateFamilyMemberInput,
 } from '../types.js';
 import { FamilyMemberError } from './member-errors.js';
+import {
+  toFamilyMemberDirectoryItemDto,
+  type FamilyMemberDirectoryQuery,
+  type FamilyMemberDirectoryResponseDto,
+} from './member-directory-dto.js';
 import type { FamilyMemberAuditAction, FamilyMemberRepository } from './member-repository.js';
 
 const OWNER_PERMISSIONS: FamilyPermission[] = [
@@ -34,6 +39,39 @@ export class FamilyMemberService {
       throw new FamilyMemberError('MEMBER_PERMISSION_DENIED', 'Missing restore_members', 403);
     }
     return this.repository.list(query);
+  }
+
+  async listDirectory(query: FamilyMemberDirectoryQuery, auth: FamilyAuthContext): Promise<FamilyMemberDirectoryResponseDto> {
+    if (auth.status !== 'active') {
+      throw new FamilyMemberError('MEMBER_PERMISSION_DENIED', 'Inactive members cannot view the directory', 403);
+    }
+    if ((query.status === 'inactive' || query.status === 'all') && !this.hasPermission(auth, 'view_members')) {
+      throw new FamilyMemberError('MEMBER_PERMISSION_DENIED', 'Permission denied', 403, { permission: 'view_members' });
+    }
+    const result = await this.repository.list({
+      page: query.page,
+      pageSize: query.pageSize,
+      search: query.search,
+      status: query.status,
+      role: query.role,
+      rank: null,
+      sortBy: directorySortToMemberSort(query.sort),
+      sortOrder: query.order,
+      includeDeleted: false,
+    });
+    const totalPages = result.total > 0 ? Math.ceil(result.total / result.pageSize) : 0;
+
+    return {
+      items: result.items.map(toFamilyMemberDirectoryItemDto),
+      pagination: {
+        page: result.page,
+        pageSize: result.pageSize,
+        totalItems: result.total,
+        totalPages,
+        hasNextPage: result.page < totalPages,
+        hasPreviousPage: result.page > 1 && totalPages > 0,
+      },
+    };
   }
 
   async get(id: string, auth: FamilyAuthContext): Promise<FamilyMember> {
@@ -196,4 +234,10 @@ export class FamilyMemberService {
 
 function uniquePermissions(permissions: FamilyPermission[]): FamilyPermission[] {
   return [...new Set(permissions)];
+}
+
+function directorySortToMemberSort(sort: FamilyMemberDirectoryQuery['sort']): FamilyMemberListQuery['sortBy'] {
+  if (sort === 'displayName') return 'nickname';
+  if (sort === 'joinedAt') return 'joinedAt';
+  return sort;
 }

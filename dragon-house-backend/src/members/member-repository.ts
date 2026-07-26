@@ -65,7 +65,7 @@ export class MemoryFamilyMemberRepository implements FamilyMemberRepository {
     if (query.rank) items = items.filter((member) => member.rank === query.rank);
     const total = items.length;
     const direction = query.sortOrder === 'asc' ? 1 : -1;
-    items.sort((left, right) => String(valueForSort(left, query.sortBy)).localeCompare(String(valueForSort(right, query.sortBy))) * direction);
+    items.sort((left, right) => compareSortValues(valueForSort(left, query.sortBy), valueForSort(right, query.sortBy)) * direction);
     const start = (query.page - 1) * query.pageSize;
     return { items: items.slice(start, start + query.pageSize), page: query.page, pageSize: query.pageSize, total };
   }
@@ -170,4 +170,9 @@ function valueForSort(member: FamilyMember, sortBy: FamilyMemberListQuery['sortB
   if (sortBy === 'staticId') return member.staticId;
   if (sortBy === 'joinedAt') return member.joinedAt;
   return member[sortBy];
+}
+
+function compareSortValues(left: string | number | null, right: string | number | null): number {
+  if (typeof left === 'number' && typeof right === 'number') return left - right;
+  return String(left ?? '').localeCompare(String(right ?? ''));
 }
