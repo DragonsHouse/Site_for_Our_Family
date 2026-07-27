@@ -4,6 +4,9 @@ import { canManageFamilyMap } from '../../../lib/family-permissions';
 import { FAMILY_MAP_REFERENCES } from '../../../lib/family-repositories';
 import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../../lib/family-types';
 import { DragonHouseCrest } from './dragon-house-crest';
+import { DragonBackground, DragonBadge, DragonButton, DragonHero, DragonSection } from '../dragon-ui/dragon-ui';
+import type { DragonBackgroundVariant } from '../dragon-ui/dragon-ui';
+import { DragonCalendar } from './dragon-calendar';
 import { FamilyMembersDirectory } from './family-members-directory';
 import { FamilyPanel } from './family-panel';
 import { FamilyProfile } from './family-profile';
@@ -21,13 +24,22 @@ function ModuleIntro({
   children?: React.ReactNode;
 }) {
   return (
-    <section className="dh-panel rounded-2xl p-5">
-      <h2 className="text-lg font-semibold text-white">{title}</h2>
-      {description ? <p className="mt-1 text-sm text-slate-400">{description}</p> : null}
-      {children ? <div className="mt-4">{children}</div> : null}
-    </section>
+    <DragonSection title={title} description={description}>
+      {children}
+    </DragonSection>
   );
 }
+
+const TAB_BACKGROUND_VARIANT: Record<FamilyTab, DragonBackgroundVariant> = {
+  cabinet: 'dashboard',
+  profile: 'profile',
+  members: 'members',
+  family: 'dashboard',
+  buyers: 'resources',
+  events: 'calendar',
+  map: 'events',
+  resources: 'resources'
+};
 
 export function FamilyShell({
   currentUser,
@@ -99,38 +111,24 @@ export function FamilyShell({
 }) {
   return (
     <main className="dh-shell px-4 py-6">
-      <div className="dh-castle-bg" aria-hidden="true" />
-      <div className="dh-global-overlay" aria-hidden="true" />
-      <div className="dh-dragon-layer" aria-hidden="true" />
-      <div className="dh-smoke" aria-hidden="true" />
+      <DragonBackground variant={TAB_BACKGROUND_VARIANT[activeTab]} />
 
       <div className="relative z-10 mx-auto w-full min-w-0 max-w-7xl space-y-4">
-        <header className="dh-panel relative overflow-hidden rounded-3xl p-5">
-          <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
+        <DragonHero
+          eyebrow="DRAGON HOUSE FORTRESS"
+          title="Family Hub"
+          description="Внутрішня фортеця сім’ї: зали, хроніки, учасники, ресурси й майбутні модулі Dragon House."
+        >
+          <div className="flex flex-col items-start gap-2 lg:items-end">
+            <div className="flex items-center gap-3">
               <DragonHouseCrest slot="header_logo" />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-amber-300">
-                  Dragon House
-                </p>
-                <h1 className="mt-1 text-3xl font-semibold text-white">Family Hub</h1>
-              </div>
+              <DragonBadge tone="gold">{currentUser.nickname}</DragonBadge>
             </div>
-
-            <div className="flex flex-col items-start gap-2 lg:items-end">
-              <div className="rounded-full border border-amber-500/30 bg-black/30 px-3 py-1 text-sm text-amber-100">
-                {currentUser.nickname}
-              </div>
-              <button
-                type="button"
-                onClick={onLogout}
-                className="rounded-lg border border-red-800 px-3 py-2 text-sm text-red-100 hover:bg-red-950/40"
-              >
-                Вийти
-              </button>
-            </div>
+            <DragonButton type="button" variant="danger" onClick={onLogout}>
+              Вийти
+            </DragonButton>
           </div>
-        </header>
+        </DragonHero>
 
         <FamilyTabs activeTab={activeTab} onChange={onTabChange} />
 
@@ -170,12 +168,9 @@ export function FamilyShell({
           </>
         ) : null}
 
+        {/* Future Calendar includes family events, meetings, quests/deadlines, tournaments, celebrations, Dragon House anniversaries and member birthdays. */}
         {activeTab === 'events' ? (
-          <>
-            {/* Future Calendar includes family events, meetings, quests/deadlines, tournaments, celebrations, Dragon House anniversaries and member birthdays. */}
-            <ModuleIntro title="Календар" description="Події, таймери й нагадування." />
-            <DashboardApp familyTab="events" />
-          </>
+          <DragonCalendar currentUser={currentUser} />
         ) : null}
 
         {activeTab === 'map' ? (

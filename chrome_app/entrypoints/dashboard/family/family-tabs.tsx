@@ -1,14 +1,15 @@
 import type { FamilyTab } from '../../../lib/family-types';
+import { DragonTabs } from '../dragon-ui/dragon-ui';
 
-const TABS: Array<{ key: FamilyTab; label: string }> = [
-  { key: 'profile', label: 'Profile' },
-  { key: 'members', label: 'Members' },
-  { key: 'cabinet', label: 'Мій кабінет' },
-  { key: 'family', label: "Сім’я" },
-  { key: 'buyers', label: 'Скупники' },
-  { key: 'events', label: 'Календар' },
-  { key: 'map', label: 'Мапа' },
-  { key: 'resources', label: 'Ресурси' }
+const TABS: Array<{ key: FamilyTab; label: string; room: string }> = [
+  { key: 'profile', label: 'Профіль', room: 'Dragon Chamber' },
+  { key: 'members', label: 'Members', room: 'Hall of Guardians' },
+  { key: 'cabinet', label: 'Мій кабінет', room: 'Entrance Hall' },
+  { key: 'family', label: "Сім’я", room: 'Hall of Flame' },
+  { key: 'buyers', label: 'Скупники', room: 'Trade Vault' },
+  { key: 'events', label: 'Календар', room: 'Hall of Chronicles' },
+  { key: 'map', label: 'Мапа', room: 'War Table' },
+  { key: 'resources', label: 'Ресурси', room: 'Treasury' }
 ];
 
 export function FamilyTabs({
@@ -18,20 +19,5 @@ export function FamilyTabs({
   activeTab: FamilyTab;
   onChange: (tab: FamilyTab) => void;
 }) {
-  return (
-    <nav className="dh-panel flex flex-wrap gap-1.5 rounded-2xl p-1.5">
-      {TABS.map((tab) => (
-        <button
-          key={tab.key}
-          type="button"
-          onClick={() => onChange(tab.key)}
-          className={`rounded-xl px-3.5 py-2 text-sm font-semibold transition ${
-            activeTab === tab.key ? 'dh-tab-active' : 'dh-tab'
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </nav>
-  );
+  return <DragonTabs tabs={TABS} activeTab={activeTab} onChange={onChange} />;
 }
