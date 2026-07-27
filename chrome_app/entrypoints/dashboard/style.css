@@ -187,6 +187,771 @@ body {
   animation: dh-enter var(--dh-motion-slow) var(--dh-ease-out) both;
 }
 
+.dh-initiation-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 126, 48, 0.22);
+  background:
+    radial-gradient(ellipse at 50% -8%, rgba(255, 91, 27, 0.18), transparent 21rem),
+    radial-gradient(ellipse at 92% 18%, rgba(137, 24, 9, 0.18), transparent 16rem),
+    linear-gradient(145deg, rgba(25, 18, 15, 0.94), rgba(7, 6, 5, 0.96));
+  box-shadow:
+    0 28px 96px rgba(0, 0, 0, 0.68),
+    0 0 64px rgba(159, 43, 12, 0.16),
+    inset 0 1px 0 rgba(255, 214, 152, 0.07);
+  backdrop-filter: blur(18px);
+  animation: dh-enter var(--dh-motion-slow) var(--dh-ease-out) both;
+}
+
+.dh-initiation-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 134, 54, 0.09), transparent 20%, transparent 80%, rgba(255, 134, 54, 0.08)),
+    radial-gradient(circle at 18% 84%, rgba(255, 88, 20, 0.12), transparent 13rem);
+  opacity: 0.86;
+  pointer-events: none;
+}
+
+.dh-initiation-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dh-initiation-embers {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 16% 86%, rgba(255, 88, 20, 0.22) 0 0.06rem, transparent 0.11rem),
+    radial-gradient(circle at 72% 18%, rgba(255, 150, 62, 0.20) 0 0.055rem, transparent 0.105rem),
+    radial-gradient(circle at 88% 72%, rgba(255, 77, 17, 0.18) 0 0.07rem, transparent 0.12rem);
+  filter: blur(0.2px);
+  opacity: 0.8;
+  animation: dh-embers-rise 5.5s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.dh-initiation-crest {
+  display: grid;
+  width: 5.5rem;
+  height: 5.5rem;
+  place-items: center;
+  border: 1px solid rgba(255, 126, 48, 0.24);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 91, 27, 0.18), transparent 4.2rem),
+    rgba(0, 0, 0, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 180, 0.08),
+    0 0 36px rgba(255, 70, 16, 0.13);
+}
+
+.dh-initiation-sound {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(255, 126, 48, 0.20);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.34);
+  padding: 0.55rem 0.8rem;
+  color: #ffd9bd;
+  font-size: 0.75rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.dh-initiation-sound:hover,
+.dh-initiation-sound:focus-visible {
+  border-color: rgba(255, 126, 48, 0.46);
+  box-shadow: 0 0 0 3px rgba(255, 90, 0, 0.16);
+}
+
+.dh-initiation-progress {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.35rem;
+}
+
+.dh-initiation-step {
+  display: flex;
+  min-height: 4.75rem;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(circle at 12% 20%, rgba(255, 91, 27, 0.12), transparent 7rem),
+    rgba(0, 0, 0, 0.28);
+  padding: 0.85rem;
+}
+
+.dh-initiation-step.complete {
+  border-color: rgba(88, 204, 126, 0.25);
+  background:
+    radial-gradient(circle at 12% 20%, rgba(143, 166, 106, 0.16), transparent 7rem),
+    rgba(0, 0, 0, 0.3);
+}
+
+.dh-initiation-step.current,
+.dh-initiation-step.ready {
+  border-color: rgba(255, 126, 48, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 226, 180, 0.06), 0 0 28px rgba(255, 82, 20, 0.10);
+}
+
+.dh-initiation-step.current .dh-initiation-step-icon,
+.dh-initiation-step.ready .dh-initiation-step-icon {
+  animation: dh-step-flame 1.8s ease-in-out infinite;
+}
+
+.dh-initiation-step-icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 91, 27, 0.12);
+  color: #ffb077;
+  font-weight: 900;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dh-initiation-step.complete .dh-initiation-step-icon {
+  background: rgba(52, 211, 153, 0.12);
+  color: #86efac;
+}
+
+.dh-initiation-date {
+  border: 1px solid rgba(255, 126, 48, 0.18);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(255, 91, 27, 0.12), transparent 16rem),
+    rgba(0, 0, 0, 0.28);
+  padding: 1rem;
+}
+
+.dh-initiation-primary {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 168, 88, 0.38);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 181, 92, 0.28), transparent 8rem),
+    linear-gradient(90deg, #7b1608, #c63b12 50%, #ff6a1a);
+  box-shadow: 0 18px 46px rgba(138, 34, 8, 0.36), 0 0 30px rgba(255, 90, 0, 0.20);
+  transition:
+    transform var(--dh-motion-base) var(--dh-ease-spring),
+    box-shadow var(--dh-motion-base) var(--dh-ease-out),
+    border-color var(--dh-motion-base) var(--dh-ease-out);
+}
+
+.dh-initiation-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  transform: translateX(-120%);
+  transition: transform 600ms var(--dh-ease-out);
+}
+
+.dh-initiation-primary:hover:not(:disabled),
+.dh-initiation-primary:focus-visible:not(:disabled) {
+  border-color: rgba(255, 202, 130, 0.62);
+  box-shadow: 0 22px 54px rgba(155, 38, 10, 0.42), 0 0 42px rgba(255, 90, 0, 0.26);
+  transform: translateY(-1px);
+}
+
+.dh-initiation-primary:hover:not(:disabled)::after,
+.dh-initiation-primary:focus-visible:not(:disabled)::after {
+  transform: translateX(120%);
+}
+
+@keyframes dh-embers-rise {
+  from {
+    transform: translateY(0);
+    opacity: 0.52;
+  }
+  to {
+    transform: translateY(-0.45rem);
+    opacity: 0.88;
+  }
+}
+
+@media (max-width: 640px) {
+  .dh-initiation-progress {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dh-initiation-scene {
+  isolation: isolate;
+  position: relative;
+  display: grid;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 82%, rgba(255, 91, 27, 0.18), transparent 36rem),
+    radial-gradient(ellipse at 16% 22%, rgba(111, 31, 17, 0.24), transparent 30rem),
+    linear-gradient(180deg, #050403 0%, #100805 48%, #050403 100%);
+  color: #f8efe3;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+.dh-initiation-fortress,
+.dh-initiation-dragon,
+.dh-initiation-smoke,
+.dh-initiation-floating-embers {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dh-initiation-fortress {
+  z-index: -4;
+  background:
+    linear-gradient(90deg, transparent 0 10%, rgba(116, 76, 52, 0.16) 10.3% 12%, transparent 12.4% 24%, rgba(116, 76, 52, 0.12) 24.4% 25.6%, transparent 26% 74%, rgba(116, 76, 52, 0.12) 74.4% 75.6%, transparent 76% 88%, rgba(116, 76, 52, 0.16) 88.3% 90%, transparent 90.4%),
+    radial-gradient(ellipse at 50% 102%, rgba(255, 92, 22, 0.24), transparent 28rem),
+    radial-gradient(ellipse at 50% 16%, rgba(255, 170, 72, 0.08), transparent 24rem),
+    linear-gradient(180deg, rgba(43, 30, 22, 0.9), rgba(7, 5, 4, 0.96));
+}
+
+.dh-initiation-fortress::before {
+  content: '';
+  position: absolute;
+  inset: 9vh 9vw 0;
+  opacity: 0.62;
+  background:
+    radial-gradient(ellipse at 50% 0, transparent 0 8rem, rgba(160, 103, 64, 0.14) 8.2rem 8.5rem, transparent 8.8rem),
+    linear-gradient(90deg, transparent 0 18%, rgba(0, 0, 0, 0.36) 18.4% 20.5%, transparent 21% 79%, rgba(0, 0, 0, 0.36) 79.5% 81.6%, transparent 82%),
+    linear-gradient(180deg, transparent 0 58%, rgba(255, 103, 26, 0.08) 58.4% 59%, transparent 60%);
+}
+
+.dh-initiation-scene::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 44%, transparent 0 28rem, rgba(0, 0, 0, 0.28) 46rem, rgba(0, 0, 0, 0.84) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.86), transparent 28%, transparent 72%, rgba(0, 0, 0, 0.86)),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.24), transparent 36%, rgba(0, 0, 0, 0.72));
+}
+
+.dh-initiation-dragon {
+  z-index: -3;
+  opacity: 0.82;
+}
+
+.dh-initiation-dragon::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 5vh;
+  width: min(72rem, 88vw);
+  height: min(28rem, 34vw);
+  transform: translateX(-50%);
+  border-radius: 48% 48% 34% 34%;
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(0, 0, 0, 0.86) 0 13%, transparent 14%),
+    conic-gradient(from 226deg at 50% 58%, transparent 0 31deg, rgba(0, 0, 0, 0.72) 32deg 76deg, transparent 77deg 283deg, rgba(0, 0, 0, 0.72) 284deg 328deg, transparent 329deg),
+    radial-gradient(ellipse at 50% 100%, rgba(255, 93, 26, 0.16), transparent 18rem);
+  filter: drop-shadow(0 0 42px rgba(255, 74, 16, 0.12));
+}
+
+.dh-dragon-eye {
+  position: absolute;
+  top: min(19vh, 12rem);
+  left: 50%;
+  width: 0.42rem;
+  height: 0.18rem;
+  border-radius: 999px;
+  background: #ffb15f;
+  box-shadow: 0 0 14px rgba(255, 91, 27, 0.72);
+}
+
+.dh-dragon-eye.left {
+  transform: translateX(-1.15rem);
+}
+
+.dh-dragon-eye.right {
+  transform: translateX(0.75rem);
+}
+
+.dh-initiation-smoke {
+  z-index: -2;
+  opacity: 0.62;
+  background:
+    radial-gradient(ellipse at 28% 74%, rgba(170, 123, 91, 0.08), transparent 22rem),
+    radial-gradient(ellipse at 70% 82%, rgba(146, 66, 38, 0.07), transparent 24rem),
+    radial-gradient(ellipse at 50% 92%, rgba(255, 91, 27, 0.08), transparent 32rem);
+  filter: blur(10px);
+  animation: dh-initiation-smoke 10s ease-in-out infinite alternate;
+}
+
+.dh-initiation-floating-embers {
+  z-index: -1;
+  opacity: 0.72;
+  background:
+    radial-gradient(circle at 16% 92%, rgba(255, 182, 82, 0.82) 0 1px, transparent 2px),
+    radial-gradient(circle at 31% 76%, rgba(255, 91, 27, 0.72) 0 1px, transparent 2px),
+    radial-gradient(circle at 69% 86%, rgba(255, 182, 82, 0.72) 0 1px, transparent 2px),
+    radial-gradient(circle at 84% 68%, rgba(255, 91, 27, 0.62) 0 1px, transparent 2px);
+  animation: dh-floating-embers 5.8s ease-in-out infinite alternate;
+}
+
+.dh-opening-ritual {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1.2rem;
+  background: rgba(5, 4, 3, 0.64);
+  animation: dh-opening-fade 1.9s ease both;
+}
+
+.dh-opening-crest,
+.dh-success-seal {
+  display: grid;
+  width: 7rem;
+  height: 7rem;
+  place-items: center;
+  border: 1px solid rgba(255, 178, 92, 0.34);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 91, 27, 0.24), rgba(0, 0, 0, 0.48) 68%);
+  box-shadow: 0 0 60px rgba(255, 91, 27, 0.28), inset 0 0 30px rgba(255, 188, 96, 0.08);
+}
+
+.dh-opening-ritual p,
+.dh-initiation-success h1 {
+  margin: 0;
+  color: #fff7ed;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-shadow: 0 0 24px rgba(255, 91, 27, 0.42);
+}
+
+.dh-opening-ritual p {
+  font-size: clamp(1.6rem, 5vw, 3.2rem);
+}
+
+.dh-opening-skip,
+.dh-initiation-secondary {
+  border: 1px solid rgba(255, 214, 168, 0.2);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.34);
+  color: #f5dcc2;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.dh-opening-skip {
+  padding: 0.7rem 1rem;
+}
+
+.dh-initiation-stage {
+  width: min(100%, 46rem);
+  max-width: calc(100vw - clamp(2rem, 6vw, 4rem));
+  box-sizing: border-box;
+  min-width: 0;
+  opacity: 0;
+  transform: translateY(0.8rem) scale(0.985);
+}
+
+.dh-initiation-stage.is-revealed {
+  opacity: 1;
+  transform: none;
+  transition: opacity 520ms ease, transform 520ms ease;
+}
+
+.dh-initiation-card {
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: 26px;
+  padding: clamp(1.15rem, 3.4vw, 2rem);
+}
+
+.dh-initiation-card * {
+  min-width: 0;
+}
+
+.dh-initiation-card::after,
+.dh-initiation-card-ornament {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dh-initiation-card::after {
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 196, 126, 0.08), inset 0 -22px 54px rgba(0, 0, 0, 0.34);
+}
+
+.dh-initiation-card-ornament {
+  background:
+    linear-gradient(90deg, rgba(255, 178, 92, 0.24), transparent 18%, transparent 82%, rgba(255, 178, 92, 0.24)),
+    radial-gradient(circle at 50% 0, rgba(255, 196, 126, 0.16), transparent 11rem);
+  opacity: 0.7;
+}
+
+.dh-initiation-topbar,
+.dh-initiation-title-lockup {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.dh-initiation-topbar {
+  justify-content: space-between;
+}
+
+.dh-initiation-title-lockup h1,
+.dh-initiation-success h1 {
+  margin: 0.35rem 0 0;
+  font-size: clamp(1.85rem, 4vw, 3.15rem);
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.dh-initiation-eyebrow {
+  margin: 0;
+  color: #ffb15f;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+}
+
+.dh-initiation-personal {
+  max-width: 38rem;
+  margin: 1.35rem 0 0;
+  color: #dac7b1;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.dh-initiation-form {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1.3rem;
+}
+
+.dh-date-label {
+  display: block;
+  color: #ffd7a3;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.dh-date-helper,
+.dh-date-microcopy {
+  display: block;
+  color: #c9b7a2;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.dh-date-helper {
+  margin-top: 0.45rem;
+}
+
+.dh-date-input-frame {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+  border: 1px solid rgba(255, 157, 74, 0.24);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(8, 6, 5, 0.86), rgba(0, 0, 0, 0.72));
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.06), 0 0 24px rgba(255, 91, 27, 0.08);
+  padding: 0.2rem 0.9rem;
+}
+
+.dh-date-input-frame:focus-within {
+  border-color: rgba(255, 190, 104, 0.62);
+  box-shadow: 0 0 0 3px rgba(255, 91, 27, 0.2), 0 0 34px rgba(255, 91, 27, 0.16);
+}
+
+.dh-date-icon {
+  display: inline-flex;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 2.35rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 177, 95, 0.28);
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 20%, rgba(255, 177, 95, 0.22), rgba(255, 91, 27, 0.08) 55%, rgba(0, 0, 0, 0.18));
+  color: #ffb15f;
+  box-shadow: inset 0 1px 0 rgba(255, 229, 191, 0.08), 0 0 18px rgba(255, 91, 27, 0.1);
+}
+
+.dh-date-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dh-date-input-frame input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #fff7ed;
+  outline: none;
+  padding: 0.95rem 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color-scheme: dark;
+}
+
+.dh-initiation-error,
+.dh-initiation-hint {
+  border-radius: 14px;
+  padding: 0.78rem 0.9rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.dh-initiation-error {
+  border: 1px solid rgba(255, 103, 82, 0.38);
+  background: rgba(117, 22, 15, 0.32);
+  color: #ffe4dc;
+}
+
+.dh-initiation-hint {
+  border: 1px solid rgba(145, 181, 103, 0.28);
+  background: rgba(63, 83, 42, 0.18);
+  color: #d9efb2;
+}
+
+.dh-initiation-primary {
+  width: 100%;
+  min-height: 3.7rem;
+  border-radius: 18px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 1000;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dh-initiation-primary:active:not(:disabled) {
+  transform: translateY(1px) scale(0.996);
+}
+
+.dh-initiation-primary:disabled {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(90deg, #33241e, #4a3027);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #cdb9a5;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.dh-initiation-secondary {
+  min-height: 3rem;
+}
+
+.dh-initiation-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  justify-content: space-between;
+  margin-top: 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.8rem;
+  color: #a99580;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.dh-initiation-success {
+  display: grid;
+  width: min(100%, 34rem);
+  justify-items: center;
+  gap: 0.85rem;
+  border: 1px solid rgba(255, 178, 92, 0.3);
+  border-radius: 26px;
+  background: linear-gradient(145deg, rgba(24, 14, 10, 0.92), rgba(5, 4, 3, 0.96));
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.72), 0 0 70px rgba(255, 91, 27, 0.18);
+  padding: clamp(1.5rem, 5vw, 2.4rem);
+  text-align: center;
+  animation: dh-success-enter 520ms ease both;
+}
+
+.dh-initiation-success p:last-child {
+  margin: 0;
+  color: #dac7b1;
+}
+
+.dh-success-seal {
+  animation: dh-seal-ignite 1.2s ease both;
+}
+
+@keyframes dh-initiation-smoke {
+  from {
+    transform: translate3d(-1.2%, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(1.2%, -0.8%, 0) scale(1.03);
+  }
+}
+
+@keyframes dh-floating-embers {
+  from {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  to {
+    transform: translateY(-1rem);
+    opacity: 0.82;
+  }
+}
+
+@keyframes dh-opening-fade {
+  0% {
+    opacity: 0;
+  }
+  18%, 72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes dh-success-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.7rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dh-seal-ignite {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 91, 27, 0);
+    filter: brightness(0.86);
+  }
+  60% {
+    box-shadow: 0 0 82px rgba(255, 91, 27, 0.42);
+    filter: brightness(1.22);
+  }
+  100% {
+    box-shadow: 0 0 52px rgba(255, 91, 27, 0.24);
+    filter: brightness(1);
+  }
+}
+
+@keyframes dh-step-flame {
+  0%, 100% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 10px rgba(255, 91, 27, 0.18);
+  }
+  50% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 24px rgba(255, 91, 27, 0.34);
+  }
+}
+
+@media (max-width: 900px) {
+  .dh-initiation-scene {
+    align-items: start;
+    display: block;
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100svh;
+    overflow-x: hidden;
+    padding: 1rem;
+  }
+
+  .dh-initiation-stage {
+    display: block;
+    width: auto;
+    max-width: none;
+    margin: 0;
+  }
+
+  .dh-initiation-card {
+    width: auto;
+    max-width: none;
+    margin: 0;
+  }
+
+  .dh-initiation-dragon {
+    opacity: 0.34;
+  }
+
+  .dh-initiation-dragon::before {
+    top: 1rem;
+    width: 120vw;
+    height: 14rem;
+  }
+
+  .dh-dragon-eye {
+    display: none;
+  }
+
+  .dh-initiation-topbar,
+  .dh-initiation-title-lockup {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dh-initiation-card {
+    border-radius: 20px;
+    padding: 1rem;
+  }
+
+  .dh-initiation-title-lockup h1 {
+    font-size: 1.62rem;
+    line-height: 1.08;
+  }
+
+  .dh-initiation-eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+  }
+
+  .dh-initiation-sound {
+    width: 100%;
+    justify-content: center;
+    gap: 0.32rem;
+    padding: 0.55rem 0.45rem;
+    font-size: 0.7rem;
+    white-space: normal;
+  }
+
+  .dh-initiation-progress {
+    grid-template-columns: 1fr;
+  }
+
+  .dh-initiation-statusbar {
+    flex-direction: column;
+  }
+}
+
 .dh-shell > .relative.z-10.mx-auto {
   position: relative;
   width: 100%;
@@ -996,6 +1761,17 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .dh-initiation-card,
+  .dh-initiation-embers,
+  .dh-initiation-primary,
+  .dh-initiation-primary::after,
+  .dh-initiation-smoke,
+  .dh-initiation-floating-embers,
+  .dh-initiation-step.current .dh-initiation-step-icon,
+  .dh-initiation-step.ready .dh-initiation-step-icon,
+  .dh-opening-ritual,
+  .dh-initiation-success,
+  .dh-success-seal,
   .dh-startup-sigil,
   .dh-loading-screen,
   .dh-loading-backdrop::after,

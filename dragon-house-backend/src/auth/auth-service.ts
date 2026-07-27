@@ -18,6 +18,7 @@ import type {
 
 const LAST_USED_UPDATE_INTERVAL_MS = 60_000;
 const STATIC_ID_MAX_LENGTH = 80;
+const BIRTHDAY_MIN_DATE = '1970-01-01';
 
 type LoginAttempt = {
   count: number;
@@ -44,6 +45,7 @@ export class StaticIdSelfServiceError extends Error {
 export type BirthdaySelfServiceErrorCode =
   | 'birthday_required'
   | 'birthday_invalid'
+  | 'birthday_too_early'
   | 'birthday_future'
   | 'birthday_update_conflict';
 
@@ -352,6 +354,9 @@ function normalizeDateOfBirth(input: string): string {
   }
 
   const today = new Date().toISOString().slice(0, 10);
+  if (dateOfBirth < BIRTHDAY_MIN_DATE) {
+    throw new BirthdaySelfServiceError('birthday_too_early', 'Date of birth must be on or after 1970-01-01');
+  }
   if (dateOfBirth > today) throw new BirthdaySelfServiceError('birthday_future', 'Date of birth cannot be in the future');
   return dateOfBirth;
 }

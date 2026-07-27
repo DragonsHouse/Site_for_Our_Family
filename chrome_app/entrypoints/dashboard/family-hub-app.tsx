@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   migrateDragonHouseAsyncData,
   migrateDragonHouseLocalData
@@ -39,8 +39,11 @@ import { DragonHouseCrest } from './family/dragon-house-crest';
 import { FamilyShell } from './family/family-shell';
 import { DragonLoadingScreen } from './loading/DragonLoadingScreen';
 import { useFamilyAssetUrl } from './family/use-family-asset-url';
+import { useOnboardingAudio } from './hooks/use-onboarding-audio';
 
 const FAMILY_TABS: FamilyTab[] = ['cabinet', 'profile', 'members', 'family', 'buyers', 'events', 'map', 'resources'];
+const BIRTHDAY_MIN_DATE = '1970-01-01';
+const BIRTHDAY_OPENING_SESSION_PREFIX = 'dragon_house_birthday_opening_seen:';
 const FAMILY_SECTIONS: FamilySection[] = [
   'home',
   'feed',
@@ -66,6 +69,42 @@ function getInitialFamilySection(): FamilySection {
 
 function inputClassName() {
   return 'w-full rounded-xl border border-white/10 bg-[#151515] px-4 py-3 text-sm text-slate-100 outline-none ring-orange-500/30 placeholder:text-slate-600 focus:ring';
+}
+
+function getTodayDateOnly() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
+function validateBirthdayInput(value: string) {
+  const dateOfBirth = value.trim();
+  if (!dateOfBirth) return 'Вкажи дату народження, щоб завершити посвяту.';
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(dateOfBirth);
+  if (!match) return 'Перевір дату — такого дня не існує.';
+
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month - 1 || utc.getUTCDate() !== day) {
+    return 'Перевір дату — такого дня не існує.';
+  }
+  if (dateOfBirth < BIRTHDAY_MIN_DATE) return 'Вкажи реальну дату народження не раніше 1970 року.';
+  if (dateOfBirth > getTodayDateOnly()) return 'Дата народження не може бути в майбутньому.';
+  return null;
+}
+
+function birthdayErrorMessage(error: string | null) {
+  if (!error) return null;
+  if (/required|empty/u.test(error)) return 'Вкажи дату народження, щоб завершити посвяту.';
+  if (/future/u.test(error)) return 'Дата народження не може бути в майбутньому.';
+  if (/1970|too_early|early/u.test(error)) return 'Вкажи реальну дату народження не раніше 1970 року.';
+  if (/invalid/u.test(error)) return 'Перевір дату — такого дня не існує.';
+  return error;
 }
 
 function AuthShell({ children }: { children: React.ReactNode }) {
@@ -314,83 +353,220 @@ function BirthdayOnboardingScreen({
   onSubmit: () => void;
   onContinue: () => void;
 }) {
+  const audio = useOnboardingAudio();
+  const maxDate = useMemo(getTodayDateOnly, []);
+  const inputError = validateBirthdayInput(value);
+  const visibleError = birthdayErrorMessage(error) ?? (value ? inputError : 'Вкажи дату народження, щоб завершити посвяту.');
+  const canSubmit = !loading && !inputError;
+  const openingSessionKey = `${BIRTHDAY_OPENING_SESSION_PREFIX}${user.id}`;
+  const [openingActive, setOpeningActive] = useState(() => {
+    if (prefersReducedMotion()) return false;
+    try {
+      return window.sessionStorage.getItem(openingSessionKey) !== 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    if (!openingActive) return undefined;
+    const timer = window.setTimeout(() => {
+      try {
+        window.sessionStorage.setItem(openingSessionKey, 'true');
+      } catch {
+        // Session storage is optional; the sequence is decorative.
+      }
+      setOpeningActive(false);
+    }, 1900);
+    return () => window.clearTimeout(timer);
+  }, [openingActive, openingSessionKey]);
+
+  function skipOpening() {
+    try {
+      window.sessionStorage.setItem(openingSessionKey, 'true');
+    } catch {
+      // Session storage is optional; the sequence is decorative.
+    }
+    setOpeningActive(false);
+  }
+
   return (
-    <AuthShell>
-      <section className="dh-auth-card w-full max-w-md rounded-3xl p-6">
-        <div className="mx-auto flex justify-center">
-          <DragonHouseCrest slot="dragon_house_logo" size="lg" />
-        </div>
-        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">DRAGON HOUSE HUB</p>
-        <h1 className="mt-2 text-2xl font-semibold text-white">Заверши профіль</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-300">
-          {user.displayName}, додай дату народження, щоб сімейний календар міг показувати важливі дати.
-        </p>
+    <main className="dh-initiation-scene">
+      <div className="dh-initiation-fortress" aria-hidden="true" />
+      <div className="dh-initiation-dragon" aria-hidden="true">
+        <span className="dh-dragon-eye left" />
+        <span className="dh-dragon-eye right" />
+      </div>
+      <div className="dh-initiation-smoke" aria-hidden="true" />
+      <div className="dh-initiation-floating-embers" aria-hidden="true" />
 
-        <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm">
-          <div className="flex items-center justify-between gap-3 text-slate-200">
-            <span>Discord linked</span>
-            <span className="font-semibold text-emerald-300">✓</span>
+      {openingActive ? (
+        <section className="dh-opening-ritual" aria-live="polite" aria-label="Початок посвяти Dragon House">
+          <div className="dh-opening-crest">
+            <DragonHouseCrest slot="dragon_house_logo" size="lg" />
           </div>
-          <div className="mt-3 flex items-center justify-between gap-3 text-slate-200">
-            <span>Static ID</span>
-            <span className="font-semibold text-emerald-300">✓</span>
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-3 text-slate-200">
-            <span>Дата народження</span>
-            <span className="font-semibold text-rose-300">✕</span>
-          </div>
-        </div>
-
-        <p className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-50">
-          Дата народження потрібна для сімейного календаря. Іншим учасникам буде видно лише день і місяць. Рік народження та вік не публікуються без окремого дозволу.
-        </p>
-
-        <form
-          className="mt-5 space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSubmit();
-          }}
-        >
-          <label className="block">
-            <span className="mb-1 block text-sm text-slate-300">Дата народження</span>
-            <input
-              className={inputClassName()}
-              type="date"
-              value={value}
-              onChange={(event) => onChange(event.target.value)}
-              autoComplete="bday"
-            />
-          </label>
-
-          {error ? (
-            <div className="rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-100">
-              {error}
-            </div>
-          ) : null}
-
-          <button
-            type="submit"
-            disabled={loading || !value.trim()}
-            className="w-full rounded-xl bg-gradient-to-r from-red-700 to-amber-500 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? 'Зберігаю...' : 'Зберегти дату народження'}
+          <p>Полум’я впізнало тебе...</p>
+          <button type="button" className="dh-opening-skip" onClick={skipOpening}>
+            Пропустити
           </button>
-          {legacyAccessAllowed ? (
+        </section>
+      ) : null}
+
+      <div className={`dh-initiation-stage ${openingActive ? 'is-opening' : 'is-revealed'}`}>
+        <section className="dh-initiation-card" aria-labelledby="birthday-initiation-heading">
+          <div className="dh-initiation-embers" aria-hidden="true" />
+          <div className="dh-initiation-card-ornament" aria-hidden="true" />
+          <div className="dh-initiation-topbar">
+            <div className="dh-initiation-title-lockup">
+              <div className="dh-initiation-crest">
+                <DragonHouseCrest slot="dragon_house_logo" size="lg" />
+              </div>
+              <div>
+                <p className="dh-initiation-eyebrow">ОСТАННІЙ ЕТАП ПОСВЯТИ</p>
+                <h1 id="birthday-initiation-heading">Полум’я чекає на останню печать</h1>
+              </div>
+            </div>
             <button
               type="button"
-              className="w-full rounded-xl border border-slate-700 bg-black/25 px-4 py-3 text-sm font-semibold text-slate-100 hover:border-slate-500 focus:outline-none focus:ring focus:ring-amber-500/30"
-              onClick={onContinue}
+              className="dh-initiation-sound"
+              aria-pressed={audio.enabled && audio.state === 'playing'}
+              aria-label={audio.enabled && audio.state === 'playing' ? 'Вимкнути звук посвяти' : 'Увімкнути звук посвяти'}
+              onClick={() => {
+                if (audio.enabled && audio.state === 'playing') {
+                  audio.toggle();
+                  return;
+                }
+                if (!audio.enabled) {
+                  audio.enableAndStart();
+                  return;
+                }
+                audio.start();
+              }}
             >
-              Продовжити в Hub
+              <span aria-hidden="true">{audio.enabled && audio.state === 'playing' ? '♪' : '×'}</span>
+              <span className="dh-sound-label">Звук посвяти</span>
+              <span>{audio.enabled && audio.state === 'playing' ? 'Вимкнути звук' : 'Увімкнути звук'}</span>
             </button>
-          ) : null}
-        </form>
-      </section>
-    </AuthShell>
+          </div>
+
+          <p className="dh-initiation-personal">
+            {user.displayName}, вкажи дату народження, щоб твоє ім’я з’явилося у сімейному календарі Dragon House.
+          </p>
+
+          <div className="dh-initiation-progress" aria-label="Прогрес посвяти">
+            <InitiationStep label="Discord" status="complete" detail="Discord підтверджено" />
+            <InitiationStep label="Static ID" status="complete" detail="Static ID прийнято" />
+            <InitiationStep label="Дата народження" status={value.trim() ? 'ready' : 'current'} detail="Дата народження — остання печать" />
+          </div>
+
+          <form
+            className="dh-initiation-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!canSubmit) return;
+              audio.start();
+              onSubmit();
+            }}
+          >
+            <label className="dh-initiation-date" htmlFor="birthday-date-input">
+              <span className="dh-date-label">Дата народження</span>
+              <span className="dh-date-helper">
+                Дата народження потрібна для сімейного календаря. Іншим учасникам буде видно лише день і місяць. Рік народження та вік не публікуються без окремого дозволу.
+              </span>
+              <span className="dh-date-input-frame">
+                <span className="dh-date-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M7.5 3.5v3M16.5 3.5v3M4 9h16M6.5 5.5h11A2.5 2.5 0 0 1 20 8v9.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5V8a2.5 2.5 0 0 1 2.5-2.5Z" />
+                    <path d="M8 13h.01M12 13h.01M16 13h.01M8 16.5h.01M12 16.5h.01" />
+                  </svg>
+                </span>
+                <input
+                  id="birthday-date-input"
+                  type="date"
+                  value={value}
+                  onChange={(event) => onChange(event.target.value)}
+                  autoComplete="bday"
+                  min={BIRTHDAY_MIN_DATE}
+                  max={maxDate}
+                  aria-describedby="birthday-date-help birthday-date-error"
+                  aria-invalid={Boolean(visibleError)}
+                />
+              </span>
+            </label>
+
+            <p id="birthday-date-help" className="dh-date-microcopy">
+              Формат зберігається як календарна дата без зміщення часового поясу.
+            </p>
+
+            <div id="birthday-date-error" className={visibleError ? 'dh-initiation-error' : 'dh-initiation-hint'} aria-live="polite">
+              {visibleError ?? 'Дата готова до печаті.'}
+            </div>
+
+            <button type="submit" disabled={!canSubmit} className="dh-initiation-primary">
+              {loading ? 'Запалюємо печать...' : 'Завершити посвяту'}
+            </button>
+            {legacyAccessAllowed ? (
+              <button type="button" className="dh-initiation-secondary" onClick={onContinue}>
+                Увійти до Hub пізніше
+              </button>
+            ) : null}
+          </form>
+
+          <div className="dh-initiation-statusbar" aria-label="Стан посвяти">
+            <span>Звук посвяти: {audio.enabled ? 'доступний після взаємодії' : 'вимкнено'}</span>
+            <span>Захищене з’єднання</span>
+            <span>Dragon House Family</span>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }
 
+function InitiationStep({ label, status, detail }: { label: string; status: 'complete' | 'current' | 'ready'; detail: string }) {
+  const isComplete = status === 'complete';
+  return (
+    <div className={`dh-initiation-step ${status}`}>
+      <span className="dh-initiation-step-icon" aria-hidden="true">{isComplete ? '✓' : '◆'}</span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold text-stone-100">{label}</span>
+        <span className="block text-xs uppercase tracking-[0.18em] text-stone-500">
+          {status === 'current' ? 'останній крок' : detail}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function BirthdaySuccessScreen({ user, onComplete }: { user: FamilyUser; onComplete: () => void }) {
+  const audio = useOnboardingAudio();
+
+  useEffect(() => {
+    audio.playConfirmation();
+    if (prefersReducedMotion()) {
+      onComplete();
+      return undefined;
+    }
+    const timer = window.setTimeout(onComplete, 1700);
+    return () => window.clearTimeout(timer);
+  }, [audio.playConfirmation, onComplete]);
+
+  return (
+    <main className="dh-initiation-scene dh-initiation-success-scene">
+      <div className="dh-initiation-fortress" aria-hidden="true" />
+      <div className="dh-initiation-dragon" aria-hidden="true" />
+      <div className="dh-initiation-smoke" aria-hidden="true" />
+      <section className="dh-initiation-success" aria-live="polite" aria-labelledby="birthday-success-heading">
+        <div className="dh-success-seal">
+          <DragonHouseCrest slot="dragon_house_logo" size="lg" />
+        </div>
+        <p className="dh-initiation-eyebrow">Dragon House Family</p>
+        <h1 id="birthday-success-heading">Посвяту завершено</h1>
+        <p>{user.displayName}, Dragon House приймає тебе до свого полум’я.</p>
+      </section>
+    </main>
+  );
+}
 function OAuthLoadingScreen() {
   return (
     <AuthShell>
@@ -506,10 +682,12 @@ export function FamilyHubApp() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [staticIdDraft, setStaticIdDraft] = useState('');
   const [birthdayDraft, setBirthdayDraft] = useState('');
+  const [birthdaySuccessUser, setBirthdaySuccessUser] = useState<FamilyUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const authCheckStartedRef = useRef(false);
   const discordLoginInFlightRef = useRef(false);
+  const birthdaySubmitInFlightRef = useRef(false);
 
   async function refreshFamilyUsers() {
     const users = await memberDataSource.listMembers();
@@ -734,6 +912,13 @@ export function FamilyHubApp() {
 
   async function handleBirthdaySubmit() {
     if (!currentUser) return;
+    if (birthdaySubmitInFlightRef.current) return;
+    const validationError = validateBirthdayInput(birthdayDraft);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    birthdaySubmitInFlightRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -741,7 +926,11 @@ export function FamilyHubApp() {
       setCurrentUser(user);
       setBirthdayDraft('');
       await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
-      setAuthState(stateForAuthenticatedUser(user, 'restore'));
+      if (prefersReducedMotion()) {
+        setAuthState(stateForAuthenticatedUser(user, 'restore'));
+      } else {
+        setBirthdaySuccessUser(user);
+      }
     } catch (err) {
       if (err instanceof BirthdayValidationError) {
         setError(err.fields.dateOfBirth ?? err.message);
@@ -751,6 +940,7 @@ export function FamilyHubApp() {
       if (route.clearAuthSession) await clearAuthSession().catch(() => undefined);
       setAuthState(route.state);
     } finally {
+      birthdaySubmitInFlightRef.current = false;
       setLoading(false);
     }
   }
@@ -864,6 +1054,12 @@ export function FamilyHubApp() {
     setAuthState({ status: 'unauthenticated' });
   }
 
+  const completeBirthdaySuccess = useCallback(() => {
+    if (!birthdaySuccessUser) return;
+    setBirthdaySuccessUser(null);
+    setAuthState(stateForAuthenticatedUser(birthdaySuccessUser, 'restore'));
+  }, [birthdaySuccessUser]);
+
   if (authState.status === 'unauthenticated' || authState.status === 'authenticating') {
     return (
       <LoginScreen
@@ -966,6 +1162,10 @@ export function FamilyHubApp() {
         onSubmit={() => void handleStaticIdSubmit()}
       />
     );
+  }
+
+  if (birthdaySuccessUser) {
+    return <BirthdaySuccessScreen user={birthdaySuccessUser} onComplete={completeBirthdaySuccess} />;
   }
 
   if (authState.status === 'birthday_required' && currentUser) {

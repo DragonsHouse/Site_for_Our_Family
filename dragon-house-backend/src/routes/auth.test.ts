@@ -444,6 +444,28 @@ describe('auth routes', { timeout: 20_000 }, () => {
     expect(future.status).toBe(400);
     expect(await future.json()).toMatchObject({ code: 'birthday_future' });
 
+    const tooEarly = await fetch(`${baseUrl}/api/family/me/birthday`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dateOfBirth: '1969-12-31' }),
+    });
+    expect(tooEarly.status).toBe(400);
+    expect(await tooEarly.json()).toMatchObject({ code: 'birthday_too_early' });
+
+    const minValid = await fetch(`${baseUrl}/api/family/me/birthday`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dateOfBirth: '1970-01-01' }),
+    });
+    expect(minValid.status).toBe(200);
+    expect(await minValid.json()).toMatchObject({
+      onboarding: {
+        complete: true,
+        state: 'complete',
+        requirements: { birthday: { satisfied: true, required: true } },
+      },
+    });
+
     const response = await fetch(`${baseUrl}/api/family/me/birthday`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${loginBody.token}`, 'Content-Type': 'application/json' },

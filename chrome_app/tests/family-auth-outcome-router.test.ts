@@ -178,12 +178,53 @@ describe('FamilyHubApp auth routing source contract', () => {
     assert.match(source, /status === 'birthday_required'/u);
     assert.match(source, /updateCurrentStaticId/u);
     assert.match(source, /updateCurrentBirthday/u);
-    assert.match(source, /Дата народження потрібна для сімейного календаря/u);
+    assert.match(source, /ОСТАННІЙ ЕТАП ПОСВЯТИ/u);
+    assert.match(source, /Полум’я чекає на останню печать/u);
+    assert.match(source, /Полум’я впізнало тебе/u);
+    assert.match(source, /Пропустити/u);
+    assert.match(source, /Завершити посвяту/u);
+    assert.match(source, /Увійти до Hub пізніше/u);
+    assert.match(source, /Дата народження потрібна для сімейного календаря\. Іншим учасникам буде видно лише день і місяць\. Рік народження та вік не публікуються без окремого дозволу\./u);
+    assert.match(source, /Discord підтверджено/u);
+    assert.match(source, /Static ID прийнято/u);
+    assert.match(source, /Дата народження — остання печать/u);
+    assert.match(source, /min=\{BIRTHDAY_MIN_DATE\}/u);
+    assert.match(source, /max=\{maxDate\}/u);
+    assert.match(source, /Вкажи реальну дату народження не раніше 1970 року\./u);
+    assert.match(source, /Дата народження не може бути в майбутньому\./u);
+    assert.match(source, /Перевір дату — такого дня не існує\./u);
+    assert.match(source, /Вкажи дату народження, щоб завершити посвяту\./u);
+    assert.match(source, /aria-describedby="birthday-date-help birthday-date-error"/u);
+    assert.match(source, /aria-invalid=\{Boolean\(visibleError\)\}/u);
+    assert.match(source, /birthdaySubmitInFlightRef/u);
+    assert.match(source, /Посвяту завершено/u);
+    assert.match(source, /Dragon House приймає тебе до свого полум’я/u);
+    assert.match(source, /sessionStorage\.setItem\(openingSessionKey, 'true'\)/u);
+    assert.match(source, /prefersReducedMotion\(\)/u);
+    assert.match(source, /useOnboardingAudio/u);
     assert.match(source, /status === 'account_deactivated'/u);
     assert.match(source, /status === 'member_access_denied'/u);
     assert.match(source, /status === 'auth_unavailable'/u);
     assert.doesNotMatch(source, /outcome\.message/u);
     assert.doesNotMatch(source, /message\.includes/u);
+  });
+
+  it('keeps onboarding audio optional and cleaned up by source contract', async () => {
+    const screen = await readSource('entrypoints/dashboard/family-hub-app.tsx');
+    const audio = await readSource('entrypoints/dashboard/hooks/use-onboarding-audio.ts');
+
+    assert.match(screen, /Звук посвяти/u);
+    assert.match(screen, /Увімкнути звук/u);
+    assert.match(screen, /Вимкнути звук/u);
+    assert.match(screen, /audio\.start\(\)/u);
+    assert.doesNotMatch(screen, /autoPlay/u);
+    assert.match(audio, /ONBOARDING_AUDIO_PREFERENCE_KEY/u);
+    assert.match(audio, /new AudioContextClass\(\)/u);
+    assert.match(audio, /window\.setInterval/u);
+    assert.match(audio, /window\.clearInterval/u);
+    assert.match(audio, /contextRef\.current\?\.close\(\)|context\?\.close\(\)/u);
+    assert.match(audio, /droneRef\.current\?\.stop\(\)/u);
+    assert.match(audio, /playConfirmation/u);
   });
 
   it('preserves auth-token-only clearing behavior in the backend auth client', async () => {
