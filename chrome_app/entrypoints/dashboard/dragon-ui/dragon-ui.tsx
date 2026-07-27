@@ -218,16 +218,25 @@ export function DragonEmptyState({
 export function DragonDialog({
   title,
   children,
-  actions
+  actions,
+  onClose
 }: {
   title: string;
   children: ReactNode;
   actions?: ReactNode;
+  onClose?: () => void;
 }) {
   return (
     <div className="dh-dragon-dialog-backdrop" role="presentation">
       <section className="dh-dragon-dialog" role="dialog" aria-modal="true" aria-labelledby="dh-dragon-dialog-title">
-        <h2 id="dh-dragon-dialog-title">{title}</h2>
+        <div className="dh-dragon-dialog-head">
+          <h2 id="dh-dragon-dialog-title">{title}</h2>
+          {onClose ? (
+            <DragonButton type="button" variant="ghost" onClick={onClose} aria-label="Закрити діалог">
+              Закрити
+            </DragonButton>
+          ) : null}
+        </div>
         <div>{children}</div>
         {actions ? <footer>{actions}</footer> : null}
       </section>

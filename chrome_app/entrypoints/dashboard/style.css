@@ -726,7 +726,7 @@ body {
   margin-top: 0.45rem;
 }
 
-.dh-calendar-days span {
+.dh-calendar-days > span:not(.dh-dragon-tooltip) {
   display: grid;
   min-height: 2.65rem;
   place-items: center;
@@ -737,13 +737,28 @@ body {
   font-weight: 800;
 }
 
-.dh-calendar-days span.has-event {
+.dh-calendar-days > span.has-event {
   border-color: rgba(255, 157, 74, 0.42);
   background:
     radial-gradient(circle at 50% 20%, rgba(255, 91, 27, 0.26), transparent 4rem),
     rgba(56, 26, 12, 0.55);
   color: #fff7ed;
   box-shadow: 0 0 20px rgba(255, 91, 27, 0.12);
+}
+
+.dh-calendar-days > .dh-dragon-tooltip {
+  display: block;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-weight: inherit;
+}
+
+.dh-calendar-days > .dh-dragon-tooltip > .dh-calendar-day-cell {
+  width: 100%;
+  height: 100%;
 }
 
 .dh-calendar-events {
@@ -812,9 +827,384 @@ body {
   font-weight: 800;
 }
 
+.dh-calendar-command-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: clamp(1rem, 2vw, 1.35rem);
+}
+
+.dh-calendar-command-main h2 {
+  margin: 0.15rem 0 0;
+  color: var(--dragon-text);
+  font-size: clamp(1.8rem, 4vw, 3.1rem);
+  line-height: 0.95;
+}
+
+.dh-calendar-command-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.dh-calendar-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.dh-calendar-stats .dh-dragon-card {
+  padding: 1rem;
+}
+
+.dh-calendar-stats strong {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--dragon-text);
+  font-size: clamp(1.65rem, 3vw, 2.25rem);
+  line-height: 1;
+}
+
+.dh-calendar-stats p {
+  margin: 0.45rem 0 0;
+  color: var(--dragon-text-soft);
+  font-size: 0.86rem;
+}
+
+.dh-calendar-workbench {
+  display: grid;
+  gap: 1rem;
+}
+
+.dh-calendar-view-panel {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  padding: clamp(0.85rem, 2vw, 1.1rem);
+}
+
+.dh-calendar-month-view,
+.dh-calendar-week-view,
+.dh-calendar-agenda-view {
+  animation: dh-dragon-seal-pulse 520ms ease-out;
+}
+
+.dh-calendar-day-cell {
+  position: relative;
+  display: grid;
+  min-height: 7.8rem;
+  align-content: start;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--dragon-radius-md);
+  background:
+    linear-gradient(145deg, rgba(38, 18, 10, 0.74), rgba(2, 2, 2, 0.58)),
+    radial-gradient(circle at 50% 0, rgba(255, 133, 48, 0.07), transparent 5rem);
+  padding: 0.62rem;
+  color: var(--dragon-text);
+  transition: border-color var(--dragon-transition), box-shadow var(--dragon-transition), transform var(--dragon-transition), opacity var(--dragon-transition);
+}
+
+.dh-calendar-day-cell:hover,
+.dh-calendar-day-cell:focus-within {
+  transform: translateY(-1px);
+  border-color: rgba(255, 138, 43, 0.46);
+  box-shadow: 0 0 24px rgba(255, 88, 22, 0.14);
+}
+
+.dh-calendar-day-cell.is-muted {
+  opacity: 0.46;
+}
+
+.dh-calendar-day-cell.is-today {
+  border-color: rgba(255, 196, 92, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(255, 196, 92, 0.2), 0 0 28px rgba(255, 99, 26, 0.16);
+}
+
+.dh-calendar-day-cell.has-birthday::before,
+.dh-calendar-day-cell.has-critical::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  border-radius: 999px;
+}
+
+.dh-calendar-day-cell.has-birthday::before {
+  right: 0.7rem;
+  bottom: 0.7rem;
+  width: 0.42rem;
+  height: 0.42rem;
+  background: #74f0a5;
+  box-shadow: 0 0 14px rgba(116, 240, 165, 0.55);
+}
+
+.dh-calendar-day-cell.has-critical::after {
+  left: 0.7rem;
+  bottom: 0.7rem;
+  width: 0.42rem;
+  height: 0.42rem;
+  background: #ff5b1b;
+  box-shadow: 0 0 14px rgba(255, 91, 27, 0.68);
+}
+
+.dh-calendar-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.dh-calendar-day-head > span {
+  color: #fff7ed;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.dh-calendar-day-events {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.dh-calendar-event-chip,
+.dh-calendar-event-row,
+.dh-calendar-agenda-event button {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.24);
+  color: var(--dragon-text);
+  font: inherit;
+}
+
+.dh-calendar-event-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  border-radius: 999px;
+  padding: 0.22rem 0.45rem;
+  text-align: left;
+  transition: border-color var(--dragon-transition), transform var(--dragon-transition), background var(--dragon-transition);
+}
+
+.dh-calendar-event-chip:hover,
+.dh-calendar-event-chip:focus-visible,
+.dh-calendar-event-row:hover,
+.dh-calendar-event-row:focus-visible,
+.dh-calendar-agenda-event button:hover,
+.dh-calendar-agenda-event button:focus-visible {
+  border-color: rgba(255, 176, 85, 0.58);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.dh-calendar-event-chip strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+.dh-calendar-overflow,
+.dh-calendar-empty-line {
+  color: var(--dragon-text-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.dh-calendar-week-view,
+.dh-calendar-agenda-view {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dh-calendar-week-day {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+}
+
+.dh-calendar-week-day.is-today {
+  border-color: rgba(255, 196, 92, 0.62);
+}
+
+.dh-calendar-week-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dh-calendar-week-day-head span {
+  color: var(--dragon-text-soft);
+  font-weight: 800;
+}
+
+.dh-calendar-week-day-head strong {
+  color: var(--dragon-text);
+  font-size: 1.6rem;
+}
+
+.dh-calendar-week-events {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dh-calendar-event-row {
+  display: grid;
+  grid-template-columns: auto minmax(4rem, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: var(--dragon-radius-sm);
+  padding: 0.62rem 0.72rem;
+  text-align: left;
+}
+
+.dh-calendar-agenda-event {
+  padding: 0;
+}
+
+.dh-calendar-agenda-event button {
+  display: grid;
+  grid-template-columns: minmax(5.6rem, auto) auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  border: 0;
+  border-radius: inherit;
+  padding: 0.85rem;
+  text-align: left;
+}
+
+.dh-calendar-agenda-event small {
+  color: var(--dragon-text-soft);
+  font-size: 0.8rem;
+}
+
+.dh-calendar-agenda-date {
+  color: #ffcf94;
+  font-weight: 900;
+}
+
+.dh-calendar-category-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.dh-calendar-category-strip .dh-dragon-badge {
+  gap: 0.38rem;
+}
+
+.dh-calendar-category-dragon-meeting {
+  --dh-category-glow: rgba(255, 196, 92, 0.24);
+}
+
+.dh-calendar-category-birthday {
+  --dh-category-glow: rgba(116, 240, 165, 0.22);
+}
+
+.dh-calendar-category-celebration {
+  --dh-category-glow: rgba(255, 213, 121, 0.2);
+}
+
+.dh-calendar-category-war-event {
+  --dh-category-glow: rgba(255, 65, 31, 0.28);
+}
+
+.dh-calendar-category-quest {
+  --dh-category-glow: rgba(255, 132, 43, 0.24);
+}
+
+.dh-calendar-category-ritual {
+  --dh-category-glow: rgba(255, 91, 27, 0.3);
+}
+
+.dh-calendar-category-resource {
+  --dh-category-glow: rgba(169, 183, 197, 0.16);
+}
+
+.dh-calendar-category-personal {
+  --dh-category-glow: rgba(219, 188, 152, 0.16);
+}
+
+.dh-calendar-event-chip,
+.dh-calendar-event-row,
+.dh-calendar-agenda-event {
+  box-shadow: inset 0 0 18px var(--dh-category-glow, rgba(255, 120, 35, 0.14));
+}
+
+.dh-calendar-dialog-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.dh-calendar-dialog-content > p {
+  margin: 0;
+  color: var(--dragon-text-soft);
+  line-height: 1.65;
+}
+
+.dh-calendar-dialog-content dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.dh-calendar-dialog-content dl > div {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--dragon-radius-sm);
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.72rem;
+}
+
+.dh-calendar-dialog-content dt {
+  color: var(--dragon-text-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dh-calendar-dialog-content dd {
+  margin: 0.2rem 0 0;
+  color: var(--dragon-text);
+  font-weight: 800;
+}
+
+.dh-calendar-dialog-placeholders {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.dh-calendar-dialog-placeholders .dh-dragon-card {
+  padding: 0.8rem;
+}
+
+.dh-calendar-dialog-placeholders strong {
+  color: var(--dragon-text);
+}
+
+.dh-dragon-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 @media (min-width: 900px) {
   .dh-calendar-grid {
     grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.82fr);
+  }
+
+  .dh-calendar-workbench {
+    grid-template-columns: minmax(18rem, 0.35fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .dh-calendar-week-view {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   .dh-calendar-event {
