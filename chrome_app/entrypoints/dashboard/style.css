@@ -1437,6 +1437,424 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.dh-profile-room {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.dh-profile-hero {
+  min-height: clamp(18rem, 34vw, 28rem);
+  align-items: center;
+}
+
+.dh-profile-hero h1 {
+  max-width: 18ch;
+  overflow-wrap: anywhere;
+}
+
+.dh-profile-hero p {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.dh-profile-hero::after,
+.dh-profile-banner::after {
+  content: '';
+  position: absolute;
+  inset: auto 8% 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 178, 92, 0.58), transparent);
+  box-shadow: 0 0 28px rgba(255, 91, 27, 0.32);
+}
+
+.dh-profile-hero-aside,
+.dh-profile-banner-identity,
+.dh-profile-command-stats,
+.dh-achievement-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.dh-profile-hero-aside {
+  max-width: 22rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.dh-profile-hero-aside > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dh-profile-banner {
+  display: grid;
+  gap: 1rem;
+  align-items: center;
+  padding: clamp(1rem, 2.7vw, 1.5rem);
+}
+
+.dh-profile-banner-mark {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  color: rgba(255, 226, 199, 0.16);
+  font-size: clamp(1.9rem, 5vw, 4.4rem);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.86;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.dh-profile-banner-identity {
+  min-width: 0;
+  align-items: center;
+}
+
+.dh-profile-banner-identity h2,
+.dh-profile-rank-progress h2 {
+  margin: 0.2rem 0 0;
+  color: var(--dragon-text);
+  font-size: clamp(1.7rem, 4vw, 3rem);
+  line-height: 1;
+}
+
+.dh-profile-banner-identity p:last-child,
+.dh-profile-rank-progress p {
+  margin: 0.35rem 0 0;
+  color: var(--dragon-text-soft);
+}
+
+.dh-profile-hero-facts {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+}
+
+.dh-profile-hero-facts div,
+.dh-profile-identity-card,
+.dh-profile-requirements .dh-dragon-card {
+  border-color: rgba(255, 157, 74, 0.16);
+  background:
+    radial-gradient(circle at 0 0, rgba(255, 91, 27, 0.10), transparent 8rem),
+    rgba(0, 0, 0, 0.22);
+}
+
+.dh-profile-hero-facts div {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid rgba(255, 157, 74, 0.16);
+  border-radius: var(--dragon-radius-sm);
+  padding: 0.72rem;
+}
+
+.dh-profile-hero-facts dt,
+.dh-profile-identity-card span,
+.dh-profile-requirements span,
+.dh-achievement-card footer,
+.dh-timeline-card time {
+  color: var(--dragon-text-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dh-profile-hero-facts dd {
+  margin: 0;
+  color: var(--dragon-text);
+  font-weight: 900;
+}
+
+.dh-profile-command-stats,
+.dh-profile-stat-grid,
+.dh-profile-achievement-grid,
+.dh-profile-inventory-grid,
+.dh-profile-permission-grid,
+.dh-profile-discord-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.dh-profile-command-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dh-profile-command-stats .dh-dragon-card,
+.dh-profile-stat-card,
+.dh-profile-identity-card,
+.dh-profile-inventory-card,
+.dh-profile-permission-seal,
+.dh-profile-discord-card {
+  padding: 1rem;
+}
+
+.dh-profile-command-stats strong,
+.dh-profile-stat-card strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--dragon-text);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  line-height: 1;
+}
+
+.dh-profile-command-stats p,
+.dh-profile-stat-card p,
+.dh-profile-inventory-card p,
+.dh-profile-permission-seal p,
+.dh-profile-discord-card p,
+.dh-achievement-card p,
+.dh-timeline-card p {
+  margin: 0.45rem 0 0;
+  color: var(--dragon-text-soft);
+  line-height: 1.55;
+}
+
+.dh-profile-identity-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.dh-profile-identity-card {
+  display: grid;
+  gap: 0.4rem;
+  min-height: 6rem;
+}
+
+.dh-profile-identity-card strong {
+  color: var(--dragon-text);
+  overflow-wrap: anywhere;
+}
+
+.dh-profile-stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dh-profile-stat-card {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dh-profile-stat-card small {
+  color: #ffcf94;
+  font-weight: 800;
+}
+
+.dh-profile-achievement-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dh-achievement-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+}
+
+.dh-achievement-icon {
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: center;
+  border: 1px solid rgba(255, 157, 74, 0.24);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 178, 92, 0.24), transparent 2.4rem),
+    rgba(0, 0, 0, 0.34);
+  color: #ffd9bd;
+  font-size: 0.72rem;
+  font-weight: 900;
+  box-shadow: 0 0 24px rgba(255, 91, 27, 0.13), var(--dragon-shadow-inset);
+}
+
+.dh-achievement-head {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.dh-achievement-head h3,
+.dh-profile-inventory-card h3,
+.dh-profile-permission-seal h3,
+.dh-timeline-card h3 {
+  margin: 0;
+  color: var(--dragon-text);
+  line-height: 1.12;
+}
+
+.dh-achievement-card footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dh-achievement-card.is-locked,
+.dh-achievement-card.is-secret {
+  filter: saturate(0.74);
+}
+
+.dh-achievement-legendary {
+  border-color: rgba(212, 175, 55, 0.46);
+  box-shadow: var(--dragon-shadow-panel), 0 0 38px rgba(212, 175, 55, 0.12), var(--dragon-shadow-inset);
+}
+
+.dh-achievement-rare {
+  border-color: rgba(143, 166, 106, 0.38);
+}
+
+.dh-profile-timeline {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.dh-timeline-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.dh-timeline-card::after {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  top: 3.2rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #ff8b00;
+  box-shadow: 0 0 18px rgba(255, 91, 27, 0.58);
+}
+
+.dh-profile-inventory-grid,
+.dh-profile-permission-grid,
+.dh-profile-discord-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dh-profile-inventory-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dh-profile-inventory-card > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dh-profile-inventory-card span {
+  border: 1px solid rgba(255, 157, 74, 0.18);
+  border-radius: 999px;
+  padding: 0.38rem 0.58rem;
+  color: var(--dragon-text-soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.dh-profile-inventory-card span.is-earned {
+  border-color: rgba(143, 166, 106, 0.34);
+  color: #d9efb2;
+}
+
+.dh-profile-permission-seal {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dh-profile-permission-seal > div {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffd9bd;
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  background: radial-gradient(circle, rgba(255, 178, 92, 0.32), rgba(139, 0, 0, 0.36) 56%, rgba(0, 0, 0, 0.34));
+  box-shadow: 0 0 26px rgba(255, 91, 27, 0.18), var(--dragon-shadow-inset);
+  animation: dh-dragon-seal-pulse 2200ms ease-in-out infinite;
+}
+
+.dh-profile-permission-seal.is-sealed {
+  opacity: 0.72;
+}
+
+.dh-profile-heatmap {
+  display: grid;
+  grid-template-columns: repeat(21, minmax(0, 1fr));
+  gap: 0.28rem;
+}
+
+.dh-profile-heatmap-cell {
+  aspect-ratio: 1;
+  min-width: 0.55rem;
+  border: 1px solid rgba(255, 157, 74, 0.08);
+  border-radius: 0.22rem;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: var(--dragon-shadow-inset);
+}
+
+.dh-profile-heatmap-cell.level-1 {
+  background: rgba(143, 166, 106, 0.24);
+}
+
+.dh-profile-heatmap-cell.level-2 {
+  background: rgba(255, 139, 0, 0.30);
+}
+
+.dh-profile-heatmap-cell.level-3 {
+  background: rgba(255, 91, 27, 0.46);
+}
+
+.dh-profile-heatmap-cell.level-4 {
+  background: #ff8b00;
+  box-shadow: 0 0 12px rgba(255, 91, 27, 0.42);
+}
+
+.dh-profile-rank-progress {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 2.7vw, 1.5rem);
+}
+
+.dh-profile-rank-progress > div:nth-child(2) {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dh-profile-rank-progress > div:nth-child(2) strong {
+  color: var(--dragon-text);
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  line-height: 1;
+}
+
+.dh-profile-requirements {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.dh-profile-requirements .dh-dragon-card {
+  display: grid;
+  gap: 0.38rem;
+  padding: 0.85rem;
+}
+
+.dh-profile-requirements strong,
+.dh-profile-discord-card strong {
+  color: var(--dragon-text);
+}
+
+.dh-profile-requirements p,
+.dh-profile-discord-card p {
+  margin: 0;
+}
+
 @media (min-width: 900px) {
   .dh-calendar-grid {
     grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.82fr);
@@ -1458,16 +1876,47 @@ body {
   .dh-members-workbench {
     grid-template-columns: minmax(17rem, 0.32fr) minmax(0, 1fr);
   }
+
+  .dh-profile-banner {
+    grid-template-columns: minmax(18rem, 0.9fr) minmax(0, 1fr);
+  }
+
+  .dh-profile-hero-facts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .dh-timeline-card {
+    grid-template-columns: minmax(8rem, 0.22fr) minmax(0, 1fr);
+  }
+
+  .dh-profile-rank-progress {
+    grid-template-columns: minmax(18rem, 0.55fr) minmax(12rem, 0.25fr);
+  }
+
+  .dh-profile-requirements {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 1180px) {
   .dh-members-stats,
-  .dh-members-grid {
+  .dh-members-grid,
+  .dh-profile-command-stats,
+  .dh-profile-stat-grid,
+  .dh-profile-achievement-grid,
+  .dh-profile-identity-grid,
+  .dh-profile-requirements {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .dh-members-card.is-list {
     grid-template-columns: 1fr;
+  }
+
+  .dh-profile-inventory-grid,
+  .dh-profile-permission-grid,
+  .dh-profile-discord-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1550,12 +1999,32 @@ body {
 
   .dh-members-stats,
   .dh-members-grid,
-  .dh-members-dialog-placeholders {
+  .dh-members-dialog-placeholders,
+  .dh-profile-command-stats,
+  .dh-profile-stat-grid,
+  .dh-profile-achievement-grid,
+  .dh-profile-identity-grid,
+  .dh-profile-inventory-grid,
+  .dh-profile-permission-grid,
+  .dh-profile-discord-grid,
+  .dh-profile-requirements {
     grid-template-columns: 1fr;
   }
 
   .dh-members-card-actions .dh-dragon-button {
     width: 100%;
+  }
+
+  .dh-profile-hero-aside {
+    justify-content: flex-start;
+  }
+
+  .dh-profile-banner-mark {
+    opacity: 0.42;
+  }
+
+  .dh-profile-heatmap {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
   }
 }
 
@@ -1566,7 +2035,8 @@ body {
   .dh-dragon-bg-embers,
   .dh-dragon-loader span,
   .dh-dragon-skeleton,
-  .dh-dragon-empty-seal {
+  .dh-dragon-empty-seal,
+  .dh-profile-permission-seal > div {
     animation: none !important;
   }
 }

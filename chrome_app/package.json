@@ -25,7 +25,7 @@
     "map:sync-assets:with-images": "node scripts/sync-map-assets.mjs --include-popup-images",
     "map:build-default-data": "node scripts/build-map-default-data.mjs",
     "test": "npm run test:auth-source && npm run test:extension-shell",
-    "test:auth-source": "node --experimental-strip-types --test tests/family-backend-current-user.test.ts tests/family-legacy-auth-cleanup.test.ts tests/family-member-data-source-boundary.test.ts tests/family-persistent-login.test.ts tests/family-auth-outcome-router.test.ts tests/family-discord-link-state.test.ts tests/family-profile-page.test.ts tests/family-members-directory.test.ts tests/dragon-design-system.test.ts tests/dragon-calendar-module.test.ts tests/dragon-data-architecture.test.ts tests/dragon-members-module.test.ts",
+    "test:auth-source": "node --experimental-strip-types --test tests/family-backend-current-user.test.ts tests/family-legacy-auth-cleanup.test.ts tests/family-member-data-source-boundary.test.ts tests/family-persistent-login.test.ts tests/family-auth-outcome-router.test.ts tests/family-discord-link-state.test.ts tests/family-profile-page.test.ts tests/family-members-directory.test.ts tests/dragon-design-system.test.ts tests/dragon-calendar-module.test.ts tests/dragon-data-architecture.test.ts tests/dragon-members-module.test.ts tests/dragon-profile-module.test.ts",
     "test:extension-shell": "node --experimental-strip-types --test tests/extension-shell-contract.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."

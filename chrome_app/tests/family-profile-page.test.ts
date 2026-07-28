@@ -10,35 +10,15 @@ async function readSource(path: string) {
   return readFile(join(root, path), 'utf8');
 }
 
-describe('member profile page source contract', () => {
-  it('renders the canonical authenticated member profile sections and empty states', async () => {
+describe('member profile page route contract', () => {
+  it('keeps the existing authenticated profile route while delegating to Dragon Profile', async () => {
     const source = await readSource('entrypoints/dashboard/family/family-profile.tsx');
 
     assert.match(source, /export function FamilyProfile\(\{ user \}: \{ user: FamilyUser \}\)/u);
-    assert.match(source, /data-profile-member="authenticated"/u);
-    assert.match(source, /General/u);
-    assert.match(source, /Discord/u);
-    assert.match(source, /Family/u);
-    assert.match(source, /Developer/u);
-    assert.match(source, /Member ID/u);
-    assert.match(source, /Display name/u);
-    assert.match(source, /Static ID/u);
-    assert.match(source, /Discord server nickname/u);
-    assert.match(source, /Not linked/u);
-    assert.match(source, /Missing/u);
-    assert.match(source, /Using Dragon House crest/u);
-    assert.match(source, /Inactive/u);
-  });
-
-  it('reserves future profile sections without implementing their behavior', async () => {
-    const source = await readSource('entrypoints/dashboard/family/family-profile.tsx');
-
-    assert.match(source, /Achievements/u);
-    assert.match(source, /Statistics/u);
-    assert.match(source, /Family History/u);
-    assert.match(source, /Permissions/u);
-    assert.match(source, /Recent Activity/u);
-    assert.match(source, /aria-disabled="true"/u);
+    assert.match(source, /<DragonProfile user=\{user\} \/>/u);
+    assert.doesNotMatch(source, /General/u);
+    assert.doesNotMatch(source, /Developer/u);
+    assert.doesNotMatch(source, /settings/iu);
   });
 
   it('routes profile through Hub navigation without arbitrary member loading', async () => {
@@ -56,7 +36,7 @@ describe('member profile page source contract', () => {
     assert.doesNotMatch(profile, /memberId.*fetch/u);
   });
 
-  it('uses existing authenticated member DTO rather than introducing a second profile DTO', async () => {
+  it('uses existing authenticated member DTO as the route input', async () => {
     const backendDto = await readSource('../dragon-house-backend/src/auth/authenticated-member-dto.ts');
     const frontendDto = await readSource('lib/family-authenticated-member.ts');
     const profile = await readSource('entrypoints/dashboard/family/family-profile.tsx');
