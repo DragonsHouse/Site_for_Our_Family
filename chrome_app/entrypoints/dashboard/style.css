@@ -17,6 +17,175 @@ body {
   overflow-x: hidden;
 }
 
+.dh-discord-sync {
+  display: grid;
+  gap: 1rem;
+}
+
+.dh-discord-sync-hero,
+.dh-discord-sync-controls {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.dh-discord-sync-portal {
+  align-items: flex-end;
+  display: grid;
+  gap: 0.35rem;
+  justify-items: end;
+  min-width: 16rem;
+  text-align: right;
+}
+
+.dh-discord-sync-portal strong,
+.dh-discord-sync-item strong,
+.dh-discord-sync-status-card strong,
+.dh-discord-sync-summary-card strong {
+  color: #fff7ed;
+}
+
+.dh-discord-sync-actions,
+.dh-discord-sync-filters {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.dh-discord-sync-status,
+.dh-discord-sync-summary,
+.dh-discord-sync-plan {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.dh-discord-sync-status-card,
+.dh-discord-sync-summary-card,
+.dh-discord-sync-loading {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.dh-discord-sync-summary-card strong {
+  font-size: clamp(1.4rem, 4vw, 2rem);
+}
+
+.dh-discord-sync-item button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 0.85rem;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.dh-discord-sync-item button > div:first-child {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.dh-discord-sync-item dl,
+.dh-discord-sync-audit-details {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  margin: 0;
+}
+
+.dh-discord-sync-item dt,
+.dh-discord-sync-audit-details dt {
+  color: rgba(253, 230, 138, 0.75);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dh-discord-sync-item dd,
+.dh-discord-sync-audit-details dd {
+  color: rgba(226, 232, 240, 0.84);
+  margin: 0;
+}
+
+.dh-discord-sync-item.is-conflict,
+.dh-discord-sync-item.is-deactivate {
+  border-color: rgba(248, 113, 113, 0.46);
+}
+
+.dh-discord-sync-dialog-grid,
+.dh-discord-sync-confirm-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+.dh-discord-sync-diff,
+.dh-discord-sync-conflicts,
+.dh-discord-sync-history-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.dh-discord-sync-diff > div {
+  border: 1px solid rgba(255, 90, 0, 0.18);
+  border-radius: 0.5rem;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(7rem, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  padding: 0.65rem;
+}
+
+.dh-discord-sync-conflicts {
+  list-style: none;
+  padding: 0;
+}
+
+.dh-discord-sync-conflicts li {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dh-discord-sync-history-list button {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.58);
+  border: 1px solid rgba(255, 90, 0, 0.2);
+  border-radius: 0.5rem;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: auto 1fr auto;
+  padding: 0.7rem;
+  text-align: left;
+}
+
+@media (max-width: 720px) {
+  .dh-discord-sync-hero,
+  .dh-discord-sync-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dh-discord-sync-portal {
+    justify-items: start;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .dh-discord-sync-diff > div,
+  .dh-discord-sync-history-list button {
+    grid-template-columns: 1fr;
+  }
+}
+
 #root {
   width: 100%;
   min-height: 100vh;

@@ -4,6 +4,7 @@ import { createApp } from '../app.js';
 import { DiscordGuildMemberReaderError } from '../discord/guild-member-reader.js';
 import { DiscordMemberSyncApplyConflictError, type DiscordMemberSyncApplyService } from '../discord/member-sync-apply-service.js';
 import type { DiscordMemberSyncDryRunService } from '../discord/member-sync-dry-run-service.js';
+import type { DiscordSyncEngineService } from '../discord/sync-engine-service.js';
 import { clearRateLimitBucketsForTests } from '../middleware/rate-limit.js';
 import { createTestConfig } from '../test/test-config.js';
 import type { FamilyAuthService } from '../auth/auth-service.js';
@@ -95,6 +96,116 @@ function applyService(apply: DiscordMemberSyncApplyService['apply']): DiscordMem
     apply,
     getLatestReport: async () => ({ syncRunId: 'sync-1' }),
   } as unknown as DiscordMemberSyncApplyService;
+}
+
+function syncEngineService(input: Partial<DiscordSyncEngineService> = {}): DiscordSyncEngineService {
+  return {
+    getIntegrationStatus: async () => ({
+      guildConfigured: true,
+      guildId: 'guild-1',
+      guildName: 'Configured Discord Guild',
+      botConfigured: true,
+      botAccessStatus: 'configured',
+      liveData: true,
+      lastSuccessfulSynchronizationAt: null,
+      linkedMemberCount: null,
+      roleMappingCount: 1,
+      planTtlSeconds: 300,
+    }),
+    generateDryRunPlan: async () => ({
+      planId: PLAN_ID,
+      guildId: 'guild-1',
+      generatedAt: GENERATED_AT,
+      expiresAt: EXPIRES_AT,
+      snapshotFingerprint: PLAN_HASH,
+      snapshot: {
+        guildId: 'guild-1',
+        memberCount: 1,
+        humanMemberCount: 1,
+        botCount: 0,
+        fingerprint: PLAN_HASH,
+        capturedAt: GENERATED_AT,
+      },
+      summary: {
+        total: 1,
+        create: 0,
+        update: 0,
+        unchanged: 1,
+        deactivate: 0,
+        conflict: 0,
+        ignoredBot: 0,
+        ignoredUnmapped: 0,
+        error: 0,
+        safeToApply: 1,
+        blocked: 0,
+        discordMembers: 1,
+        humanMembers: 1,
+        familyMembers: 1,
+      },
+      items: [],
+      warnings: [],
+      conflicts: [],
+      missingRoleMappings: [],
+      source: 'live-discord',
+      stale: false,
+      applied: false,
+      rawDryRun: dryRunResult({ discordMemberCount: 1 }),
+    }),
+    getPlan: async () => (await syncEngineService().generateDryRunPlan('owner-1')),
+    applyPlan: async () => ({
+      syncRunId: 'sync-1',
+      planId: PLAN_ID,
+      guildId: 'guild-1',
+      appliedAt: GENERATED_AT,
+      status: 'succeeded',
+      summary: { created: 0, updated: 0, skipped: 1, inactive: 0, reactivated: 0, conflicts: 0, warnings: 0, errors: 0, auditEntries: 0 },
+      created: [],
+      updated: [],
+      deactivated: [],
+      reactivated: [],
+      skipped: ['member-1'],
+      conflicts: [],
+      warnings: [],
+      errors: [],
+      auditEntries: 0,
+    }),
+    listHistory: async () => [
+      {
+        auditId: PLAN_ID,
+        planId: PLAN_ID,
+        guildId: 'guild-1',
+        initiatedByMemberId: 'owner-1',
+        startedAt: GENERATED_AT,
+        completedAt: GENERATED_AT,
+        mode: 'dry-run',
+        status: 'succeeded',
+        counts: { unchanged: 1 },
+        conflicts: [],
+        appliedCreates: 0,
+        appliedUpdates: 0,
+        appliedDeactivations: 0,
+        skippedItems: 0,
+        failures: 0,
+        snapshotMetadata: {},
+        applicationStatus: 'succeeded',
+        errorSummary: null,
+      },
+    ],
+    getAuditRecord: async () => (await syncEngineService().listHistory())[0],
+    listRoleMappings: async () => [
+      {
+        discordRoleId: 'role-1',
+        discordRoleName: 'Guard',
+        mappedFamilyRole: 'member',
+        rank: 1,
+        permissions: [],
+        priority: 10,
+        enabled: true,
+        mappingType: 'primary_hierarchy',
+      },
+    ],
+    ...input,
+  } as DiscordSyncEngineService;
 }
 
 async function withServer(dependencies: Parameters<typeof createApp>[1], config = createTestConfig()) {
@@ -260,5 +371,59 @@ describe('Discord sync dry-run route', () => {
 
     expect(result.status).toBe(409);
     expect(result.body).toEqual({ error: 'discord_sync_plan_expired', message: 'expired' });
+  });
+
+  it('protects the new synchronization chamber endpoints with Discord admin permission', async () => {
+    const baseUrl = await withServer({
+      authService: authService('member'),
+      memberSyncDryRunService: dryRunService(async () => dryRunResult()),
+      discordSyncEngineService: syncEngineService(),
+    });
+
+    const response = await fetch(`${baseUrl}/api/discord/sync/status`, {
+      headers: { authorization: 'Bearer test-token' },
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'discord_sync_admin_required' });
+  });
+
+  it('returns status, server-generated plans, role mappings and audit history for authorized leaders', async () => {
+    const baseUrl = await withServer({
+      authService: authService('owner'),
+      memberSyncDryRunService: dryRunService(async () => dryRunResult()),
+      discordSyncEngineService: syncEngineService(),
+    });
+
+    const status = await fetch(`${baseUrl}/api/discord/sync/status`, { headers: { authorization: 'Bearer test-token' } });
+    const plan = await fetch(`${baseUrl}/api/discord/sync/plans`, { method: 'POST', headers: { authorization: 'Bearer test-token' } });
+    const roleMappings = await fetch(`${baseUrl}/api/discord/sync/role-mappings`, { headers: { authorization: 'Bearer test-token' } });
+    const history = await fetch(`${baseUrl}/api/discord/sync/history`, { headers: { authorization: 'Bearer test-token' } });
+
+    expect(status.status).toBe(200);
+    expect((await status.json()).guildId).toBe('guild-1');
+    expect(plan.status).toBe(200);
+    expect((await plan.json()).snapshotFingerprint).toBe(PLAN_HASH);
+    expect(roleMappings.status).toBe(200);
+    expect((await roleMappings.json())[0].discordRoleId).toBe('role-1');
+    expect(history.status).toBe(200);
+    expect((await history.json())[0].planId).toBe(PLAN_ID);
+  });
+
+  it('applies a reviewed server plan by idempotent plan endpoint', async () => {
+    const baseUrl = await withServer({
+      authService: authService('owner'),
+      memberSyncDryRunService: dryRunService(async () => dryRunResult()),
+      discordSyncEngineService: syncEngineService(),
+    });
+
+    const response = await fetch(`${baseUrl}/api/discord/sync/plans/${PLAN_ID}/apply`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ confirm: true, idempotencyKey: 'discord-sync-route-key' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).syncRunId).toBe('sync-1');
   });
 });

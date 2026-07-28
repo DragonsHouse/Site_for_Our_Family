@@ -5,6 +5,7 @@ import type { FamilyAuthService } from '../auth/auth-service.js';
 import { DiscordGuildMemberReaderError } from '../discord/guild-member-reader.js';
 import { DiscordMemberSyncApplyConflictError, type DiscordMemberSyncApplyService } from '../discord/member-sync-apply-service.js';
 import type { DiscordMemberSyncDryRunService } from '../discord/member-sync-dry-run-service.js';
+import { DiscordSyncEngineError, type DiscordSyncEngineService } from '../discord/sync-engine-service.js';
 import { requireFamilyAuthContext } from '../middleware/family-auth-context.js';
 import { createAuthenticatedRateLimit } from '../middleware/rate-limit.js';
 import { createLogger, planHashPrefix } from '../logging/logger.js';
@@ -18,11 +19,25 @@ const ApplySyncSchema = z.object({
   idempotencyKey: z.string().trim().min(12).max(120),
 }).strict();
 
+const ApplyPlanSchema = z.object({
+  confirm: z.literal(true),
+  idempotencyKey: z.string().trim().min(12).max(120),
+}).strict();
+
+const PlanIdParamsSchema = z.object({
+  planId: z.string().regex(/^[a-f0-9]{32}$/u),
+}).strict();
+
+const AuditIdParamsSchema = z.object({
+  auditId: z.string().trim().min(1).max(120),
+}).strict();
+
 export function createDiscordSyncRouter(
   config: AppConfig,
   authService: FamilyAuthService | null,
   dryRunService: DiscordMemberSyncDryRunService | null,
   applyService: DiscordMemberSyncApplyService | null = null,
+  syncEngineService: DiscordSyncEngineService | null = null,
 ): Router {
   const router = Router();
   const requireAuth = requireFamilyAuthContext(config, authService);
@@ -114,10 +129,103 @@ export function createDiscordSyncRouter(
     response.json(await applyService.getLatestReport());
   });
 
+  router.get('/discord/sync/status', requireAuth, reportLimit, async (request, response) => {
+    if (!request.familyAuth) return response.status(401).json({ error: 'session_required' });
+    if (!canManageDiscordSync(request.familyAuth)) return response.status(403).json({ error: 'discord_sync_admin_required' });
+    if (!syncEngineService) return response.status(503).json({ error: 'discord_sync_unavailable' });
+    try {
+      response.json(await syncEngineService.getIntegrationStatus());
+    } catch (error) {
+      respondWithDiscordSyncError(response, error);
+    }
+  });
+
+  router.post('/discord/sync/plans', requireAuth, dryRunLimit, async (request, response) => {
+    if (!request.familyAuth) return response.status(401).json({ error: 'session_required' });
+    if (!canManageDiscordSync(request.familyAuth)) return response.status(403).json({ error: 'discord_sync_admin_required' });
+    if (!syncEngineService) return response.status(503).json({ error: 'discord_sync_unavailable' });
+    try {
+      response.json(await syncEngineService.generateDryRunPlan(request.familyAuth.familyMemberId));
+    } catch (error) {
+      respondWithDiscordSyncError(response, error);
+    }
+  });
+
+  router.get('/discord/sync/plans/:planId', requireAuth, reportLimit, async (request, response) => {
+    if (!request.familyAuth) return response.status(401).json({ error: 'session_required' });
+    if (!canManageDiscordSync(request.familyAuth)) return response.status(403).json({ error: 'discord_sync_admin_required' });
+    if (!syncEngineService) return response.status(503).json({ error: 'discord_sync_unavailable' });
+    const parsed = PlanIdParamsSchema.safeParse(request.params);
+    if (!parsed.success) return response.status(400).json({ error: 'invalid_discord_sync_plan_id' });
+    try {
+      response.json(await syncEngineService.getPlan(parsed.data.planId));
+    } catch (error) {
+      respondWithDiscordSyncError(response, error);
+    }
+  });
+
+  router.post('/discord/sync/plans/:planId/apply', requireAuth, applyLimit, async (request, response) => {
+    if (!request.familyAuth) return response.status(401).json({ error: 'session_required' });
+    if (!canManageDiscordSync(request.familyAuth)) return response.status(403).json({ error: 'discord_sync_admin_required' });
+    if (!syncEngineService) return response.status(503).json({ error: 'discord_apply_sync_unavailable' });
+    const params = PlanIdParamsSchema.safeParse(request.params);
+    const body = ApplyPlanSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return response.status(400).json({
+        error: 'discord_apply_sync_confirmation_required',
+        message: 'Apply sync requires confirm=true and an idempotencyKey for a server-generated plan.',
+      });
+    }
+    try {
+      response.json(await syncEngineService.applyPlan(params.data.planId, body.data.idempotencyKey, request.familyAuth.familyMemberId));
+    } catch (error) {
+      respondWithDiscordSyncError(response, error);
+    }
+  });
+
+  router.get('/discord/sync/history', requireAuth, reportLimit, async (request, response) => {
+    if (!request.familyAuth) return response.status(401).json({ error: 'session_required' });
+    if (!canManageDiscordSync(request.familyAuth)) return response.status(403).json({ error: 'discord_sync_admin_required' });
+    if (!syncEngineService) return response.status(503).json({ error: 'discord_sync_unavailable' });
+    try {
+      response.json(await syncEngineService.listHistory());
+    } catch (error) {
+      respondWithDiscordSyncError(response, error);
+    }
+  });
+
+  router.get('/discord/sync/history/:auditId', requireAuth, reportLimit, async (request, response) => {
+    if (!request.familyAuth) return response.status(401).json({ error: 'session_required' });
+    if (!canManageDiscordSync(request.familyAuth)) return response.status(403).json({ error: 'discord_sync_admin_required' });
+    if (!syncEngineService) return response.status(503).json({ error: 'discord_sync_unavailable' });
+    const parsed = AuditIdParamsSchema.safeParse(request.params);
+    if (!parsed.success) return response.status(400).json({ error: 'invalid_discord_sync_audit_id' });
+    try {
+      response.json(await syncEngineService.getAuditRecord(parsed.data.auditId));
+    } catch (error) {
+      respondWithDiscordSyncError(response, error);
+    }
+  });
+
+  router.get('/discord/sync/role-mappings', requireAuth, reportLimit, async (request, response) => {
+    if (!request.familyAuth) return response.status(401).json({ error: 'session_required' });
+    if (!canManageDiscordSync(request.familyAuth)) return response.status(403).json({ error: 'discord_sync_admin_required' });
+    if (!syncEngineService) return response.status(503).json({ error: 'discord_sync_unavailable' });
+    try {
+      response.json(await syncEngineService.listRoleMappings());
+    } catch (error) {
+      respondWithDiscordSyncError(response, error);
+    }
+  });
+
   return router;
 }
 
 function respondWithDiscordSyncError(response: import('express').Response, error: unknown): void {
+  if (error instanceof DiscordSyncEngineError) {
+    response.status(error.status).json({ error: error.code, message: error.message });
+    return;
+  }
   if (error instanceof DiscordGuildMemberReaderError) {
     const status = error.code === 'discord_api_error' ? 502 : 503;
     response.status(status).json({ error: error.code, message: error.message });
@@ -128,4 +236,8 @@ function respondWithDiscordSyncError(response: import('express').Response, error
     return;
   }
   response.status(500).json({ error: 'discord_sync_failed' });
+}
+
+function canManageDiscordSync(auth: NonNullable<import('express').Request['familyAuth']>) {
+  return auth.role === 'owner' || auth.permissions.includes('manage_discord_integration');
 }

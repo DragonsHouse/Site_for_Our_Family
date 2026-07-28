@@ -10,6 +10,7 @@ const TABS: Array<{ key: FamilyTab; label: string; room: string }> = [
   { key: 'tower-defense', label: 'Вогняна варта', room: 'War Chamber' },
   { key: 'achievements', label: 'Achievements', room: 'Seal Engine' },
   { key: 'resources', label: 'Resources', room: 'Treasury' },
+  { key: 'discord-sync', label: 'Discord Sync', room: 'Sync Chamber' },
   { key: 'family', label: 'Family', room: 'Hall of Flame' },
   { key: 'buyers', label: 'Buyers', room: 'Trade Vault' },
   { key: 'map', label: 'Map', room: 'War Table' }

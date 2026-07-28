@@ -332,7 +332,7 @@ export type DiscordMemberSyncDryRunItem = {
   > & {
     discordUserId?: string | null;
   };
-  matchedBy: 'discord_user_id' | 'none' | 'not_applicable';
+  matchedBy: 'discord_user_id' | 'static_id' | 'none' | 'not_applicable';
   /** @deprecated Use primaryRank. Kept temporarily for existing dry-run consumers. */
   proposedRole?: DiscordMemberSyncProposedRole;
   primaryRank?: DiscordMemberSyncProposedRole;

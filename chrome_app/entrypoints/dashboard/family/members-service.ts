@@ -6,6 +6,7 @@ import {
   DRAGON_MEMBER_ROLE_META,
   DRAGON_MEMBER_STATUS_META,
   type DragonMember,
+  type DragonMemberDiscordSyncState,
   type DragonMemberRole,
   type DragonMembersFilters,
   type DragonMemberStatus
@@ -56,6 +57,14 @@ export function formatDragonMemberDate(date: string) {
 
 export function formatDragonMemberBirthday(date?: string) {
   return formatDragonBirthday(date);
+}
+
+export function getDragonMemberDiscordSyncState(member: DragonMember): DragonMemberDiscordSyncState {
+  if (member.discordSyncState) return member.discordSyncState;
+  if (member.discordGuildActive === false) return 'guild-inactive';
+  if (member.discordSyncedAt) return 'synchronized';
+  if (member.discordUserId) return 'linked';
+  return 'not-linked';
 }
 
 export function filterDragonMembers(members: DragonMember[], filters: DragonMembersFilters) {

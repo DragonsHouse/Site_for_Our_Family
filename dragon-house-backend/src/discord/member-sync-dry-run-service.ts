@@ -19,6 +19,7 @@ import type {
   FamilyRole,
   NormalizedDiscordGuildMember,
 } from '../types.js';
+import { parseStaticIdFromDiscordNickname } from './static-id-nickname.js';
 
 const EMPTY_SUMMARY: DiscordMemberSyncDryRunSummary = {
   create: 0,
@@ -140,7 +141,10 @@ export class DiscordMemberSyncDryRunService {
         continue;
       }
 
-      const identityWarnings = missingIdentityWarnings(discordMember);
+      const identityWarnings = [
+        ...missingIdentityWarnings(discordMember),
+        ...staticIdNicknameWarnings(discordMember),
+      ];
       const resolution = resolveDiscordRoles(discordMember, mappings);
       const unknownRoles = discordMember.roleIds.filter(
         (roleId) => !activeMappingsByRoleId.has(roleId) && roleId !== discordMember.guildId,
@@ -155,7 +159,16 @@ export class DiscordMemberSyncDryRunService {
         continue;
       }
 
-      const familyMember = linkedMembersByDiscordId.get(discordMember.discordUserId) ?? null;
+      const linkedFamilyMember = linkedMembersByDiscordId.get(discordMember.discordUserId) ?? null;
+      const staticIdMatch = findStaticIdFamilyMember(discordMember, familyMembers, result);
+      if (linkedFamilyMember && staticIdMatch.member && linkedFamilyMember.id !== staticIdMatch.member.id) {
+        addAction(result, conflictAction(discordMember, 'static_id_mismatch', [
+          ...identityWarnings,
+          `Discord user is linked to ${linkedFamilyMember.id}, but nickname Static ID points to ${staticIdMatch.member.id}.`,
+        ], { ...resolution, primaryRank: resolution.primaryRank }));
+        continue;
+      }
+      const familyMember = linkedFamilyMember ?? staticIdMatch.member;
       const resolutionWithPrimary = protectOwnerResolution(familyMember, discordMember, protectedOwner, {
         ...resolution,
         primaryRank: resolution.primaryRank,
@@ -189,7 +202,7 @@ export class DiscordMemberSyncDryRunService {
         reason: identityWarnings.length ? 'missing_required_identity_data' : changes.length ? 'matched_member_differs' : 'matched_member_current',
         discordMember,
         familyMember: toFamilyMemberRef(familyMember),
-        matchedBy: 'discord_user_id',
+        matchedBy: linkedFamilyMember ? 'discord_user_id' : 'static_id',
         ...resolutionItemFields(resolutionWithPrimary),
         changes,
         warnings,
@@ -444,6 +457,26 @@ function possibleManualLinks(discordMember: NormalizedDiscordGuildMember, family
     .sort();
 }
 
+function staticIdNicknameWarnings(discordMember: NormalizedDiscordGuildMember): string[] {
+  const parsed = parseStaticIdFromDiscordNickname(discordMember.serverNickname ?? discordMember.globalName ?? discordMember.username);
+  return parsed.warning ? [parsed.warning] : [];
+}
+
+function findStaticIdFamilyMember(
+  discordMember: NormalizedDiscordGuildMember,
+  familyMembers: FamilyMember[],
+  result: DiscordMemberSyncDryRunResult,
+): { member: FamilyMember | null } {
+  const parsed = parseStaticIdFromDiscordNickname(discordMember.serverNickname ?? discordMember.globalName ?? discordMember.username);
+  if (parsed.status !== 'valid') return { member: null };
+  const matches = familyMembers.filter((member) => member.staticId === parsed.staticId && !member.deletedAt);
+  if (matches.length > 1) {
+    addConflict(result, `Duplicate Static ID ${parsed.staticId} matched Discord user ${discordMember.discordUserId}.`);
+    return { member: null };
+  }
+  return { member: matches[0] ?? null };
+}
+
 function createChanges(
   discordMember: NormalizedDiscordGuildMember,
   resolution: DiscordRoleResolution & { primaryRank: DiscordMemberSyncProposedRole },
@@ -465,6 +498,7 @@ function updateChanges(
   resolution: DiscordRoleResolution & { primaryRank: DiscordMemberSyncProposedRole },
 ): DiscordMemberSyncChange[] {
   return [
+    compare('discord_user_id', familyMember.discord?.discordUserId ?? null, discordMember.discordUserId),
     compare('discord_username', familyMember.discord?.discordUsername ?? null, discordMember.username),
     compare('discord_global_name', familyMember.discord?.discordGlobalName ?? null, discordMember.globalName),
     compare('discord_server_nickname', familyMember.discord?.discordServerNickname ?? null, discordMember.serverNickname),

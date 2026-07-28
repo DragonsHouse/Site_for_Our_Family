@@ -907,6 +907,7 @@ export type FamilyTab =
   | 'tower-defense'
   | 'achievements'
   | 'resources'
+  | 'discord-sync'
   | 'family'
   | 'buyers'
   | 'map';

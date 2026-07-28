@@ -26,7 +26,7 @@ import {
   type DragonMembersView,
   type DragonMemberStatus
 } from './members-models';
-import { formatDragonMemberBirthday, formatDragonMemberDate } from './members-service';
+import { formatDragonMemberBirthday, formatDragonMemberDate, getDragonMemberDiscordSyncState } from './members-service';
 import { useDragonMembersState } from './members-state';
 
 const VIEW_TABS: Array<{ key: DragonMembersView; label: string; room: string }> = [
@@ -282,6 +282,7 @@ export function DragonMembers({ currentUser }: { currentUser: FamilyUser }) {
 function DragonMemberCard({ member, view, onOpen }: { member: DragonMember; view: DragonMembersView; onOpen: () => void }) {
   const roleMeta = DRAGON_MEMBER_ROLE_META[member.role];
   const statusMeta = DRAGON_MEMBER_STATUS_META[member.status];
+  const discordSyncState = getDragonMemberDiscordSyncState(member);
   const rankPower = Math.min(100, Math.max(0, member.rankLevel));
 
   return (
@@ -302,6 +303,9 @@ function DragonMemberCard({ member, view, onOpen }: { member: DragonMember; view
         </DragonBadge>
         <DragonBadge tone={statusMeta.tone} className={statusMeta.className}>
           {statusMeta.label}
+        </DragonBadge>
+        <DragonBadge tone={discordSyncState === 'synchronized' ? 'success' : discordSyncState === 'conflict' ? 'danger' : 'muted'}>
+          Discord {discordSyncState}
         </DragonBadge>
       </div>
       <dl className="dh-members-card-facts">

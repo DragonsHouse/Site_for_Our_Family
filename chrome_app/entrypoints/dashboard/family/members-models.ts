@@ -10,6 +10,7 @@ export type DragonMemberRole =
   | 'egg';
 
 export type DragonMemberStatus = 'online' | 'offline' | 'away' | 'in_voice' | 'recently_active';
+export type DragonMemberDiscordSyncState = 'not-linked' | 'linked' | 'synchronized' | 'guild-inactive' | 'conflict';
 
 export type DragonMembersView = 'grid' | 'list';
 
@@ -27,6 +28,10 @@ export type DragonMember = DragonEntity & {
   showBirthdayAge?: boolean;
   status: DragonMemberStatus;
   staticId: string;
+  discordUserId?: string | null;
+  discordSyncedAt?: string | null;
+  discordGuildActive?: boolean;
+  discordSyncState?: DragonMemberDiscordSyncState;
   avatarUrl?: string | null;
   voiceChannel?: string;
   lastActiveAt?: string;
