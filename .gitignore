@@ -19,6 +19,7 @@ coverage/
 logs/
 test-results/
 playwright-report/
+chrome_app/.artifacts/
 
 # Browser profiles and temporary runtime data
 .tmp/
