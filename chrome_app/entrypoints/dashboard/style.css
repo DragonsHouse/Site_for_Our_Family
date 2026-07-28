@@ -4250,6 +4250,225 @@ body {
   border-left-color: rgba(255, 126, 42, 0.72);
 }
 
+.dh-tower-defense {
+  color: #f6ead2;
+}
+
+.dh-tower-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.dh-tower-hero::after {
+  position: absolute;
+  inset: auto 1.5rem 1rem auto;
+  width: 10rem;
+  height: 10rem;
+  border: 1px solid rgba(255, 194, 92, 0.28);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 114, 44, 0.28), transparent 62%);
+  content: '';
+  filter: blur(1px);
+  animation: dh-event-ember-breath 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.dh-tower-hero-actions,
+.dh-tower-actions,
+.dh-roster-filters,
+.dh-tower-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.dh-tower-command-grid,
+.dh-tower-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.dh-tower-command-card,
+.dh-tower-stat,
+.dh-tower-most {
+  min-height: 7rem;
+  background: linear-gradient(145deg, rgba(28, 15, 12, 0.92), rgba(6, 8, 12, 0.88));
+  border-color: rgba(255, 156, 70, 0.22);
+}
+
+.dh-tower-command-card p,
+.dh-tower-stat span,
+.dh-kicker {
+  margin: 0;
+  color: #b99d72;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dh-tower-command-card strong,
+.dh-tower-stat strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: #fff3d6;
+  font-size: clamp(1.25rem, 2vw, 1.85rem);
+}
+
+.dh-tower-command-card small,
+.dh-fire-guard-main small,
+.dh-defense-history-card small {
+  color: #aeb3bd;
+}
+
+.dh-tower-signal {
+  display: block;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-bottom: 0.7rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, #ffe0a3, #ff772a 48%, rgba(255, 119, 42, 0.16) 72%);
+  box-shadow: 0 0 24px rgba(255, 119, 42, 0.48);
+}
+
+.dh-tower-active {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.75fr) minmax(0, 1.25fr);
+  gap: 1rem;
+}
+
+.dh-tower-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dh-tower-defense-card,
+.dh-tower-operation-card,
+.dh-defense-history-card,
+.dh-defense-timeline-entry {
+  border-radius: 8px;
+}
+
+.dh-tower-defense-card p,
+.dh-tower-operation-card p,
+.dh-defense-timeline-entry p {
+  color: #d9c4a4;
+}
+
+.dh-tower-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.dh-tower-details-grid dt {
+  color: #9d8763;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dh-tower-details-grid dd {
+  margin: 0.2rem 0 0;
+  color: #f7e2bc;
+}
+
+.dh-fire-roster,
+.dh-fire-roster-list,
+.dh-tower-card-list,
+.dh-defense-history,
+.dh-defense-timeline,
+.dh-dialog-stack,
+.dh-attendance-editor {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.dh-fire-guard-row {
+  display: grid;
+  grid-template-columns: auto minmax(11rem, 1fr) auto minmax(9rem, 0.5fr) minmax(9rem, 0.5fr);
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.dh-fire-guard-main {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.dh-fire-guard-main strong,
+.dh-defense-history-card strong,
+.dh-defense-timeline-entry strong {
+  color: #fff0ce;
+}
+
+.dh-fire-guard-main span,
+.dh-defense-history-card span {
+  color: #c9aa7c;
+  font-size: 0.86rem;
+}
+
+.dh-defense-history-card,
+.dh-defense-timeline-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dh-defense-history-card small {
+  grid-column: 1 / -1;
+}
+
+.dh-defense-timeline-entry {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.dh-defense-timeline-entry > span {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 999px;
+  background: #ff9b45;
+  box-shadow: 0 0 18px rgba(255, 155, 69, 0.55);
+}
+
+.dh-tower-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.dh-tower-form label,
+.dh-attendance-editor label,
+.dh-dialog-stack label {
+  display: grid;
+  gap: 0.35rem;
+  color: #f2dbb4;
+  font-size: 0.88rem;
+}
+
+.dh-tower-form-wide {
+  grid-column: 1 / -1;
+}
+
+.dh-tower-alert {
+  border: 1px solid rgba(255, 87, 87, 0.42);
+  border-radius: 8px;
+  background: rgba(78, 14, 14, 0.74);
+  color: #ffd2c9;
+  padding: 0.9rem 1rem;
+}
+
+.dh-tower-loading {
+  display: grid;
+  gap: 0.75rem;
+}
+
 @keyframes dh-event-ember-breath {
   0%, 100% {
     opacity: 0.55;
@@ -4281,7 +4500,12 @@ body {
 
 @media (max-width: 760px) {
   .dh-event-engine-hero,
-  .dh-event-command-grid {
+  .dh-event-command-grid,
+  .dh-tower-command-grid,
+  .dh-tower-active,
+  .dh-tower-stat-grid,
+  .dh-fire-guard-row,
+  .dh-tower-form {
     grid-template-columns: 1fr;
   }
 
@@ -4356,7 +4580,8 @@ body {
   .dh-engine-rarity-mythic.is-unlocked,
   .dh-achievement-notification.dh-engine-rarity-legendary,
   .dh-achievement-notification.dh-engine-rarity-mythic,
-  .dh-event-engine-hero::after {
+  .dh-event-engine-hero::after,
+  .dh-tower-hero::after {
     animation: none !important;
   }
 

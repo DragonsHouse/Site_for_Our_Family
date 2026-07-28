@@ -10,6 +10,7 @@ import { DragonAchievementEngineScreen } from './dragon-achievements';
 import { DragonCalendar } from './dragon-calendar';
 import { DragonEventEngineScreen } from './dragon-events';
 import { DragonMembers } from './dragon-members';
+import { DragonTowerDefenseScreen } from './dragon-tower-defense';
 import { FamilyPanel } from './family-panel';
 import { FamilyProfile } from './family-profile';
 import { FamilyTabs } from './family-tabs';
@@ -38,6 +39,7 @@ const TAB_BACKGROUND_VARIANT: Record<FamilyTab, DragonBackgroundVariant> = {
   profile: 'profile',
   calendar: 'calendar',
   events: 'events',
+  'tower-defense': 'events',
   achievements: 'achievements',
   resources: 'resources',
   family: 'dashboard',
@@ -178,6 +180,8 @@ export function FamilyShell({
         ) : null}
 
         {activeTab === 'events' ? <DragonEventEngineScreen /> : null}
+
+        {activeTab === 'tower-defense' ? <DragonTowerDefenseScreen /> : null}
 
         {activeTab === 'achievements' ? <DragonAchievementEngineScreen /> : null}
 

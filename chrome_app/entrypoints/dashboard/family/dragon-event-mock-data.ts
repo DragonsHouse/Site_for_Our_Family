@@ -199,6 +199,12 @@ export const DRAGON_EVENT_MOCK_DATA: DragonEvent[] = [
     questIds: [],
     towerDefense: {
       defenseId: 'td_future_training',
+      towerId: 'tower-training',
+      towerName: 'Defense Training Tower',
+      towerCode: 'TRN-01',
+      commanderMemberId: 'war-council',
+      readiness: 'ready',
+      defenseStatus: 'scheduled',
       waveId: 'wave_placeholder',
       attendance: [{ memberId: 'guardians', status: 'present' }],
       result: 'scheduled',

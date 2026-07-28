@@ -70,8 +70,14 @@ export type DragonEventReward = {
 
 export type DragonEventTowerDefenseMetadata = {
   defenseId?: string;
+  towerId?: string;
+  towerName?: string;
+  towerCode?: string;
+  commanderMemberId?: string;
+  readiness?: 'critical' | 'insufficient' | 'ready' | 'reinforced';
+  defenseStatus?: 'draft' | 'scheduled' | 'gathering' | 'active' | 'completed' | 'cancelled';
   waveId?: string;
-  attendance?: Array<{ memberId: string; status: 'present' | 'late' | 'absent' }>;
+  attendance?: Array<{ memberId: string; status: 'unconfirmed' | 'present' | 'late' | 'absent' | 'excused' }>;
   result?: 'victory' | 'defeat' | 'in_progress' | 'scheduled';
   rewardId?: string;
   futureFields?: Record<string, string | number | boolean>;

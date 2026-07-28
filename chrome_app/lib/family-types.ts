@@ -904,6 +904,7 @@ export type FamilyTab =
   | 'profile'
   | 'calendar'
   | 'events'
+  | 'tower-defense'
   | 'achievements'
   | 'resources'
   | 'family'
