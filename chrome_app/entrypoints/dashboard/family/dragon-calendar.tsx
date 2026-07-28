@@ -8,8 +8,10 @@ import {
   DragonEmptyState,
   DragonHero,
   DragonInput,
+  DragonLoader,
   DragonPanel,
   DragonProgress,
+  DragonRetry,
   DragonSection,
   DragonSelect,
   DragonTabs,
@@ -94,6 +96,11 @@ export function DragonCalendar({ currentUser }: { currentUser: FamilyUser }) {
           </DragonButton>
         </div>
       </DragonPanel>
+
+      {calendar.loading ? <DragonLoader label="Dragon Calendar відкриває хроніки" /> : null}
+      {calendar.error ? (
+        <DragonRetry title="Хроніки не відкрились" description={calendar.error.message} onRetry={calendar.refresh} />
+      ) : null}
 
       <section className="dh-calendar-stats" aria-label="Швидка статистика Dragon Calendar">
         <DragonCard>

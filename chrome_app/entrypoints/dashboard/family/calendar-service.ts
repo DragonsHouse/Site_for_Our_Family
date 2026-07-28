@@ -1,14 +1,28 @@
 import { DRAGON_CALENDAR_MOCK_EVENTS } from './calendar-mock-data';
 import type { DragonCalendarCategory, DragonCalendarEvent, DragonCalendarFilters } from './calendar-models';
 import { compareEvents } from './calendar-date';
+import { createMockRepository } from '../data/repositories/mock-repository';
+import type { Repository } from '../data/repositories/repository';
 
-export type DragonCalendarRepository = {
-  listEvents: () => DragonCalendarEvent[];
-};
+export type DragonCalendarCreateInput = Omit<DragonCalendarEvent, 'id'>;
+export type DragonCalendarUpdateInput = Partial<DragonCalendarEvent>;
 
-export const mockDragonCalendarRepository: DragonCalendarRepository = {
-  listEvents: () => DRAGON_CALENDAR_MOCK_EVENTS
-};
+export type DragonCalendarRepository = Repository<
+  DragonCalendarEvent,
+  DragonCalendarCreateInput,
+  DragonCalendarUpdateInput,
+  DragonCalendarFilters
+>;
+
+export const mockDragonCalendarRepository: DragonCalendarRepository = createMockRepository<
+  DragonCalendarEvent,
+  DragonCalendarCreateInput,
+  DragonCalendarUpdateInput,
+  DragonCalendarFilters
+>(DRAGON_CALENDAR_MOCK_EVENTS, (input) => ({
+  id: globalThis.crypto?.randomUUID?.() ?? `calendar-${Date.now()}`,
+  ...input
+}));
 
 export type DragonCalendarStats = {
   totalEvents: number;

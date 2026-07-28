@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
+import { useDragonCollection } from '../data/hooks/use-dragon-collection';
 import { addDays, addMonths, buildMonthDays, buildWeekDays, groupEventsByDate, toDateKey } from './calendar-date';
 import {
   filterDragonCalendarEvents,
   getDragonCalendarMembers,
   getDragonCalendarStats,
   mockDragonCalendarRepository,
-  type DragonCalendarRepository
+  type DragonCalendarCreateInput,
+  type DragonCalendarRepository,
+  type DragonCalendarUpdateInput
 } from './calendar-service';
 import type { DragonCalendarEvent, DragonCalendarFilters, DragonCalendarView } from './calendar-models';
 
@@ -22,10 +25,18 @@ export function useDragonCalendarState(repository: DragonCalendarRepository = mo
   const todayKey = useMemo(() => toDateKey(today), [today]);
   const [view, setView] = useState<DragonCalendarView>('month');
   const [anchorDate, setAnchorDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
-  const [filters, setFilters] = useState<DragonCalendarFilters>(DEFAULT_FILTERS);
   const [selectedEvent, setSelectedEvent] = useState<DragonCalendarEvent | null>(null);
-  const events = useMemo(() => repository.listEvents(), [repository]);
-  const filteredEvents = useMemo(() => filterDragonCalendarEvents(events, filters), [events, filters]);
+  const collection = useDragonCollection<
+    DragonCalendarEvent,
+    DragonCalendarFilters,
+    DragonCalendarCreateInput,
+    DragonCalendarUpdateInput
+  >(repository, DEFAULT_FILTERS, {
+    page: 1,
+    pageSize: 200
+  });
+  const events = collection.items;
+  const filteredEvents = useMemo(() => filterDragonCalendarEvents(events, collection.filters), [events, collection.filters]);
   const eventsByDate = useMemo(() => groupEventsByDate(filteredEvents), [filteredEvents]);
   const monthDays = useMemo(() => buildMonthDays(anchorDate, eventsByDate, todayKey), [anchorDate, eventsByDate, todayKey]);
   const weekDays = useMemo(() => buildWeekDays(anchorDate, eventsByDate, todayKey), [anchorDate, eventsByDate, todayKey]);
@@ -39,8 +50,12 @@ export function useDragonCalendarState(repository: DragonCalendarRepository = mo
     setAnchorDate,
     today,
     todayKey,
-    filters,
-    setFilters,
+    filters: collection.filters,
+    setFilters: collection.setFilters,
+    loading: collection.loading,
+    refreshing: collection.refreshing,
+    error: collection.error,
+    refresh: collection.refresh,
     events,
     filteredEvents,
     monthDays,
@@ -52,6 +67,6 @@ export function useDragonCalendarState(repository: DragonCalendarRepository = mo
     goToToday: () => setAnchorDate(new Date(today.getFullYear(), today.getMonth(), today.getDate())),
     goToPrevious: () => setAnchorDate((current) => (view === 'month' ? addMonths(current, -1) : addDays(current, -7))),
     goToNext: () => setAnchorDate((current) => (view === 'month' ? addMonths(current, 1) : addDays(current, 7))),
-    clearFilters: () => setFilters(DEFAULT_FILTERS)
+    clearFilters: () => collection.setFilters(DEFAULT_FILTERS)
   };
 }

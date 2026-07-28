@@ -538,6 +538,21 @@ body {
   animation: dh-dragon-seal-pulse 1600ms ease-in-out infinite;
 }
 
+.dh-dragon-skeleton {
+  position: relative;
+  min-height: 5.5rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 157, 74, 0.14);
+  border-radius: var(--dragon-radius-lg);
+  background:
+    radial-gradient(circle at 18% 0, rgba(255, 91, 27, 0.12), transparent 12rem),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 178, 92, 0.08), rgba(255, 255, 255, 0.04)),
+    rgba(0, 0, 0, 0.26);
+  background-size: 100% 100%, 220% 100%, 100% 100%;
+  box-shadow: var(--dragon-shadow-inset);
+  animation: dh-dragon-skeleton 1800ms var(--dragon-ease-out) infinite;
+}
+
 .dh-dragon-empty {
   display: grid;
   justify-items: center;
@@ -1296,6 +1311,7 @@ body {
   .dh-dragon-bg-smoke,
   .dh-dragon-bg-embers,
   .dh-dragon-loader span,
+  .dh-dragon-skeleton,
   .dh-dragon-empty-seal {
     animation: none !important;
   }
@@ -2127,6 +2143,15 @@ body {
   }
   50% {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 24px rgba(255, 91, 27, 0.34);
+  }
+}
+
+@keyframes dh-dragon-skeleton {
+  from {
+    background-position: 0 0, 180% 0, 0 0;
+  }
+  to {
+    background-position: 0 0, -40% 0, 0 0;
   }
 }
 

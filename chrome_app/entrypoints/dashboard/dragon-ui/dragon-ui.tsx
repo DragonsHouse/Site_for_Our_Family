@@ -196,6 +196,10 @@ export function DragonLoader({ label = 'Dragon House відкриває залу
   );
 }
 
+export function DragonSkeleton({ label = 'Завантаження', className }: { label?: string; className?: string }) {
+  return <div className={cx('dh-dragon-skeleton', className)} role="status" aria-label={label} />;
+}
+
 export function DragonEmptyState({
   title,
   description,
@@ -212,6 +216,28 @@ export function DragonEmptyState({
       {description ? <p>{description}</p> : null}
       {action ? <div>{action}</div> : null}
     </DragonCard>
+  );
+}
+
+export function DragonRetry({
+  title = 'Зала тимчасово не відкрилась',
+  description,
+  onRetry
+}: {
+  title?: string;
+  description?: string;
+  onRetry: () => void;
+}) {
+  return (
+    <DragonEmptyState
+      title={title}
+      description={description}
+      action={
+        <DragonButton type="button" variant="secondary" onClick={onRetry}>
+          Спробувати ще раз
+        </DragonButton>
+      }
+    />
   );
 }
 

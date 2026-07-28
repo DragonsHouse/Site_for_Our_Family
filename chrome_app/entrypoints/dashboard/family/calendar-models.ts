@@ -24,8 +24,7 @@ export type DragonCalendarAttachment = {
   kind: 'document' | 'image' | 'link';
 };
 
-export type DragonCalendarEvent = {
-  id: string;
+export type DragonCalendarEvent = DragonEntity & {
   title: string;
   description: string;
   date: string;
@@ -121,3 +120,4 @@ export const DRAGON_CALENDAR_VIEW_TABS: Array<{ key: DragonCalendarView; label: 
   { key: 'week', label: 'Тиждень', room: 'Flame Line' },
   { key: 'agenda', label: 'Список', room: 'Seal Ledger' }
 ];
+import type { DragonEntity } from '../data/models/entity';

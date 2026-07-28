@@ -30,8 +30,10 @@ describe('Dragon House design system source contract', () => {
       'DragonDivider',
       'DragonSection',
       'DragonLoader',
+      'DragonSkeleton',
       'DragonProgress',
       'DragonEmptyState',
+      'DragonRetry',
       'DragonHero'
     ].forEach((name) => assert.match(uiSource, new RegExp(`export function ${name}|export \\{ ${name}`)));
   });
