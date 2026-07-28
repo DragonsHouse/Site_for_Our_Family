@@ -41,5 +41,6 @@ export type DragonBackgroundVariant =
   | 'members'
   | 'profile'
   | 'events'
+  | 'achievements'
   | 'quests'
   | 'resources';

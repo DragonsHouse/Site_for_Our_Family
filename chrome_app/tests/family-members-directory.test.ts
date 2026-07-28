@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -137,11 +137,13 @@ describe('family members directory source contract', () => {
 
     assert.match(tabs, /key: 'members'/u);
     assert.match(tabs, /label: 'Members'/u);
-    assert.match(tabs, /key: 'events', label: 'Календар'/u);
+    assert.match(tabs, /key: 'calendar', label: 'Calendar'/u);
+    assert.match(tabs, /key: 'events', label: 'Events'/u);
     assert.doesNotMatch(tabs, /Birthdays/u);
     assert.match(app, /'members'/u);
     assert.match(shell, /activeTab === 'members'/u);
     assert.match(shell, /<DragonMembers currentUser=\{currentUser\} \/>/u);
+    assert.match(shell, /activeTab === 'calendar'/u);
     assert.match(shell, /Future Calendar includes family events, meetings, quests\/deadlines, tournaments, celebrations, Dragon House anniversaries and member birthdays\./u);
     assert.match(page, /<FamilyMemberDetails/u);
     assert.doesNotMatch(page, /\/api\/family\/members\/\$\{/u);

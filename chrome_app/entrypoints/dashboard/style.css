@@ -206,8 +206,13 @@ body {
 }
 
 .dh-dragon-bg-events .dh-dragon-bg-embers,
+.dh-dragon-bg-achievements .dh-dragon-bg-embers,
 .dh-dragon-bg-quests .dh-dragon-bg-embers {
   opacity: 0.78;
+}
+
+.dh-dragon-bg-achievements {
+  filter: saturate(1.06) brightness(0.98);
 }
 
 .dh-dragon-bg-resources {

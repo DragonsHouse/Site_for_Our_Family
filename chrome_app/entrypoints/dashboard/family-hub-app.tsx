@@ -41,7 +41,7 @@ import { DragonLoadingScreen } from './loading/DragonLoadingScreen';
 import { useFamilyAssetUrl } from './family/use-family-asset-url';
 import { useOnboardingAudio } from './hooks/use-onboarding-audio';
 
-const FAMILY_TABS: FamilyTab[] = ['cabinet', 'profile', 'members', 'family', 'buyers', 'events', 'map', 'resources'];
+const FAMILY_TABS: FamilyTab[] = ['cabinet', 'members', 'profile', 'calendar', 'events', 'achievements', 'resources', 'family', 'buyers', 'map'];
 const BIRTHDAY_MIN_DATE = '1970-01-01';
 const BIRTHDAY_OPENING_SESSION_PREFIX = 'dragon_house_birthday_opening_seen:';
 const FAMILY_SECTIONS: FamilySection[] = [

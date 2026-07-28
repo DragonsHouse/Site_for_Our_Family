@@ -54,7 +54,7 @@ describe('Dragon House design system source contract', () => {
   });
 
   it('provides reusable DragonBackground variants for core Hub rooms', () => {
-    ['login', 'dashboard', 'calendar', 'members', 'profile', 'events', 'quests', 'resources'].forEach((variant) => {
+    ['login', 'dashboard', 'calendar', 'members', 'profile', 'events', 'achievements', 'quests', 'resources'].forEach((variant) => {
       assert.match(themeSource, new RegExp(`'${variant}'`));
       assert.match(styleSource, new RegExp(`dh-dragon-bg-${variant}`));
     });
@@ -68,8 +68,12 @@ describe('Dragon House design system source contract', () => {
     assert.match(shellSource, /<DragonBackground variant=\{TAB_BACKGROUND_VARIANT\[activeTab\]\}/);
     assert.match(shellSource, /<DragonHero/);
     assert.match(shellSource, /<DragonCalendar currentUser=\{currentUser\}/);
+    assert.match(shellSource, /<DashboardApp familyTab="events" \/>/);
+    assert.match(shellSource, /<DragonAchievementEngineScreen \/>/);
     assert.match(tabsSource, /<DragonTabs/);
     assert.match(tabsSource, /Hall of Chronicles/);
+    assert.match(tabsSource, /Event Watch/);
+    assert.match(tabsSource, /Seal Engine/);
     assert.doesNotMatch(tabsSource, /dh-panel flex flex-wrap/);
   });
 

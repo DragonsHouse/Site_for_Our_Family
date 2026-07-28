@@ -6,6 +6,7 @@ import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab
 import { DragonHouseCrest } from './dragon-house-crest';
 import { DragonBackground, DragonBadge, DragonButton, DragonHero, DragonSection } from '../dragon-ui/dragon-ui';
 import type { DragonBackgroundVariant } from '../dragon-ui/dragon-ui';
+import { DragonAchievementEngineScreen } from './dragon-achievements';
 import { DragonCalendar } from './dragon-calendar';
 import { DragonMembers } from './dragon-members';
 import { FamilyPanel } from './family-panel';
@@ -32,13 +33,15 @@ function ModuleIntro({
 
 const TAB_BACKGROUND_VARIANT: Record<FamilyTab, DragonBackgroundVariant> = {
   cabinet: 'dashboard',
-  profile: 'profile',
   members: 'members',
+  profile: 'profile',
+  calendar: 'calendar',
+  events: 'events',
+  achievements: 'achievements',
+  resources: 'resources',
   family: 'dashboard',
   buyers: 'resources',
-  events: 'calendar',
-  map: 'events',
-  resources: 'resources'
+  map: 'events'
 };
 
 export function FamilyShell({
@@ -169,9 +172,18 @@ export function FamilyShell({
         ) : null}
 
         {/* Future Calendar includes family events, meetings, quests/deadlines, tournaments, celebrations, Dragon House anniversaries and member birthdays. */}
-        {activeTab === 'events' ? (
+        {activeTab === 'calendar' ? (
           <DragonCalendar currentUser={currentUser} />
         ) : null}
+
+        {activeTab === 'events' ? (
+          <>
+            <ModuleIntro title="Events" description="Dragon House event watch uses the existing Events schedule module from the Hub dashboard." />
+            <DashboardApp familyTab="events" />
+          </>
+        ) : null}
+
+        {activeTab === 'achievements' ? <DragonAchievementEngineScreen /> : null}
 
         {activeTab === 'map' ? (
           <>
