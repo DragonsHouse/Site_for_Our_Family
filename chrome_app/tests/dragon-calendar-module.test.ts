@@ -45,8 +45,13 @@ describe('Dragon Calendar production module source contract', () => {
       'personal'
     ].forEach((category) => {
       assert.match(modelsSource, new RegExp(category));
+    });
+    ['dragon_meeting', 'celebration', 'war_event', 'quest', 'ritual', 'resource', 'personal'].forEach((category) => {
       assert.match(mockSource, new RegExp(category));
     });
+    assert.match(stateSource, /useDragonBirthdayState/);
+    assert.match(stateSource, /mergeDragonCalendarBirthdayEvents/);
+    assert.doesNotMatch(mockSource, /category: 'birthday'/);
 
     [
       'dh-calendar-category-dragon-meeting',

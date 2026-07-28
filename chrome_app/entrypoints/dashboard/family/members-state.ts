@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { sortUpcomingDragonBirthdays, toDragonBirthdayData } from './birthday-service';
 import { useDragonCollection } from '../data/hooks/use-dragon-collection';
 import {
   filterDragonMembers,
@@ -38,6 +39,8 @@ export function useDragonMembersState(repository: DragonMembersRepository = mock
   const stats = useMemo(() => getDragonMembersStats(filteredMembers), [filteredMembers]);
   const joinYears = useMemo(() => getDragonMemberJoinYears(members), [members]);
   const birthdayMonths = useMemo(() => getDragonMemberBirthdayMonths(members), [members]);
+  const birthdays = useMemo(() => members.map((member) => toDragonBirthdayData(member)), [members]);
+  const upcomingBirthdays = useMemo(() => sortUpcomingDragonBirthdays(birthdays), [birthdays]);
 
   return {
     view,
@@ -53,6 +56,8 @@ export function useDragonMembersState(repository: DragonMembersRepository = mock
     stats,
     joinYears,
     birthdayMonths,
+    birthdays,
+    upcomingBirthdays,
     selectedMember,
     setSelectedMember,
     clearFilters: () => collection.setFilters(DEFAULT_FILTERS)

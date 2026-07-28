@@ -118,6 +118,36 @@ export function DragonMembers({ currentUser }: { currentUser: FamilyUser }) {
         </DragonCard>
       </section>
 
+      <DragonSection eyebrow="BIRTHDAY CHAMBER" title="Upcoming birthday flames">
+        {members.upcomingBirthdays.length ? (
+          <div className="dh-members-birthday-grid">
+            {members.upcomingBirthdays.slice(0, 4).map((occurrence) => {
+              const date = occurrence.birthday.date;
+              const fallbackDate = date ? `--${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}` : null;
+              return (
+                <DragonCard key={occurrence.birthday.id} className={occurrence.isToday ? 'is-birthday-today' : ''}>
+                  <div className="dh-members-birthday-card">
+                    <DragonAvatar src={occurrence.birthday.avatarUrl} name={occurrence.birthday.memberName} />
+                    <div>
+                      <DragonBadge tone={occurrence.isToday ? 'gold' : 'success'}>
+                        {occurrence.isToday ? 'Today' : `${occurrence.daysUntil} days`}
+                      </DragonBadge>
+                      <strong>{occurrence.birthday.memberName}</strong>
+                      <p>
+                        {formatDragonMemberBirthday(date?.isoDate ?? fallbackDate ?? undefined)}
+                        {occurrence.age !== null ? ` · ${occurrence.age}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                </DragonCard>
+              );
+            })}
+          </div>
+        ) : (
+          <DragonEmptyState title="No birthday flames yet" description="Birthdays will appear here when members share visible day and month data." />
+        )}
+      </DragonSection>
+
       <div className="dh-members-workbench">
         <DragonSection
           eyebrow="GUARDIAN FILTERS"

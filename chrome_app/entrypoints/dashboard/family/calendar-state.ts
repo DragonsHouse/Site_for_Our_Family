@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useDragonCollection } from '../data/hooks/use-dragon-collection';
+import { mergeDragonCalendarBirthdayEvents } from './birthday-service';
+import { useDragonBirthdayState } from './birthday-state';
 import { addDays, addMonths, buildMonthDays, buildWeekDays, groupEventsByDate, toDateKey } from './calendar-date';
 import {
   filterDragonCalendarEvents,
@@ -35,7 +37,11 @@ export function useDragonCalendarState(repository: DragonCalendarRepository = mo
     page: 1,
     pageSize: 200
   });
-  const events = collection.items;
+  const birthdayState = useDragonBirthdayState(undefined, anchorDate.getFullYear());
+  const events = useMemo(
+    () => mergeDragonCalendarBirthdayEvents(collection.items, birthdayState.calendarEvents),
+    [collection.items, birthdayState.calendarEvents]
+  );
   const filteredEvents = useMemo(() => filterDragonCalendarEvents(events, collection.filters), [events, collection.filters]);
   const eventsByDate = useMemo(() => groupEventsByDate(filteredEvents), [filteredEvents]);
   const monthDays = useMemo(() => buildMonthDays(anchorDate, eventsByDate, todayKey), [anchorDate, eventsByDate, todayKey]);
@@ -52,10 +58,13 @@ export function useDragonCalendarState(repository: DragonCalendarRepository = mo
     todayKey,
     filters: collection.filters,
     setFilters: collection.setFilters,
-    loading: collection.loading,
-    refreshing: collection.refreshing,
-    error: collection.error,
-    refresh: collection.refresh,
+    loading: collection.loading || birthdayState.loading,
+    refreshing: collection.refreshing || birthdayState.refreshing,
+    error: collection.error ?? birthdayState.error,
+    refresh: () => {
+      collection.refresh();
+      birthdayState.refresh();
+    },
     events,
     filteredEvents,
     monthDays,

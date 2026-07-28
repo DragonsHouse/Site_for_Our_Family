@@ -1,5 +1,6 @@
 import { createMockRepository } from '../data/repositories/mock-repository';
 import type { Repository } from '../data/repositories/repository';
+import { formatDragonBirthday, getDragonBirthdayMonths, parseDragonBirthday, toDragonBirthdayData } from './birthday-service';
 import { DRAGON_MEMBERS_MOCK_DATA } from './members-mock-data';
 import {
   DRAGON_MEMBER_ROLE_META,
@@ -54,11 +55,7 @@ export function formatDragonMemberDate(date: string) {
 }
 
 export function formatDragonMemberBirthday(date?: string) {
-  if (!date) {
-    return 'Hidden';
-  }
-
-  return new Intl.DateTimeFormat('en', { day: '2-digit', month: 'long' }).format(new Date(`${date}T00:00:00`));
+  return formatDragonBirthday(date);
 }
 
 export function filterDragonMembers(members: DragonMember[], filters: DragonMembersFilters) {
@@ -76,7 +73,7 @@ export function filterDragonMembers(members: DragonMember[], filters: DragonMemb
       const matchesRole = filters.role === 'all' || member.role === filters.role;
       const matchesStatus = filters.status === 'all' || member.status === filters.status;
       const matchesJoinYear = !filters.joinYear || member.joinedAt.startsWith(filters.joinYear);
-      const matchesBirthdayMonth = !filters.birthdayMonth || member.birthday?.slice(5, 7) === filters.birthdayMonth;
+      const matchesBirthdayMonth = !filters.birthdayMonth || parseDragonBirthday(member.birthday)?.month === Number(filters.birthdayMonth);
 
       return matchesSearch && matchesRole && matchesStatus && matchesJoinYear && matchesBirthdayMonth;
     })
@@ -96,7 +93,7 @@ export function getDragonMembersStats(members: DragonMember[]): DragonMembersSta
     totalMembers: members.length,
     onlineMembers: members.filter((member) => member.status === 'online').length,
     inVoiceMembers: members.filter((member) => member.status === 'in_voice').length,
-    birthdayMembers: members.filter((member) => Boolean(member.birthday)).length,
+    birthdayMembers: members.filter((member) => Boolean(parseDragonBirthday(member.birthday))).length,
     roleCounts,
     statusCounts
   };
@@ -107,7 +104,7 @@ export function getDragonMemberJoinYears(members: DragonMember[]) {
 }
 
 export function getDragonMemberBirthdayMonths(members: DragonMember[]) {
-  return Array.from(new Set(members.map((member) => member.birthday?.slice(5, 7)).filter(Boolean) as string[])).sort();
+  return getDragonBirthdayMonths(members.map((member) => toDragonBirthdayData(member)));
 }
 
 function compareDragonMembers(left: DragonMember, right: DragonMember, filters: DragonMembersFilters) {

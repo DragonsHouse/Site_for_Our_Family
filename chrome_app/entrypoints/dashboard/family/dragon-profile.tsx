@@ -11,6 +11,7 @@ import {
   DragonSection
 } from '../dragon-ui/dragon-ui';
 import { DragonAchievementCard, DragonActivityHeatmap, DragonStatisticCard, DragonTimeline } from './dragon-profile-components';
+import { formatDragonBirthday } from './birthday-service';
 import { DRAGON_PROFILE_STATUS_META } from './profile-models';
 import { formatDragonProfileDate } from './profile-service';
 import { useDragonProfileState } from './profile-state';
@@ -107,7 +108,7 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
             ['Dragon Title', identity.dragonTitle],
             ['Current Rank', `${identity.currentRank} (${identity.rankLevel})`],
             ['Element', identity.element],
-            ['Birthday', formatDragonProfileDate(identity.birthday)],
+            ['Birthday', formatDragonBirthday(identity.birthday)],
             ['Join Date', formatDragonProfileDate(identity.joinDate)],
             ['Current Status', statusMeta.label],
             ['Static ID', identity.staticId],

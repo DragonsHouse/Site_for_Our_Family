@@ -1,4 +1,5 @@
 import type { DragonEntity } from '../data/models/entity';
+import type { DragonBirthdayVisibility } from './birthday-models';
 
 export type DragonMemberRole =
   | 'volodarka_predvichnoho_polumia'
@@ -22,6 +23,8 @@ export type DragonMember = DragonEntity & {
   rankLevel: number;
   joinedAt: string;
   birthday?: string;
+  birthdayVisibility?: DragonBirthdayVisibility;
+  showBirthdayAge?: boolean;
   status: DragonMemberStatus;
   staticId: string;
   avatarUrl?: string | null;

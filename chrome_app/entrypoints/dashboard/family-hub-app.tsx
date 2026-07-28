@@ -37,6 +37,7 @@ import { AuthStartupGate } from './auth/AuthStartupGate';
 import { LoginForm } from './auth/LoginForm';
 import { DragonHouseCrest } from './family/dragon-house-crest';
 import { FamilyShell } from './family/family-shell';
+import { validateDragonBirthdayValue } from './family/birthday-service';
 import { DragonLoadingScreen } from './loading/DragonLoadingScreen';
 import { useFamilyAssetUrl } from './family/use-family-asset-url';
 import { useOnboardingAudio } from './hooks/use-onboarding-audio';
@@ -80,22 +81,12 @@ function prefersReducedMotion() {
 }
 
 function validateBirthdayInput(value: string) {
-  const dateOfBirth = value.trim();
-  if (!dateOfBirth) return 'Вкажи дату народження, щоб завершити посвяту.';
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(dateOfBirth);
-  if (!match) return 'Перевір дату — такого дня не існує.';
-
-  const [, yearText, monthText, dayText] = match;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
-  const utc = new Date(Date.UTC(year, month - 1, day));
-  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month - 1 || utc.getUTCDate() !== day) {
-    return 'Перевір дату — такого дня не існує.';
-  }
-  if (dateOfBirth < BIRTHDAY_MIN_DATE) return 'Вкажи реальну дату народження не раніше 1970 року.';
-  if (dateOfBirth > getTodayDateOnly()) return 'Дата народження не може бути в майбутньому.';
-  return null;
+  const result = validateDragonBirthdayValue(value, getTodayDateOnly());
+  if (result.valid) return null;
+  if (result.code === 'required') return 'Вкажи дату народження, щоб завершити посвяту.';
+  if (result.code === 'too_early') return 'Вкажи реальну дату народження не раніше 1970 року.';
+  if (result.code === 'future') return 'Дата народження не може бути в майбутньому.';
+  return 'Перевір дату — такого дня не існує.';
 }
 
 function birthdayErrorMessage(error: string | null) {

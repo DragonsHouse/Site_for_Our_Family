@@ -2,23 +2,9 @@ import type { DragonCalendarEvent } from './calendar-models';
 
 export const DRAGON_CALENDAR_MOCK_EVENTS: DragonCalendarEvent[] = [
   {
-    id: 'birthday-anastasia',
-    title: 'День народження Anastasia_Dragons',
-    description: 'Сімейне полум’я підсвічує день народження без публікації року.',
-    date: '2026-07-29',
-    startTime: '00:00',
-    category: 'birthday',
-    priority: 'high',
-    participants: [{ id: 'anastasia', name: 'Anastasia_Dragons', role: 'Dragon House' }],
-    createdBy: 'system',
-    hall: 'Family Calendar',
-    attachments: [],
-    activity: 'Birthday seal prepared'
-  },
-  {
     id: 'war-council-july',
     title: 'War Council',
-    description: 'Рада щодо активностей, ролей і пріоритетів наступного тижня.',
+    description: 'Council meeting for activity, roles and next week priorities.',
     date: '2026-07-30',
     startTime: '20:30',
     endTime: '21:30',
@@ -35,8 +21,8 @@ export const DRAGON_CALENDAR_MOCK_EVENTS: DragonCalendarEvent[] = [
   },
   {
     id: 'weekly-quests',
-    title: 'Сімейні квести тижня',
-    description: 'Підготовка задач, звітів і нагород для учасників.',
+    title: 'Weekly Family Quests',
+    description: 'Prepare tasks, reports and rewards for Dragon House members.',
     date: '2026-08-01',
     startTime: '19:00',
     category: 'quest',
@@ -49,8 +35,8 @@ export const DRAGON_CALENDAR_MOCK_EVENTS: DragonCalendarEvent[] = [
   },
   {
     id: 'ritual-flame',
-    title: 'Ритуал полум’я',
-    description: 'Церемоніальний слот для важливого сімейного оголошення.',
+    title: 'Flame Ritual',
+    description: 'Ceremonial slot for an important family announcement.',
     date: '2026-07-27',
     startTime: '21:00',
     category: 'ritual',
@@ -63,8 +49,8 @@ export const DRAGON_CALENDAR_MOCK_EVENTS: DragonCalendarEvent[] = [
   },
   {
     id: 'resource-audit',
-    title: 'Перевірка ресурсів',
-    description: 'Огляд матеріалів, нотаток і майбутньої Treasury-структури.',
+    title: 'Resource Audit',
+    description: 'Review materials, notes and the future Treasury structure.',
     date: '2026-07-27',
     startTime: '18:00',
     category: 'resource',
@@ -77,8 +63,8 @@ export const DRAGON_CALENDAR_MOCK_EVENTS: DragonCalendarEvent[] = [
   },
   {
     id: 'personal-focus',
-    title: 'Особистий фокус',
-    description: 'Приватний слот для власних задач у Dragon House.',
+    title: 'Personal Focus',
+    description: 'Private slot for personal Dragon House tasks.',
     date: '2026-07-28',
     startTime: '16:00',
     category: 'personal',
@@ -91,8 +77,8 @@ export const DRAGON_CALENDAR_MOCK_EVENTS: DragonCalendarEvent[] = [
   },
   {
     id: 'celebration-hall',
-    title: 'Сімейне святкування',
-    description: 'Легка подія для відмітки перемог і нових учасників.',
+    title: 'Family Celebration',
+    description: 'Light family event for victories and new members.',
     date: '2026-08-03',
     startTime: '20:00',
     category: 'celebration',
@@ -105,8 +91,8 @@ export const DRAGON_CALENDAR_MOCK_EVENTS: DragonCalendarEvent[] = [
   },
   {
     id: 'war-event-training',
-    title: 'Тренування оборони',
-    description: 'Підготовка до бойової активності та розподіл ролей.',
+    title: 'Defense Training',
+    description: 'Preparation for combat activity and role assignment.',
     date: '2026-08-06',
     startTime: '22:00',
     category: 'war_event',
