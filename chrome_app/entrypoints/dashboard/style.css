@@ -3740,6 +3740,270 @@ body {
   }
 }
 
+.dh-achievement-engine {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.dh-achievement-engine-hero {
+  overflow: hidden;
+}
+
+.dh-achievement-engine-hero::after {
+  content: '';
+  position: absolute;
+  inset: auto -12% -42% 44%;
+  height: 16rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 192, 90, 0.26), rgba(255, 90, 0, 0.11) 42%, transparent 72%);
+  filter: blur(8px);
+  pointer-events: none;
+  animation: dh-breathing-glow 4.8s ease-in-out infinite;
+}
+
+.dh-achievement-summary {
+  display: grid;
+  min-width: min(24rem, 100%);
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 192, 90, 0.24);
+  border-radius: 8px;
+  background: rgba(10, 8, 7, 0.68);
+  box-shadow: inset 0 0 28px rgba(255, 90, 0, 0.1);
+}
+
+.dh-achievement-summary div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dh-achievement-summary strong {
+  color: #ffc05a;
+  font-size: clamp(1.45rem, 4vw, 2.35rem);
+}
+
+.dh-achievement-summary p {
+  margin: 0;
+  color: #d8c4a7;
+  font-weight: 800;
+}
+
+.dh-achievement-filters {
+  display: grid;
+  gap: 1rem;
+}
+
+.dh-achievement-category-tabs {
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.dh-achievement-filter-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 14rem) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.dh-achievement-gallery,
+.dh-achievement-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.dh-engine-achievement-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 17rem;
+}
+
+.dh-engine-achievement-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 18% 12%, rgba(255, 192, 90, 0.18), transparent 36%);
+  opacity: 0.78;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.dh-engine-achievement-card:hover::before {
+  opacity: 1;
+  transform: scale(1.04);
+}
+
+.dh-engine-achievement-open {
+  position: relative;
+  display: grid;
+  width: 100%;
+  grid-template-columns: 3.4rem 1fr;
+  gap: 0.85rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dh-engine-achievement-open strong,
+.dh-achievement-notification strong {
+  display: block;
+  color: #fff5df;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.dh-engine-achievement-open small {
+  display: block;
+  margin-top: 0.35rem;
+  color: #d0b997;
+  line-height: 1.45;
+}
+
+.dh-engine-achievement-icon,
+.dh-achievement-details-seal {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 192, 90, 0.24);
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(255, 192, 90, 0.16), rgba(60, 16, 10, 0.58));
+  color: #ffc05a;
+  font-weight: 900;
+  box-shadow: inset 0 0 24px rgba(255, 90, 0, 0.13);
+}
+
+.dh-engine-achievement-icon {
+  width: 3.4rem;
+  height: 3.4rem;
+}
+
+.dh-engine-achievement-meta,
+.dh-engine-achievement-card footer {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.dh-engine-achievement-meta {
+  margin: 1rem 0 0.8rem;
+}
+
+.dh-engine-achievement-card footer {
+  margin-top: 0.9rem;
+  color: #d8c4a7;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.dh-engine-achievement-card.is-locked {
+  filter: saturate(0.72);
+}
+
+.dh-engine-rarity-epic {
+  box-shadow: inset 0 0 0 1px rgba(255, 122, 0, 0.28), 0 0 34px rgba(255, 90, 0, 0.14);
+}
+
+.dh-engine-rarity-epic .dh-engine-achievement-icon {
+  animation: dh-epic-ember 3.8s ease-in-out infinite;
+}
+
+.dh-engine-rarity-legendary,
+.dh-engine-rarity-mythic {
+  box-shadow: inset 0 0 0 1px rgba(255, 192, 90, 0.34), 0 0 42px rgba(255, 192, 90, 0.18);
+}
+
+.dh-engine-rarity-legendary.is-unlocked,
+.dh-engine-rarity-mythic.is-unlocked,
+.dh-achievement-notification.dh-engine-rarity-legendary,
+.dh-achievement-notification.dh-engine-rarity-mythic {
+  animation: dh-legendary-unlock-glow 4.4s ease-in-out infinite;
+}
+
+.dh-achievement-details {
+  display: grid;
+  gap: 1rem;
+}
+
+.dh-achievement-details-seal {
+  width: 5rem;
+  height: 5rem;
+  font-size: 1.25rem;
+}
+
+.dh-achievement-details p {
+  color: #d8c4a7;
+  line-height: 1.55;
+}
+
+.dh-achievement-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.85rem;
+}
+
+.dh-achievement-notification {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.dh-achievement-notification > span {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 192, 90, 0.14);
+  color: #ffc05a;
+  font-weight: 900;
+}
+
+.dh-achievement-notification p {
+  margin: 0.35rem 0 0;
+  color: #d0b997;
+}
+
+@keyframes dh-legendary-unlock-glow {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.18) saturate(1.16);
+  }
+}
+
+@keyframes dh-epic-ember {
+  0%, 100% {
+    box-shadow: inset 0 0 24px rgba(255, 90, 0, 0.13);
+  }
+  50% {
+    box-shadow: inset 0 0 30px rgba(255, 90, 0, 0.24), 0 0 22px rgba(255, 122, 0, 0.22);
+  }
+}
+
+@media (max-width: 760px) {
+  .dh-achievement-filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dh-achievement-engine-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .dh-engine-achievement-card {
+    min-height: 0;
+  }
+}
+
 @keyframes dh-final-flare {
   0% {
     filter: brightness(1);
@@ -3781,7 +4045,13 @@ body {
   .dh-loading-backdrop::after,
   .dh-fire-core,
   .dh-fire-tongues,
-  .dh-embers span {
+  .dh-embers span,
+  .dh-achievement-engine-hero::after,
+  .dh-engine-rarity-epic .dh-engine-achievement-icon,
+  .dh-engine-rarity-legendary.is-unlocked,
+  .dh-engine-rarity-mythic.is-unlocked,
+  .dh-achievement-notification.dh-engine-rarity-legendary,
+  .dh-achievement-notification.dh-engine-rarity-mythic {
     animation: none !important;
   }
 
