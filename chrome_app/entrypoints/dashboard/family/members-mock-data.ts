@@ -1,0 +1,112 @@
+import type { DragonMember } from './members-models';
+
+export const DRAGON_MEMBERS_MOCK_DATA: DragonMember[] = [
+  {
+    id: 'member-anastasia',
+    discordNickname: 'Anastasia_Dragons',
+    dragonTitle: 'Volodarka Predvichnoho Polumia',
+    role: 'volodarka_predvichnoho_polumia',
+    rank: 'Matriarch',
+    rankLevel: 100,
+    joinedAt: '2024-01-12',
+    birthday: '1998-07-27',
+    status: 'online',
+    staticId: 'DH-001',
+    avatarUrl: null,
+    voiceChannel: 'Hall of Flame'
+  },
+  {
+    id: 'member-kael',
+    discordNickname: 'Kael_Flamekeeper',
+    dragonTitle: 'Keeper of Flame',
+    role: 'keeper_of_flame',
+    rank: 'Flame Warden',
+    rankLevel: 82,
+    joinedAt: '2024-02-03',
+    birthday: '1994-11-09',
+    status: 'in_voice',
+    staticId: 'DH-014',
+    avatarUrl: null,
+    voiceChannel: 'War Council'
+  },
+  {
+    id: 'member-mira',
+    discordNickname: 'Mira_Elder',
+    dragonTitle: 'Elder of the East Wing',
+    role: 'elder',
+    rank: 'Elder',
+    rankLevel: 74,
+    joinedAt: '2024-03-18',
+    birthday: '1991-03-21',
+    status: 'recently_active',
+    staticId: 'DH-027',
+    avatarUrl: null,
+    lastActiveAt: 'Today'
+  },
+  {
+    id: 'member-ronin',
+    discordNickname: 'Ronin_Scale',
+    dragonTitle: 'Senior Dragon',
+    role: 'senior_dragon',
+    rank: 'Vanguard',
+    rankLevel: 61,
+    joinedAt: '2024-08-22',
+    status: 'away',
+    staticId: 'DH-033',
+    avatarUrl: null,
+    lastActiveAt: '2 hours ago'
+  },
+  {
+    id: 'member-lyra',
+    discordNickname: 'Lyra_Ashsong',
+    dragonTitle: 'Dragon',
+    role: 'dragon',
+    rank: 'Guardian',
+    rankLevel: 44,
+    joinedAt: '2025-01-06',
+    birthday: '2000-05-15',
+    status: 'online',
+    staticId: 'DH-048',
+    avatarUrl: null
+  },
+  {
+    id: 'member-orion',
+    discordNickname: 'Orion_Ironwing',
+    dragonTitle: 'Dragon',
+    role: 'dragon',
+    rank: 'Forge Guard',
+    rankLevel: 39,
+    joinedAt: '2025-04-11',
+    status: 'offline',
+    staticId: 'DH-052',
+    avatarUrl: null,
+    lastActiveAt: 'Yesterday'
+  },
+  {
+    id: 'member-selene',
+    discordNickname: 'Selene_Ember',
+    dragonTitle: 'Egg',
+    role: 'egg',
+    rank: 'Initiate',
+    rankLevel: 12,
+    joinedAt: '2026-02-02',
+    birthday: '2004-02-29',
+    status: 'recently_active',
+    staticId: 'DH-071',
+    avatarUrl: null,
+    lastActiveAt: 'Today'
+  },
+  {
+    id: 'member-varyn',
+    discordNickname: 'Varyn_Nightscale',
+    dragonTitle: 'Egg',
+    role: 'egg',
+    rank: 'Initiate',
+    rankLevel: 9,
+    joinedAt: '2026-06-19',
+    status: 'offline',
+    staticId: 'DH-084',
+    avatarUrl: null,
+    lastActiveAt: '4 days ago'
+  }
+];

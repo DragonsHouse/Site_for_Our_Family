@@ -7,7 +7,7 @@ import { DragonHouseCrest } from './dragon-house-crest';
 import { DragonBackground, DragonBadge, DragonButton, DragonHero, DragonSection } from '../dragon-ui/dragon-ui';
 import type { DragonBackgroundVariant } from '../dragon-ui/dragon-ui';
 import { DragonCalendar } from './dragon-calendar';
-import { FamilyMembersDirectory } from './family-members-directory';
+import { DragonMembers } from './dragon-members';
 import { FamilyPanel } from './family-panel';
 import { FamilyProfile } from './family-profile';
 import { FamilyTabs } from './family-tabs';
@@ -144,7 +144,7 @@ export function FamilyShell({
 
         {activeTab === 'profile' ? <FamilyProfile user={currentUser} /> : null}
 
-        {activeTab === 'members' ? <FamilyMembersDirectory currentUser={currentUser} onOpenOwnProfile={() => onTabChange('profile')} /> : null}
+        {activeTab === 'members' ? <DragonMembers currentUser={currentUser} /> : null}
 
         {activeTab === 'family' ? (
           <FamilyPanel

@@ -141,7 +141,7 @@ describe('family members directory source contract', () => {
     assert.doesNotMatch(tabs, /Birthdays/u);
     assert.match(app, /'members'/u);
     assert.match(shell, /activeTab === 'members'/u);
-    assert.match(shell, /<FamilyMembersDirectory currentUser=\{currentUser\} onOpenOwnProfile=\{\(\) => onTabChange\('profile'\)\} \/>/u);
+    assert.match(shell, /<DragonMembers currentUser=\{currentUser\} \/>/u);
     assert.match(shell, /Future Calendar includes family events, meetings, quests\/deadlines, tournaments, celebrations, Dragon House anniversaries and member birthdays\./u);
     assert.match(page, /<FamilyMemberDetails/u);
     assert.doesNotMatch(page, /\/api\/family\/members\/\$\{/u);
