@@ -1,12 +1,7 @@
 import { useMemo } from 'react';
 import { useDragonCollection } from '../data/hooks/use-dragon-collection';
 import type { DragonMember, DragonMembersFilters } from './members-models';
-import {
-  mockDragonMembersRepository,
-  type DragonMemberCreateInput,
-  type DragonMembersRepository,
-  type DragonMemberUpdateInput
-} from './members-service';
+import type { DragonMemberCreateInput, DragonMembersRepository, DragonMemberUpdateInput } from './members-service';
 import {
   buildDragonBirthdayCalendarEvents,
   groupDragonBirthdaysByMonth,
@@ -24,9 +19,16 @@ const BIRTHDAY_FILTERS: DragonMembersFilters = {
   direction: 'asc'
 };
 
-export function useDragonBirthdayState(repository: DragonMembersRepository = mockDragonMembersRepository, year = new Date().getFullYear()) {
+export type DragonBirthdayStateDependencies = {
+  membersRepository: DragonMembersRepository;
+  year?: number;
+  todayKey?: string;
+};
+
+export function useDragonBirthdayState(dependencies: DragonBirthdayStateDependencies) {
+  const year = dependencies.year ?? new Date().getFullYear();
   const collection = useDragonCollection<DragonMember, DragonMembersFilters, DragonMemberCreateInput, DragonMemberUpdateInput>(
-    repository,
+    dependencies.membersRepository,
     BIRTHDAY_FILTERS,
     {
       page: 1,
@@ -34,9 +36,9 @@ export function useDragonBirthdayState(repository: DragonMembersRepository = moc
     }
   );
   const birthdays = useMemo(() => collection.items.map((member) => toDragonBirthdayData(member)), [collection.items]);
-  const upcomingBirthdays = useMemo(() => sortUpcomingDragonBirthdays(birthdays), [birthdays]);
+  const upcomingBirthdays = useMemo(() => sortUpcomingDragonBirthdays(birthdays, dependencies.todayKey), [birthdays, dependencies.todayKey]);
   const birthdaysByMonth = useMemo(() => groupDragonBirthdaysByMonth(birthdays), [birthdays]);
-  const calendarEvents = useMemo(() => buildDragonBirthdayCalendarEvents(birthdays, year), [birthdays, year]);
+  const calendarEvents = useMemo(() => buildDragonBirthdayCalendarEvents(birthdays, year, dependencies.todayKey), [birthdays, dependencies.todayKey, year]);
 
   return {
     loading: collection.loading,

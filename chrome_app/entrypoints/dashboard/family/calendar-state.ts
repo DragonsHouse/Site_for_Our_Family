@@ -7,12 +7,12 @@ import {
   filterDragonCalendarEvents,
   getDragonCalendarMembers,
   getDragonCalendarStats,
-  mockDragonCalendarRepository,
   type DragonCalendarCreateInput,
   type DragonCalendarRepository,
   type DragonCalendarUpdateInput
 } from './calendar-service';
 import type { DragonCalendarEvent, DragonCalendarFilters, DragonCalendarView } from './calendar-models';
+import type { DragonMembersRepository } from './members-service';
 
 const DEFAULT_FILTERS: DragonCalendarFilters = {
   search: '',
@@ -22,8 +22,14 @@ const DEFAULT_FILTERS: DragonCalendarFilters = {
   dateTo: ''
 };
 
-export function useDragonCalendarState(repository: DragonCalendarRepository = mockDragonCalendarRepository) {
-  const today = useMemo(() => new Date(), []);
+export type DragonCalendarStateDependencies = {
+  calendarRepository: DragonCalendarRepository;
+  membersRepository: DragonMembersRepository;
+  now?: Date;
+};
+
+export function useDragonCalendarState(dependencies: DragonCalendarStateDependencies) {
+  const today = useMemo(() => dependencies.now ?? new Date(), [dependencies.now]);
   const todayKey = useMemo(() => toDateKey(today), [today]);
   const [view, setView] = useState<DragonCalendarView>('month');
   const [anchorDate, setAnchorDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -33,11 +39,15 @@ export function useDragonCalendarState(repository: DragonCalendarRepository = mo
     DragonCalendarFilters,
     DragonCalendarCreateInput,
     DragonCalendarUpdateInput
-  >(repository, DEFAULT_FILTERS, {
+  >(dependencies.calendarRepository, DEFAULT_FILTERS, {
     page: 1,
     pageSize: 200
   });
-  const birthdayState = useDragonBirthdayState(undefined, anchorDate.getFullYear());
+  const birthdayState = useDragonBirthdayState({
+    membersRepository: dependencies.membersRepository,
+    year: anchorDate.getFullYear(),
+    todayKey
+  });
   const events = useMemo(
     () => mergeDragonCalendarBirthdayEvents(collection.items, birthdayState.calendarEvents),
     [collection.items, birthdayState.calendarEvents]

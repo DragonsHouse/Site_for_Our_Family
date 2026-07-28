@@ -203,10 +203,20 @@ export function DragonAchievementFilters({
             </option>
           ))}
         </DragonSelect>
-        <DragonButton type="button" variant="secondary" onClick={() => onChange({ ...filters, completion: filters.completion === 'unlocked' ? 'all' : 'unlocked' })}>
+        <DragonButton
+          type="button"
+          variant="secondary"
+          aria-pressed={filters.completion === 'unlocked'}
+          onClick={() => onChange({ ...filters, completion: filters.completion === 'unlocked' ? 'all' : 'unlocked' })}
+        >
           Unlocked
         </DragonButton>
-        <DragonButton type="button" variant="ghost" onClick={() => onChange({ ...filters, completion: filters.completion === 'locked' ? 'all' : 'locked' })}>
+        <DragonButton
+          type="button"
+          variant="ghost"
+          aria-pressed={filters.completion === 'locked'}
+          onClick={() => onChange({ ...filters, completion: filters.completion === 'locked' ? 'all' : 'locked' })}
+        >
           Locked
         </DragonButton>
       </div>

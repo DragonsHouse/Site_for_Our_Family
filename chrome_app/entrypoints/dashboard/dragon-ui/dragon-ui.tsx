@@ -1,6 +1,17 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import {
+  useId,
+  useRef,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes
+} from 'react';
 import type { DragonBackgroundVariant } from './dragon-theme';
 import { DragonBackground } from './dragon-background';
+import { useDragonDialogFocus } from './use-dragon-dialog-focus';
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -145,8 +156,34 @@ export function DragonTabs<T extends string>({
   onChange: (tab: T) => void;
   className?: string;
 }) {
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));
+    const currentIndex = buttons.indexOf(event.target as HTMLButtonElement);
+    if (currentIndex === -1) return;
+
+    event.preventDefault();
+
+    const lastIndex = buttons.length - 1;
+    const nextIndex =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? lastIndex
+          : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+            ? currentIndex === 0
+              ? lastIndex
+              : currentIndex - 1
+            : currentIndex === lastIndex
+              ? 0
+              : currentIndex + 1;
+
+    buttons[nextIndex]?.focus();
+  };
+
   return (
-    <nav className={cx('dh-dragon-tabs', className)} aria-label="Dragon House navigation">
+    <nav className={cx('dh-dragon-tabs', className)} aria-label="Dragon House navigation" onKeyDown={handleKeyDown}>
       {tabs.map((tab) => (
         <button
           key={tab.key}
@@ -245,18 +282,56 @@ export function DragonDialog({
   title,
   children,
   actions,
-  onClose
+  onClose,
+  initialFocusRef,
+  closeOnEscape = true,
+  restoreFocus = true,
+  closeOnBackdrop = false,
+  ariaLabelledBy,
+  ariaDescribedBy
 }: {
   title: string;
   children: ReactNode;
   actions?: ReactNode;
   onClose?: () => void;
+  initialFocusRef?: RefObject<HTMLElement>;
+  closeOnEscape?: boolean;
+  restoreFocus?: boolean;
+  closeOnBackdrop?: boolean;
+  ariaLabelledBy?: string;
+  ariaDescribedBy?: string;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const generatedTitleId = useId();
+  const titleId = ariaLabelledBy ?? generatedTitleId;
+
+  useDragonDialogFocus({
+    dialogRef,
+    initialFocusRef,
+    onClose,
+    closeOnEscape,
+    restoreFocus
+  });
+
   return (
-    <div className="dh-dragon-dialog-backdrop" role="presentation">
-      <section className="dh-dragon-dialog" role="dialog" aria-modal="true" aria-labelledby="dh-dragon-dialog-title">
+    <div
+      className="dh-dragon-dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (closeOnBackdrop && event.target === event.currentTarget) onClose?.();
+      }}
+    >
+      <section
+        ref={dialogRef}
+        className="dh-dragon-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={ariaDescribedBy}
+        tabIndex={-1}
+      >
         <div className="dh-dragon-dialog-head">
-          <h2 id="dh-dragon-dialog-title">{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           {onClose ? (
             <DragonButton type="button" variant="ghost" onClick={onClose} aria-label="Закрити діалог">
               Закрити

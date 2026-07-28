@@ -26,7 +26,9 @@ import {
   type DragonCalendarEvent,
   type DragonCalendarPriority
 } from './calendar-models';
+import { createMockDragonCalendarStateDependencies } from './calendar-composition';
 import { useDragonCalendarState } from './calendar-state';
+import type { DragonCalendarStateDependencies } from './calendar-state';
 
 const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
@@ -61,8 +63,8 @@ function getDayTooltip(day: DragonCalendarDay) {
   return `${getDayTitle(day.date)}: ${day.events.map((event) => event.title).join(', ')}`;
 }
 
-export function DragonCalendar({ currentUser }: { currentUser: FamilyUser }) {
-  const calendar = useDragonCalendarState();
+export function DragonCalendar({ currentUser, dependencies }: { currentUser: FamilyUser; dependencies?: DragonCalendarStateDependencies }) {
+  const calendar = useDragonCalendarState(dependencies ?? createMockDragonCalendarStateDependencies());
   const title = calendar.view === 'week' ? `Тиждень від ${getDayTitle(calendar.weekDays[0].date)}` : getMonthTitle(calendar.anchorDate);
   const visibleAgendaEvents = calendar.filteredEvents.filter((event) => calendar.view !== 'agenda' || event.date >= calendar.todayKey);
 
