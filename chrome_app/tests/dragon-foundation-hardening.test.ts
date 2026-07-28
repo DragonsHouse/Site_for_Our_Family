@@ -41,11 +41,11 @@ function focusContainer(elements: Array<ReturnType<typeof focusableElement>>) {
 describe('Dragon production foundation hardening', () => {
   it('uses an explicit Calendar and Birthday repository composition boundary', () => {
     assert.match(calendarStateSource, /export type DragonCalendarStateDependencies/);
-    assert.match(calendarStateSource, /calendarRepository: DragonCalendarRepository/);
+    assert.match(calendarStateSource, /eventRepository: DragonEventRepository/);
     assert.match(calendarStateSource, /membersRepository: DragonMembersRepository/);
-    assert.match(calendarStateSource, /dependencies\.calendarRepository/);
+    assert.match(calendarStateSource, /dependencies\.eventRepository/);
     assert.match(calendarStateSource, /membersRepository: dependencies\.membersRepository/);
-    assert.doesNotMatch(calendarStateSource, /mockDragonCalendarRepository|mockDragonMembersRepository/);
+    assert.doesNotMatch(calendarStateSource, /mockDragonEventRepository|mockDragonMembersRepository/);
     assert.doesNotMatch(calendarStateSource, /useDragonBirthdayState\(undefined/);
 
     assert.match(birthdayStateSource, /export type DragonBirthdayStateDependencies/);
@@ -57,8 +57,9 @@ describe('Dragon production foundation hardening', () => {
   });
 
   it('keeps calendar and birthday merge behavior isolated from mock event duplication', () => {
-    assert.match(calendarStateSource, /mergeDragonCalendarBirthdayEvents/);
-    assert.match(calendarStateSource, /birthdayState\.calendarEvents/);
+    assert.match(calendarStateSource, /mergeDragonEvents/);
+    assert.match(calendarStateSource, /buildDragonBirthdayEvents/);
+    assert.match(calendarStateSource, /mapDragonEventsToCalendarEvents/);
     assert.match(calendarStateSource, /todayKey/);
     assert.match(birthdayStateSource, /buildDragonBirthdayCalendarEvents/);
     assert.match(birthdayStateSource, /sortUpcomingDragonBirthdays\(birthdays, dependencies\.todayKey\)/);

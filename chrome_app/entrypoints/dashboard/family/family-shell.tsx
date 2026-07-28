@@ -8,6 +8,7 @@ import { DragonBackground, DragonBadge, DragonButton, DragonHero, DragonSection 
 import type { DragonBackgroundVariant } from '../dragon-ui/dragon-ui';
 import { DragonAchievementEngineScreen } from './dragon-achievements';
 import { DragonCalendar } from './dragon-calendar';
+import { DragonEventEngineScreen } from './dragon-events';
 import { DragonMembers } from './dragon-members';
 import { FamilyPanel } from './family-panel';
 import { FamilyProfile } from './family-profile';
@@ -176,12 +177,7 @@ export function FamilyShell({
           <DragonCalendar currentUser={currentUser} />
         ) : null}
 
-        {activeTab === 'events' ? (
-          <>
-            <ModuleIntro title="Events" description="Dragon House event watch uses the existing Events schedule module from the Hub dashboard." />
-            <DashboardApp familyTab="events" />
-          </>
-        ) : null}
+        {activeTab === 'events' ? <DragonEventEngineScreen /> : null}
 
         {activeTab === 'achievements' ? <DragonAchievementEngineScreen /> : null}
 

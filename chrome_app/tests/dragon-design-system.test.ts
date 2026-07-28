@@ -68,12 +68,13 @@ describe('Dragon House design system source contract', () => {
     assert.match(shellSource, /<DragonBackground variant=\{TAB_BACKGROUND_VARIANT\[activeTab\]\}/);
     assert.match(shellSource, /<DragonHero/);
     assert.match(shellSource, /<DragonCalendar currentUser=\{currentUser\}/);
-    assert.match(shellSource, /<DashboardApp familyTab="events" \/>/);
+    assert.match(shellSource, /<DragonEventEngineScreen \/>/);
     assert.match(shellSource, /<DragonAchievementEngineScreen \/>/);
     assert.match(tabsSource, /<DragonTabs/);
     assert.match(tabsSource, /Hall of Chronicles/);
     assert.match(tabsSource, /Event Watch/);
     assert.match(tabsSource, /Seal Engine/);
+    assert.doesNotMatch(shellSource, /DashboardApp familyTab="events"/);
     assert.doesNotMatch(tabsSource, /dh-panel flex flex-wrap/);
   });
 

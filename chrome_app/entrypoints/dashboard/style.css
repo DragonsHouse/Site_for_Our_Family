@@ -4004,6 +4004,263 @@ body {
   color: #d0b997;
 }
 
+.dh-event-engine {
+  display: grid;
+  gap: 1rem;
+}
+
+.dh-event-engine-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.38fr);
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.dh-event-engine-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 1rem 1rem auto;
+  width: 11rem;
+  height: 11rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 186, 82, 0.2), transparent 67%);
+  pointer-events: none;
+  animation: dh-event-ember-breath 5s ease-in-out infinite;
+}
+
+.dh-event-engine-hero h1 {
+  margin: 0.25rem 0 0.55rem;
+  color: #fff6df;
+  font-size: clamp(2rem, 4vw, 4.4rem);
+  line-height: 0.95;
+}
+
+.dh-event-engine-hero p {
+  max-width: 48rem;
+  color: #e0c7a2;
+}
+
+.dh-event-statistics {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.75rem;
+  align-content: center;
+  padding: 1rem;
+  border: 1px solid rgba(255, 194, 92, 0.28);
+  border-radius: 8px;
+  background: rgba(18, 10, 7, 0.58);
+}
+
+.dh-event-statistics > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dh-event-statistics strong {
+  color: #ffd48a;
+  font-size: 1.6rem;
+}
+
+.dh-event-filters {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.5fr) repeat(4, minmax(8rem, 1fr)) repeat(2, minmax(8rem, 0.8fr)) minmax(8rem, 0.8fr) auto;
+  gap: 0.7rem;
+  align-items: end;
+}
+
+.dh-event-command-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dh-event-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem;
+}
+
+.dh-event-card,
+.dh-event-mini-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.dh-event-card::before,
+.dh-event-mini-card::before,
+.dh-event-timeline-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-left: 3px solid rgba(255, 184, 72, 0.42);
+  pointer-events: none;
+}
+
+.dh-event-card-open,
+.dh-event-mini-card button,
+.dh-event-timeline-item {
+  display: grid;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dh-event-card-open {
+  grid-template-columns: 3.2rem 1fr;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.dh-event-card-open strong,
+.dh-event-mini-card strong,
+.dh-event-timeline-item strong {
+  color: #fff4dc;
+}
+
+.dh-event-card-open small,
+.dh-event-mini-card span,
+.dh-event-timeline-item small {
+  color: #d0b997;
+}
+
+.dh-event-card-glyph {
+  display: grid;
+  width: 3.2rem;
+  height: 3.2rem;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 184, 72, 0.34);
+  background: rgba(255, 157, 48, 0.12);
+  color: #ffd48a;
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dh-event-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 1rem 0;
+}
+
+.dh-event-card dl,
+.dh-event-details dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+}
+
+.dh-event-card dt,
+.dh-event-details dt {
+  color: #9d8763;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dh-event-card dd,
+.dh-event-details dd {
+  margin: 0.2rem 0 0;
+  color: #f3dfbb;
+}
+
+.dh-event-mini-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dh-event-mini-card button {
+  gap: 0.45rem;
+}
+
+.dh-event-timeline {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.dh-event-timeline-item {
+  position: relative;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(18, 10, 7, 0.58);
+}
+
+.dh-event-timeline-item:hover,
+.dh-event-timeline-item:focus-visible,
+.dh-event-card-open:hover,
+.dh-event-card-open:focus-visible,
+.dh-event-mini-card button:hover,
+.dh-event-mini-card button:focus-visible {
+  outline: 2px solid rgba(255, 194, 92, 0.38);
+  outline-offset: 3px;
+}
+
+.dh-event-details {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.dh-event-details-seal {
+  display: grid;
+  width: 5rem;
+  height: 5rem;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 194, 92, 0.34);
+  background: rgba(255, 153, 42, 0.13);
+  color: #ffd48a;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dh-event-details-main p {
+  color: #e0c7a2;
+}
+
+.dh-event-details-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.85rem;
+}
+
+.dh-event-type-birthday::before {
+  border-left-color: rgba(87, 217, 163, 0.72);
+}
+
+.dh-event-type-tower-defense::before,
+.dh-event-type-war::before {
+  border-left-color: rgba(255, 87, 87, 0.72);
+}
+
+.dh-event-type-quest::before,
+.dh-event-type-training::before {
+  border-left-color: rgba(255, 126, 42, 0.72);
+}
+
+@keyframes dh-event-ember-breath {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.06);
+  }
+}
+
 @keyframes dh-legendary-unlock-glow {
   0%, 100% {
     filter: brightness(1);
@@ -4023,6 +4280,21 @@ body {
 }
 
 @media (max-width: 760px) {
+  .dh-event-engine-hero,
+  .dh-event-command-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dh-event-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .dh-event-card dl,
+  .dh-event-details,
+  .dh-event-details dl {
+    grid-template-columns: 1fr;
+  }
+
   .dh-achievement-filter-row {
     grid-template-columns: 1fr;
   }
@@ -4083,7 +4355,8 @@ body {
   .dh-engine-rarity-legendary.is-unlocked,
   .dh-engine-rarity-mythic.is-unlocked,
   .dh-achievement-notification.dh-engine-rarity-legendary,
-  .dh-achievement-notification.dh-engine-rarity-mythic {
+  .dh-achievement-notification.dh-engine-rarity-mythic,
+  .dh-event-engine-hero::after {
     animation: none !important;
   }
 

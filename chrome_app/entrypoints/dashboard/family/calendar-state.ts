@@ -1,17 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useDragonCollection } from '../data/hooks/use-dragon-collection';
-import { mergeDragonCalendarBirthdayEvents } from './birthday-service';
 import { useDragonBirthdayState } from './birthday-state';
 import { addDays, addMonths, buildMonthDays, buildWeekDays, groupEventsByDate, toDateKey } from './calendar-date';
 import {
   filterDragonCalendarEvents,
   getDragonCalendarMembers,
   getDragonCalendarStats,
-  type DragonCalendarCreateInput,
-  type DragonCalendarRepository,
-  type DragonCalendarUpdateInput
 } from './calendar-service';
 import type { DragonCalendarEvent, DragonCalendarFilters, DragonCalendarView } from './calendar-models';
+import type { DragonEvent, DragonEventFilters } from './dragon-event-models';
+import type { DragonEventCreateInput, DragonEventRepository, DragonEventUpdateInput } from './dragon-event-repository';
+import { buildDragonBirthdayEvents, mapDragonEventsToCalendarEvents, mergeDragonEvents } from './dragon-event-service';
 import type { DragonMembersRepository } from './members-service';
 
 const DEFAULT_FILTERS: DragonCalendarFilters = {
@@ -23,7 +22,7 @@ const DEFAULT_FILTERS: DragonCalendarFilters = {
 };
 
 export type DragonCalendarStateDependencies = {
-  calendarRepository: DragonCalendarRepository;
+  eventRepository: DragonEventRepository;
   membersRepository: DragonMembersRepository;
   now?: Date;
 };
@@ -34,12 +33,8 @@ export function useDragonCalendarState(dependencies: DragonCalendarStateDependen
   const [view, setView] = useState<DragonCalendarView>('month');
   const [anchorDate, setAnchorDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedEvent, setSelectedEvent] = useState<DragonCalendarEvent | null>(null);
-  const collection = useDragonCollection<
-    DragonCalendarEvent,
-    DragonCalendarFilters,
-    DragonCalendarCreateInput,
-    DragonCalendarUpdateInput
-  >(dependencies.calendarRepository, DEFAULT_FILTERS, {
+  const [filters, setFilters] = useState<DragonCalendarFilters>(DEFAULT_FILTERS);
+  const collection = useDragonCollection<DragonEvent, Partial<DragonEventFilters>, DragonEventCreateInput, DragonEventUpdateInput>(dependencies.eventRepository, {}, {
     page: 1,
     pageSize: 200
   });
@@ -48,11 +43,16 @@ export function useDragonCalendarState(dependencies: DragonCalendarStateDependen
     year: anchorDate.getFullYear(),
     todayKey
   });
-  const events = useMemo(
-    () => mergeDragonCalendarBirthdayEvents(collection.items, birthdayState.calendarEvents),
-    [collection.items, birthdayState.calendarEvents]
+  const birthdayDragonEvents = useMemo(
+    () => buildDragonBirthdayEvents(birthdayState.birthdays, anchorDate.getFullYear(), todayKey),
+    [anchorDate, birthdayState.birthdays, todayKey]
   );
-  const filteredEvents = useMemo(() => filterDragonCalendarEvents(events, collection.filters), [events, collection.filters]);
+  const dragonEvents = useMemo(() => mergeDragonEvents(collection.items, birthdayDragonEvents), [birthdayDragonEvents, collection.items]);
+  const events = useMemo(
+    () => mapDragonEventsToCalendarEvents(dragonEvents),
+    [dragonEvents]
+  );
+  const filteredEvents = useMemo(() => filterDragonCalendarEvents(events, filters), [events, filters]);
   const eventsByDate = useMemo(() => groupEventsByDate(filteredEvents), [filteredEvents]);
   const monthDays = useMemo(() => buildMonthDays(anchorDate, eventsByDate, todayKey), [anchorDate, eventsByDate, todayKey]);
   const weekDays = useMemo(() => buildWeekDays(anchorDate, eventsByDate, todayKey), [anchorDate, eventsByDate, todayKey]);
@@ -66,8 +66,8 @@ export function useDragonCalendarState(dependencies: DragonCalendarStateDependen
     setAnchorDate,
     today,
     todayKey,
-    filters: collection.filters,
-    setFilters: collection.setFilters,
+    filters,
+    setFilters,
     loading: collection.loading || birthdayState.loading,
     refreshing: collection.refreshing || birthdayState.refreshing,
     error: collection.error ?? birthdayState.error,
@@ -75,6 +75,7 @@ export function useDragonCalendarState(dependencies: DragonCalendarStateDependen
       collection.refresh();
       birthdayState.refresh();
     },
+    dragonEvents,
     events,
     filteredEvents,
     monthDays,
@@ -86,6 +87,6 @@ export function useDragonCalendarState(dependencies: DragonCalendarStateDependen
     goToToday: () => setAnchorDate(new Date(today.getFullYear(), today.getMonth(), today.getDate())),
     goToPrevious: () => setAnchorDate((current) => (view === 'month' ? addMonths(current, -1) : addDays(current, -7))),
     goToNext: () => setAnchorDate((current) => (view === 'month' ? addMonths(current, 1) : addDays(current, 7))),
-    clearFilters: () => collection.setFilters(DEFAULT_FILTERS)
+    clearFilters: () => setFilters(DEFAULT_FILTERS)
   };
 }

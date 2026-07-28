@@ -7,6 +7,8 @@ const modelsSource = readFileSync(new URL('../entrypoints/dashboard/family/calen
 const serviceSource = readFileSync(new URL('../entrypoints/dashboard/family/calendar-service.ts', import.meta.url), 'utf8');
 const stateSource = readFileSync(new URL('../entrypoints/dashboard/family/calendar-state.ts', import.meta.url), 'utf8');
 const mockSource = readFileSync(new URL('../entrypoints/dashboard/family/calendar-mock-data.ts', import.meta.url), 'utf8');
+const eventModelsSource = readFileSync(new URL('../entrypoints/dashboard/family/dragon-event-models.ts', import.meta.url), 'utf8');
+const eventServiceSource = readFileSync(new URL('../entrypoints/dashboard/family/dragon-event-service.ts', import.meta.url), 'utf8');
 const styleSource = readFileSync(new URL('../entrypoints/dashboard/style.css', import.meta.url), 'utf8');
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -17,6 +19,8 @@ describe('Dragon Calendar production module source contract', () => {
     assert.match(mockSource, /DRAGON_CALENDAR_MOCK_EVENTS/);
     assert.match(serviceSource, /export type DragonCalendarRepository/);
     assert.match(serviceSource, /mockDragonCalendarRepository/);
+    assert.match(eventModelsSource, /export type DragonEvent/);
+    assert.match(stateSource, /eventRepository: DragonEventRepository/);
     assert.match(stateSource, /useDragonCalendarState/);
     assert.doesNotMatch(serviceSource, /fetch\(/);
     assert.doesNotMatch(calendarSource, /fetch\(/);
@@ -50,7 +54,8 @@ describe('Dragon Calendar production module source contract', () => {
       assert.match(mockSource, new RegExp(category));
     });
     assert.match(stateSource, /useDragonBirthdayState/);
-    assert.match(stateSource, /mergeDragonCalendarBirthdayEvents/);
+    assert.match(stateSource, /mergeDragonEvents/);
+    assert.match(eventServiceSource, /mapDragonEventsToCalendarEvents/);
     assert.doesNotMatch(mockSource, /category: 'birthday'/);
 
     [

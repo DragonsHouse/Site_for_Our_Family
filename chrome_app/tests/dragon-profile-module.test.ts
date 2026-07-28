@@ -80,7 +80,9 @@ describe('Dragon Profile command chamber source contract', () => {
       assert.match(mockSource, new RegExp(field));
     });
     assert.match(serviceSource, /mockDragonProfileRepository/);
-    assert.match(stateSource, /repository: DragonProfileRepository = mockDragonProfileRepository/);
+    assert.match(stateSource, /profileRepository\?: DragonProfileRepository/);
+    assert.match(stateSource, /eventRepository\?: DragonEventRepository/);
+    assert.match(stateSource, /timelineRepositoryBoundary: 'Repository<DragonEvent>'/);
     assert.doesNotMatch(profileSource, /mockDragonProfileRepository/);
   });
 

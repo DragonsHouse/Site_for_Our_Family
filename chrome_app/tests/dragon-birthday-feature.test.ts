@@ -123,7 +123,8 @@ describe('Dragon Birthday feature', () => {
   it('keeps birthday architecture out of React mock imports and calendar mock duplication', () => {
     assert.match(stateSource, /Repository<DragonMember>|sourceRepository: 'Repository<DragonMember>'/);
     assert.match(calendarStateSource, /useDragonBirthdayState/);
-    assert.match(calendarStateSource, /mergeDragonCalendarBirthdayEvents/);
+    assert.match(calendarStateSource, /mergeDragonEvents/);
+    assert.match(calendarStateSource, /buildDragonBirthdayEvents/);
     assert.doesNotMatch(calendarMockSource, /category: 'birthday'/);
     assert.doesNotMatch(membersSource, /members-mock-data|DRAGON_MEMBERS_MOCK_DATA/);
     assert.doesNotMatch(profileSource, /profile-mock-data|DRAGON_PROFILE_MOCK_DATA/);

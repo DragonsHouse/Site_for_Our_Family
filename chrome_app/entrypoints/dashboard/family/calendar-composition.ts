@@ -1,5 +1,5 @@
-import { mockDragonCalendarRepository } from './calendar-service';
 import type { DragonCalendarStateDependencies } from './calendar-state';
+import { mockDragonEventRepository } from './dragon-event-repository';
 import { mockDragonMembersRepository } from './members-service';
 
 export function createDragonCalendarStateDependencies(dependencies: DragonCalendarStateDependencies): DragonCalendarStateDependencies {
@@ -10,7 +10,7 @@ export function createMockDragonCalendarStateDependencies(
   overrides: Partial<DragonCalendarStateDependencies> = {}
 ): DragonCalendarStateDependencies {
   return {
-    calendarRepository: mockDragonCalendarRepository,
+    eventRepository: mockDragonEventRepository,
     membersRepository: mockDragonMembersRepository,
     ...overrides
   };
