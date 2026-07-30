@@ -1,8 +1,6 @@
 import {
   useId,
   useRef,
-  type ButtonHTMLAttributes,
-  type InputHTMLAttributes,
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
@@ -12,25 +10,33 @@ import {
 import type { DragonBackgroundVariant } from './dragon-theme';
 import { DragonBackground } from './dragon-background';
 import { useDragonDialogFocus } from './use-dragon-dialog-focus';
+import {
+  DragonBadge,
+  DragonButton,
+  DragonCheckbox,
+  DragonInput,
+  DragonPanel,
+  DragonStatusMessage,
+  DragonToggle,
+  DragonTooltip
+} from './components/primitives';
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
 }
 
 export { DragonBackground };
+export {
+  DragonBadge,
+  DragonButton,
+  DragonCheckbox,
+  DragonInput,
+  DragonPanel,
+  DragonStatusMessage,
+  DragonToggle,
+  DragonTooltip
+};
 export type { DragonBackgroundVariant };
-
-export function DragonPanel({
-  children,
-  className,
-  variant = 'default'
-}: {
-  children: ReactNode;
-  className?: string;
-  variant?: 'default' | 'elevated' | 'ceremonial';
-}) {
-  return <section className={cx('dh-dragon-panel', `dh-dragon-panel-${variant}`, className)}>{children}</section>;
-}
 
 export function DragonCard({
   children,
@@ -92,37 +98,6 @@ export function DragonHero({
       {children ? <div className="dh-dragon-hero-aside">{children}</div> : null}
     </DragonPanel>
   );
-}
-
-export function DragonButton({
-  children,
-  className,
-  variant = 'primary',
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
-}) {
-  return (
-    <button {...props} className={cx('dh-dragon-button', `dh-dragon-button-${variant}`, className)}>
-      {children}
-    </button>
-  );
-}
-
-export function DragonBadge({
-  children,
-  className,
-  tone = 'ember'
-}: {
-  children: ReactNode;
-  className?: string;
-  tone?: 'ember' | 'gold' | 'success' | 'muted' | 'danger';
-}) {
-  return <span className={cx('dh-dragon-badge', `dh-dragon-badge-${tone}`, className)}>{children}</span>;
-}
-
-export function DragonInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cx('dh-dragon-input', className)} />;
 }
 
 export function DragonTextarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
@@ -350,15 +325,6 @@ export function DragonToast({ children, tone = 'ember' }: { children: ReactNode;
     <div className={cx('dh-dragon-toast', `dh-dragon-toast-${tone}`)} role="status">
       {children}
     </div>
-  );
-}
-
-export function DragonTooltip({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <span className="dh-dragon-tooltip">
-      {children}
-      <span role="tooltip">{label}</span>
-    </span>
   );
 }
 

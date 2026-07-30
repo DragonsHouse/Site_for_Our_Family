@@ -1,4 +1,5 @@
 @import '../shared/design-system.css';
+@import './dragon-ui/styles/primitives.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -189,57 +190,6 @@ body {
 #root {
   width: 100%;
   min-height: 100vh;
-}
-
-:root {
-  --dh-bg: #050403;
-  --dh-bg-deep: #0b0806;
-  --dh-graphite: #151515;
-  --dh-graphite-2: #191919;
-  --dh-graphite-3: #1e1e1e;
-  --dh-graphite-4: #242424;
-  --dh-elevated: #292929;
-  --dh-elevated-2: #303030;
-  --dh-border: rgba(255, 255, 255, 0.07);
-  --dh-border-strong: rgba(255, 255, 255, 0.10);
-  --dh-text: #f4f1ec;
-  --dh-text-soft: #aaa39a;
-  --dh-text-muted: #77736d;
-  --dh-red-dark: #4b0904;
-  --dh-red: #8b0000;
-  --dh-red-hot: #ff1a00;
-  --dh-orange: #ff5a00;
-  --dh-orange-hot: #ff5a00;
-  --dh-gold: #ff5a00;
-  --dh-gold-soft: #ff8b00;
-  --dh-success: #8fa66a;
-  --dragon-obsidian: #050403;
-  --dragon-obsidian-soft: #100805;
-  --dragon-stone: #241913;
-  --dragon-metal: #2b211c;
-  --dragon-border: rgba(255, 160, 78, 0.18);
-  --dragon-border-hot: rgba(255, 178, 92, 0.42);
-  --dragon-text: #f8efe3;
-  --dragon-text-soft: #c9b7a2;
-  --dragon-text-muted: #8e7c6b;
-  --dragon-ember: #ff5a00;
-  --dragon-ember-hot: #ff8b00;
-  --dragon-gold: #d4af37;
-  --dragon-success: #8fa66a;
-  --dragon-danger: #f87171;
-  --dragon-radius-sm: 0.75rem;
-  --dragon-radius-md: 1rem;
-  --dragon-radius-lg: 1.25rem;
-  --dragon-radius-xl: 1.5rem;
-  --dragon-shadow-panel: 0 28px 96px rgba(0, 0, 0, 0.68);
-  --dragon-shadow-ember: 0 0 34px rgba(255, 91, 27, 0.20);
-  --dragon-shadow-inset: inset 0 1px 0 rgba(255, 226, 180, 0.08);
-  --dragon-motion-fast: 140ms;
-  --dragon-motion-base: 220ms;
-  --dragon-motion-slow: 420ms;
-  --dragon-motion-ambient: 8000ms;
-  --dragon-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --dragon-ease-spring: cubic-bezier(0.2, 0.9, 0.2, 1.15);
 }
 
 .dh-dragon-bg,

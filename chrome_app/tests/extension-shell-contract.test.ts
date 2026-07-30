@@ -171,6 +171,7 @@ describe('extension shell source contract', () => {
   it('uses the official black and ember-red brand palette in extension surfaces', () => {
     const brandedCss = [
       readSource('entrypoints', 'popup', 'style.css'),
+      readSource('entrypoints', 'shared', 'design-tokens.css'),
       readSource('entrypoints', 'shared', 'design-system.css'),
       readSource('entrypoints', 'dashboard', 'style.css'),
       readSource('entrypoints', 'options', 'style.css')

@@ -1,3 +1,5 @@
+import { DragonCheckbox } from '../dragon-ui/dragon-ui';
+
 export function RememberMeCheckbox({
   checked,
   onChange,
@@ -6,13 +8,10 @@ export function RememberMeCheckbox({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="dh-remember-row">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span>Запам’ятати мене</span>
-    </label>
+    <DragonCheckbox
+      checked={checked}
+      label="Запам’ятати мене"
+      onCheckedChange={onChange}
+    />
   );
 }

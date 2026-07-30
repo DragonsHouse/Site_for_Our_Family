@@ -1,0 +1,435 @@
+.dh-dragon-button,
+.dh-dragon-input,
+.dh-dragon-badge,
+.dh-dragon-check,
+.dh-dragon-status {
+  font: inherit;
+}
+
+.dh-dragon-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dh-space-2);
+  border: 1px solid color-mix(in srgb, var(--dragon-ember-hot) 34%, transparent);
+  border-radius: var(--dragon-radius-md);
+  cursor: pointer;
+  padding: 0.65rem 1rem;
+  color: var(--dragon-text);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.dh-dragon-button-primary {
+  background:
+    radial-gradient(circle at 50% 0, color-mix(in srgb, var(--dragon-gold) 25%, transparent), transparent 8rem),
+    linear-gradient(90deg, var(--dh-red), var(--dh-red-hot) 50%, var(--dragon-ember));
+  box-shadow: var(--dragon-shadow-panel), var(--dragon-shadow-ember);
+}
+
+.dh-dragon-button-secondary,
+.dh-dragon-button-quiet {
+  background: color-mix(in srgb, var(--dragon-obsidian) 74%, transparent);
+}
+
+.dh-dragon-button-quiet {
+  border-color: var(--dragon-border);
+  box-shadow: none;
+}
+
+.dh-dragon-button-danger {
+  border-color: color-mix(in srgb, var(--dragon-danger) 44%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dragon-danger) 32%, var(--dragon-obsidian)), var(--dh-red));
+}
+
+.dh-dragon-button:hover:not(:disabled, [aria-disabled='true']),
+.dh-dragon-button:focus-visible {
+  border-color: var(--dragon-border-hot);
+  box-shadow: var(--dh-focus-ring), var(--dragon-shadow-ember);
+}
+
+.dh-dragon-button:disabled,
+.dh-dragon-button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.62;
+  filter: grayscale(0.28);
+}
+
+.dh-dragon-button-icon,
+.dh-dragon-button-spinner {
+  display: inline-grid;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.dh-dragon-button-spinner {
+  border: 2px solid color-mix(in srgb, var(--dragon-text) 24%, transparent);
+  border-top-color: var(--dragon-text);
+  border-radius: 999px;
+  animation: dh-dragon-spin var(--dragon-motion-slow) linear infinite;
+}
+
+.dh-dragon-field,
+.dh-dragon-check {
+  display: grid;
+  gap: var(--dh-space-2);
+  color: var(--dragon-text-soft);
+}
+
+.dh-dragon-field-label,
+.dh-dragon-check-label {
+  display: flex;
+  gap: var(--dh-space-1);
+  color: var(--dragon-text);
+  font-weight: 800;
+}
+
+.dh-dragon-field-description,
+.dh-dragon-check-description,
+.dh-dragon-panel-description {
+  color: var(--dragon-text-muted);
+  line-height: 1.45;
+}
+
+.dh-dragon-input-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  border-radius: var(--dragon-radius-md);
+}
+
+.dh-dragon-input-shell .dh-dragon-input {
+  grid-column: 1 / -1;
+}
+
+.dh-dragon-input-shell .dh-dragon-input-with-visuals {
+  grid-column: 2;
+}
+
+.dh-dragon-input-visual {
+  display: inline-grid;
+  min-width: 2.4rem;
+  place-items: center;
+  color: var(--dragon-text-muted);
+}
+
+.dh-dragon-input {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid color-mix(in srgb, var(--dragon-ember-hot) 22%, transparent);
+  border-radius: var(--dragon-radius-md);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--dragon-obsidian) 92%, transparent), color-mix(in srgb, var(--dragon-obsidian) 76%, transparent));
+  color: var(--dragon-text);
+  outline: none;
+  padding: 0.75rem 0.9rem;
+  box-shadow: var(--dragon-shadow-inset);
+}
+
+.dh-dragon-input:focus {
+  border-color: var(--dragon-border-hot);
+  box-shadow: var(--dh-focus-ring), var(--dragon-shadow-ember);
+}
+
+.dh-dragon-input:disabled,
+.dh-dragon-field.is-disabled,
+.dh-dragon-check.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.dh-dragon-field.has-error .dh-dragon-input,
+.dh-dragon-check.has-error .dh-dragon-check-box {
+  border-color: color-mix(in srgb, var(--dragon-danger) 58%, transparent);
+}
+
+.dh-dragon-field.has-success .dh-dragon-input {
+  border-color: color-mix(in srgb, var(--dragon-success) 58%, transparent);
+}
+
+.dh-dragon-field-error {
+  color: var(--dragon-danger);
+  line-height: 1.4;
+}
+
+.dh-dragon-field-success {
+  color: var(--dragon-success);
+  line-height: 1.4;
+}
+
+.dh-dragon-check {
+  position: relative;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dh-dragon-check input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.dh-dragon-check-box {
+  display: grid;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  place-items: center;
+  border: 1px solid var(--dragon-border-hot);
+  border-radius: var(--dh-radius-xs);
+  background: color-mix(in srgb, var(--dragon-obsidian) 80%, transparent);
+  box-shadow: var(--dragon-shadow-inset);
+}
+
+.dh-dragon-check input:checked + .dh-dragon-check-box,
+.dh-dragon-check input:indeterminate + .dh-dragon-check-box {
+  background: linear-gradient(135deg, var(--dh-red), var(--dragon-ember));
+}
+
+.dh-dragon-check input:checked + .dh-dragon-check-box::after {
+  content: '';
+  width: 0.38rem;
+  height: 0.62rem;
+  border: solid var(--dragon-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.dh-dragon-check input:indeterminate + .dh-dragon-check-box::after {
+  content: '';
+  width: 0.56rem;
+  height: 2px;
+  background: var(--dragon-text);
+}
+
+.dh-dragon-check input:focus-visible + .dh-dragon-check-box {
+  box-shadow: var(--dh-focus-ring), var(--dragon-shadow-ember);
+}
+
+.dh-dragon-toggle .dh-dragon-check-box {
+  width: 2.4rem;
+  border-radius: 999px;
+  justify-content: start;
+  padding: 0.12rem;
+}
+
+.dh-dragon-toggle .dh-dragon-check-box::after {
+  content: '';
+  width: 0.78rem;
+  height: 0.78rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--dragon-text-muted);
+  transform: none;
+  transition: transform var(--dragon-transition), background-color var(--dragon-transition);
+}
+
+.dh-dragon-toggle input:checked + .dh-dragon-check-box::after {
+  background: var(--dragon-text);
+  transform: translateX(1.12rem);
+}
+
+.dh-dragon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dh-space-1);
+  border: 1px solid var(--dragon-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dragon-obsidian) 70%, transparent);
+  padding: 0.34rem 0.62rem;
+  color: var(--dragon-text-soft);
+  font-size: var(--dh-font-xs);
+  font-weight: 900;
+}
+
+.dh-dragon-badge-compact {
+  padding: 0.2rem 0.46rem;
+}
+
+.dh-dragon-badge-active {
+  border-color: color-mix(in srgb, var(--dragon-ember) 38%, transparent);
+  color: var(--dragon-ember-hot);
+}
+
+.dh-dragon-badge-warning,
+.dh-dragon-badge-ceremonial {
+  border-color: color-mix(in srgb, var(--dragon-gold) 42%, transparent);
+  color: var(--dragon-gold);
+}
+
+.dh-dragon-badge-danger {
+  border-color: color-mix(in srgb, var(--dragon-danger) 42%, transparent);
+  color: var(--dragon-danger);
+}
+
+.dh-dragon-badge-permission {
+  border-color: color-mix(in srgb, var(--dragon-success) 42%, transparent);
+  color: var(--dragon-success);
+}
+
+.dh-dragon-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--dragon-border);
+  border-radius: var(--dragon-radius-xl);
+  color: var(--dragon-text);
+  box-shadow: var(--dragon-shadow-panel), var(--dragon-shadow-inset);
+  backdrop-filter: blur(18px);
+}
+
+.dh-dragon-panel-mounted {
+  background:
+    radial-gradient(ellipse at 50% -8%, color-mix(in srgb, var(--dragon-ember) 16%, transparent), transparent 21rem),
+    linear-gradient(145deg, color-mix(in srgb, var(--dragon-stone) 54%, transparent), color-mix(in srgb, var(--dragon-obsidian) 96%, transparent));
+}
+
+.dh-dragon-panel-raised {
+  border-radius: var(--dragon-radius-lg);
+  background:
+    radial-gradient(ellipse at 0 0, color-mix(in srgb, var(--dragon-ember) 11%, transparent), transparent 16rem),
+    linear-gradient(145deg, color-mix(in srgb, var(--dragon-stone) 42%, transparent), color-mix(in srgb, var(--dragon-obsidian) 94%, transparent));
+}
+
+.dh-dragon-panel-sealed {
+  border-color: var(--dragon-border-hot);
+  background:
+    radial-gradient(ellipse at 50% -15%, color-mix(in srgb, var(--dragon-ember-hot) 22%, transparent), transparent 22rem),
+    linear-gradient(145deg, color-mix(in srgb, var(--dragon-metal) 68%, transparent), color-mix(in srgb, var(--dragon-obsidian) 97%, transparent));
+}
+
+.dh-dragon-panel-critical {
+  border-color: color-mix(in srgb, var(--dragon-danger) 50%, transparent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--dragon-danger) 18%, var(--dragon-stone)), color-mix(in srgb, var(--dragon-obsidian) 96%, transparent));
+}
+
+.dh-dragon-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--dragon-ember) 8%, transparent), transparent 18%, transparent 82%, color-mix(in srgb, var(--dragon-ember) 7%, transparent)),
+    radial-gradient(circle at 18% 84%, color-mix(in srgb, var(--dragon-ember) 10%, transparent), transparent 13rem);
+}
+
+.dh-dragon-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dh-dragon-panel-header,
+.dh-dragon-panel-body {
+  padding: var(--dh-space-5);
+}
+
+.dh-dragon-panel-header + .dh-dragon-panel-body {
+  padding-top: 0;
+}
+
+.dh-dragon-panel-title {
+  margin: 0;
+  color: var(--dragon-text);
+  line-height: 1.2;
+}
+
+.dh-dragon-tooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.dh-dragon-tooltip [role='tooltip'] {
+  position: absolute;
+  left: 50%;
+  z-index: 10;
+  width: max-content;
+  max-width: min(16rem, 80vw);
+  transform: translateX(-50%);
+  border: 1px solid var(--dragon-border);
+  border-radius: var(--dragon-radius-sm);
+  background: color-mix(in srgb, var(--dragon-obsidian) 96%, transparent);
+  color: var(--dragon-text-soft);
+  opacity: 0;
+  padding: 0.45rem 0.55rem;
+  pointer-events: none;
+  transition: opacity var(--dragon-transition);
+}
+
+.dh-dragon-tooltip-top [role='tooltip'] {
+  bottom: calc(100% + 0.45rem);
+}
+
+.dh-dragon-tooltip-bottom [role='tooltip'] {
+  top: calc(100% + 0.45rem);
+}
+
+.dh-dragon-tooltip:hover [role='tooltip'],
+.dh-dragon-tooltip:focus-within [role='tooltip'] {
+  opacity: 1;
+}
+
+.dh-dragon-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dh-space-3);
+  border: 1px solid var(--dragon-border);
+  border-radius: var(--dragon-radius-md);
+  background: color-mix(in srgb, var(--dragon-obsidian) 82%, transparent);
+  color: var(--dragon-text);
+  padding: 0.75rem 0.9rem;
+  box-shadow: var(--dragon-shadow-inset);
+}
+
+.dh-dragon-status-copy {
+  display: grid;
+  gap: var(--dh-space-1);
+}
+
+.dh-dragon-status-action {
+  margin-left: auto;
+}
+
+.dh-dragon-status-success {
+  border-color: color-mix(in srgb, var(--dragon-success) 42%, transparent);
+}
+
+.dh-dragon-status-warning {
+  border-color: color-mix(in srgb, var(--dragon-gold) 42%, transparent);
+}
+
+.dh-dragon-status-error {
+  border-color: color-mix(in srgb, var(--dragon-danger) 42%, transparent);
+}
+
+.dh-dragon-status-spinner {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  border: 2px solid color-mix(in srgb, var(--dragon-text) 24%, transparent);
+  border-top-color: var(--dragon-text);
+  border-radius: 999px;
+  animation: dh-dragon-spin var(--dragon-motion-slow) linear infinite;
+}
+
+@keyframes dh-dragon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dh-dragon-button-spinner,
+  .dh-dragon-status-spinner {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

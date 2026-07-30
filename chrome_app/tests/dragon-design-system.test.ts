@@ -6,6 +6,7 @@ const uiSource = readFileSync(new URL('../entrypoints/dashboard/dragon-ui/dragon
 const backgroundSource = readFileSync(new URL('../entrypoints/dashboard/dragon-ui/dragon-background.tsx', import.meta.url), 'utf8');
 const themeSource = readFileSync(new URL('../entrypoints/dashboard/dragon-ui/dragon-theme.ts', import.meta.url), 'utf8');
 const styleSource = readFileSync(new URL('../entrypoints/dashboard/style.css', import.meta.url), 'utf8');
+const tokenSource = readFileSync(new URL('../entrypoints/shared/design-tokens.css', import.meta.url), 'utf8');
 const shellSource = readFileSync(new URL('../entrypoints/dashboard/family/family-shell.tsx', import.meta.url), 'utf8');
 const tabsSource = readFileSync(new URL('../entrypoints/dashboard/family/family-tabs.tsx', import.meta.url), 'utf8');
 const calendarSource = readFileSync(new URL('../entrypoints/dashboard/family/dragon-calendar.tsx', import.meta.url), 'utf8');
@@ -16,9 +17,11 @@ describe('Dragon House design system source contract', () => {
     [
       'DragonBackground',
       'DragonButton',
+      'DragonCheckbox',
       'DragonCard',
       'DragonPanel',
       'DragonInput',
+      'DragonToggle',
       'DragonTextarea',
       'DragonSelect',
       'DragonDialog',
@@ -26,6 +29,7 @@ describe('Dragon House design system source contract', () => {
       'DragonBadge',
       'DragonToast',
       'DragonTooltip',
+      'DragonStatusMessage',
       'DragonAvatar',
       'DragonDivider',
       'DragonSection',
@@ -35,7 +39,7 @@ describe('Dragon House design system source contract', () => {
       'DragonEmptyState',
       'DragonRetry',
       'DragonHero'
-    ].forEach((name) => assert.match(uiSource, new RegExp(`export function ${name}|export \\{ ${name}`)));
+    ].forEach((name) => assert.match(uiSource, new RegExp(`export function ${name}|export \\{[\\s\\S]*${name}`)));
   });
 
   it('centralizes Dragon Fortress theme tokens and ambient animation names', () => {
@@ -45,7 +49,10 @@ describe('Dragon House design system source contract', () => {
       '--dragon-metal',
       '--dragon-border-hot',
       '--dragon-shadow-ember',
-      '--dragon-motion-ambient',
+      '--dragon-motion-ambient'
+    ].forEach((pattern) => assert.match(tokenSource, new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))));
+
+    [
       '@keyframes dh-dragon-breathe',
       '@keyframes dh-dragon-smoke',
       '@keyframes dh-dragon-embers',
