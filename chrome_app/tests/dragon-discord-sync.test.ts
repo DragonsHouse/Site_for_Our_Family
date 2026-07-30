@@ -11,7 +11,7 @@ const screenSource = readFileSync(new URL('../entrypoints/dashboard/family/drago
 const clientSource = readFileSync(new URL('../lib/family-discord-sync-client.ts', import.meta.url), 'utf8');
 const typesSource = readFileSync(new URL('../lib/family-discord-sync-types.ts', import.meta.url), 'utf8');
 const shellSource = readFileSync(new URL('../entrypoints/dashboard/family/family-shell.tsx', import.meta.url), 'utf8');
-const tabsSource = readFileSync(new URL('../entrypoints/dashboard/family/family-tabs.tsx', import.meta.url), 'utf8');
+const roomNavigationSource = readFileSync(new URL('../entrypoints/dashboard/family/room-navigation.ts', import.meta.url), 'utf8');
 const hubSource = readFileSync(new URL('../entrypoints/dashboard/family-hub-app.tsx', import.meta.url), 'utf8');
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -133,10 +133,11 @@ describe('Dragon Discord Synchronization Engine frontend', () => {
   });
 
   it('adds administration navigation without replacing Events or Fire Guard', () => {
-    assert.match(hubSource, /'resources', 'discord-sync', 'family'/);
-    assert.match(tabsSource, /key: 'events'/);
-    assert.match(tabsSource, /key: 'tower-defense'/);
-    assert.match(tabsSource, /key: 'discord-sync'/);
+    assert.match(hubSource, /DRAGON_ROOM_TAB_KEYS/);
+    assert.match(roomNavigationSource, /key: 'resources'[\s\S]*key: 'discord-sync'[\s\S]*key: 'family'/);
+    assert.match(roomNavigationSource, /key: 'events'/);
+    assert.match(roomNavigationSource, /key: 'tower-defense'/);
+    assert.match(roomNavigationSource, /key: 'discord-sync'/);
     assert.match(shellSource, /activeTab === 'events' \? <DragonEventEngineScreen \/>/);
     assert.match(shellSource, /activeTab === 'tower-defense' \? <DragonTowerDefenseScreen \/>/);
     assert.match(shellSource, /activeTab === 'discord-sync' \? <DragonDiscordSyncScreen currentUser=\{currentUser\} \/>/);

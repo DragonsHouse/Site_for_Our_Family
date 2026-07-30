@@ -1,5 +1,6 @@
 @import '../shared/design-system.css';
 @import './dragon-ui/styles/primitives.css';
+@import './dragon-ui/styles/room-shell.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

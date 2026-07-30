@@ -9,6 +9,7 @@ const styleSource = readFileSync(new URL('../entrypoints/dashboard/style.css', i
 const tokenSource = readFileSync(new URL('../entrypoints/shared/design-tokens.css', import.meta.url), 'utf8');
 const shellSource = readFileSync(new URL('../entrypoints/dashboard/family/family-shell.tsx', import.meta.url), 'utf8');
 const tabsSource = readFileSync(new URL('../entrypoints/dashboard/family/family-tabs.tsx', import.meta.url), 'utf8');
+const roomNavigationSource = readFileSync(new URL('../entrypoints/dashboard/family/room-navigation.ts', import.meta.url), 'utf8');
 const calendarSource = readFileSync(new URL('../entrypoints/dashboard/family/dragon-calendar.tsx', import.meta.url), 'utf8');
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -38,7 +39,13 @@ describe('Dragon House design system source contract', () => {
       'DragonProgress',
       'DragonEmptyState',
       'DragonRetry',
-      'DragonHero'
+      'DragonHero',
+      'DragonRoomShell',
+      'DragonRoomHeader',
+      'DragonRoomBody',
+      'DragonRoomRail',
+      'DragonRoomPanel',
+      'DragonRoomStatusArea'
     ].forEach((name) => assert.match(uiSource, new RegExp(`export function ${name}|export \\{[\\s\\S]*${name}`)));
   });
 
@@ -72,15 +79,15 @@ describe('Dragon House design system source contract', () => {
   });
 
   it('routes Family Hub shell and navigation through Dragon UI instead of generic dashboard tabs', () => {
-    assert.match(shellSource, /<DragonBackground variant=\{TAB_BACKGROUND_VARIANT\[activeTab\]\}/);
+    assert.match(shellSource, /<DragonBackground variant=\{DRAGON_ROOM_BACKGROUND_VARIANT\[activeTab\]\}/);
     assert.match(shellSource, /<DragonHero/);
     assert.match(shellSource, /<DragonCalendar currentUser=\{currentUser\}/);
     assert.match(shellSource, /<DragonEventEngineScreen \/>/);
     assert.match(shellSource, /<DragonAchievementEngineScreen \/>/);
-    assert.match(tabsSource, /<DragonTabs/);
-    assert.match(tabsSource, /Hall of Chronicles/);
-    assert.match(tabsSource, /Event Watch/);
-    assert.match(tabsSource, /Seal Engine/);
+    assert.match(tabsSource, /<DragonRoomRail/);
+    assert.match(roomNavigationSource, /Hall of Chronicles/);
+    assert.match(roomNavigationSource, /Event Watch/);
+    assert.match(roomNavigationSource, /Seal Engine/);
     assert.doesNotMatch(shellSource, /DashboardApp familyTab="events"/);
     assert.doesNotMatch(tabsSource, /dh-panel flex flex-wrap/);
   });

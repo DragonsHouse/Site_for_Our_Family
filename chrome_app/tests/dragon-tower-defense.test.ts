@@ -35,7 +35,7 @@ const serviceSource = readFileSync(new URL('../entrypoints/dashboard/family/towe
 const stateSource = readFileSync(new URL('../entrypoints/dashboard/family/tower-defense-state.ts', import.meta.url), 'utf8');
 const screenSource = readFileSync(new URL('../entrypoints/dashboard/family/dragon-tower-defense.tsx', import.meta.url), 'utf8');
 const shellSource = readFileSync(new URL('../entrypoints/dashboard/family/family-shell.tsx', import.meta.url), 'utf8');
-const tabsSource = readFileSync(new URL('../entrypoints/dashboard/family/family-tabs.tsx', import.meta.url), 'utf8');
+const roomNavigationSource = readFileSync(new URL('../entrypoints/dashboard/family/room-navigation.ts', import.meta.url), 'utf8');
 const hubSource = readFileSync(new URL('../entrypoints/dashboard/family-hub-app.tsx', import.meta.url), 'utf8');
 const calendarStateSource = readFileSync(new URL('../entrypoints/dashboard/family/calendar-state.ts', import.meta.url), 'utf8');
 const eventModelsSource = readFileSync(new URL('../entrypoints/dashboard/family/dragon-event-models.ts', import.meta.url), 'utf8');
@@ -229,10 +229,11 @@ describe('Dragon Tower Defense and Fire Guard', () => {
   });
 
   it('adds the navigation entry without replacing Events and uses Dragon UI dialogs', () => {
-    assert.match(hubSource, /'events', 'tower-defense', 'achievements'/);
-    assert.match(tabsSource, /key: 'events'/);
-    assert.match(tabsSource, /key: 'tower-defense'/);
-    assert.match(tabsSource, /Вогняна варта/);
+    assert.match(hubSource, /DRAGON_ROOM_TAB_KEYS/);
+    assert.match(roomNavigationSource, /key: 'events'[\s\S]*key: 'tower-defense'[\s\S]*key: 'achievements'/);
+    assert.match(roomNavigationSource, /key: 'events'/);
+    assert.match(roomNavigationSource, /key: 'tower-defense'/);
+    assert.match(roomNavigationSource, /War Chamber/);
     assert.match(shellSource, /activeTab === 'events' \? <DragonEventEngineScreen \/>/);
     assert.match(shellSource, /activeTab === 'tower-defense' \? <DragonTowerDefenseScreen \/>/);
     assert.match(screenSource, /DragonDialog/);

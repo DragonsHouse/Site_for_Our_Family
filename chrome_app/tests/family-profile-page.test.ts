@@ -23,12 +23,12 @@ describe('member profile page route contract', () => {
 
   it('routes profile through Hub navigation without arbitrary member loading', async () => {
     const shell = await readSource('entrypoints/dashboard/family/family-shell.tsx');
-    const tabs = await readSource('entrypoints/dashboard/family/family-tabs.tsx');
+    const navigation = await readSource('entrypoints/dashboard/family/room-navigation.ts');
     const app = await readSource('entrypoints/dashboard/family-hub-app.tsx');
     const profile = await readSource('entrypoints/dashboard/family/family-profile.tsx');
 
-    assert.match(tabs, /key: 'profile'/u);
-    assert.match(app, /'profile'/u);
+    assert.match(navigation, /key: 'profile'/u);
+    assert.match(app, /DRAGON_ROOM_TAB_KEYS/u);
     assert.match(shell, /activeTab === 'profile'/u);
     assert.match(shell, /<FamilyProfile user=\{currentUser\}/u);
     assert.doesNotMatch(profile, /URLSearchParams/u);

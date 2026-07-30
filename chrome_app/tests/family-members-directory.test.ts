@@ -130,16 +130,16 @@ describe('family members directory source contract', () => {
   });
 
   it('routes the directory and public details through the Hub Members tab', async () => {
-    const tabs = await readSource('entrypoints/dashboard/family/family-tabs.tsx');
+    const navigation = await readSource('entrypoints/dashboard/family/room-navigation.ts');
     const app = await readSource('entrypoints/dashboard/family-hub-app.tsx');
     const shell = await readSource('entrypoints/dashboard/family/family-shell.tsx');
     const page = await readSource('entrypoints/dashboard/family/family-members-directory.tsx');
 
-    assert.match(tabs, /key: 'members'/u);
-    assert.match(tabs, /label: 'Members'/u);
-    assert.match(tabs, /key: 'calendar', label: 'Calendar'/u);
-    assert.match(tabs, /key: 'events', label: 'Events'/u);
-    assert.doesNotMatch(tabs, /Birthdays/u);
+    assert.match(navigation, /key: 'members'/u);
+    assert.match(navigation, /label: 'Members'/u);
+    assert.match(navigation, /key: 'calendar'[\s\S]*label: 'Calendar'/u);
+    assert.match(navigation, /key: 'events'[\s\S]*label: 'Events'/u);
+    assert.doesNotMatch(navigation, /Birthdays/u);
     assert.match(app, /'members'/u);
     assert.match(shell, /activeTab === 'members'/u);
     assert.match(shell, /<DragonMembers currentUser=\{currentUser\} \/>/u);

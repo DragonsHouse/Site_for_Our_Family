@@ -20,6 +20,14 @@ import {
   DragonToggle,
   DragonTooltip
 } from './components/primitives';
+import {
+  DragonRoomBody,
+  DragonRoomHeader,
+  DragonRoomPanel,
+  DragonRoomRail,
+  DragonRoomShell,
+  DragonRoomStatusArea
+} from './components/room-shell';
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -35,6 +43,14 @@ export {
   DragonStatusMessage,
   DragonToggle,
   DragonTooltip
+};
+export {
+  DragonRoomBody,
+  DragonRoomHeader,
+  DragonRoomPanel,
+  DragonRoomRail,
+  DragonRoomShell,
+  DragonRoomStatusArea
 };
 export type { DragonBackgroundVariant };
 

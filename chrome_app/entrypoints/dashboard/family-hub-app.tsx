@@ -41,8 +41,8 @@ import { validateDragonBirthdayValue } from './family/birthday-service';
 import { DragonLoadingScreen } from './loading/DragonLoadingScreen';
 import { useFamilyAssetUrl } from './family/use-family-asset-url';
 import { useOnboardingAudio } from './hooks/use-onboarding-audio';
+import { DRAGON_ROOM_TAB_KEYS } from './family/room-navigation';
 
-const FAMILY_TABS: FamilyTab[] = ['cabinet', 'members', 'profile', 'calendar', 'events', 'tower-defense', 'achievements', 'resources', 'discord-sync', 'family', 'buyers', 'map'];
 const BIRTHDAY_MIN_DATE = '1970-01-01';
 const BIRTHDAY_OPENING_SESSION_PREFIX = 'dragon_house_birthday_opening_seen:';
 const FAMILY_SECTIONS: FamilySection[] = [
@@ -60,7 +60,7 @@ const FAMILY_SECTIONS: FamilySection[] = [
 
 function getInitialFamilyTab(): FamilyTab {
   const tab = new URL(window.location.href).searchParams.get('tab');
-  return FAMILY_TABS.includes(tab as FamilyTab) ? (tab as FamilyTab) : 'cabinet';
+  return DRAGON_ROOM_TAB_KEYS.includes(tab as FamilyTab) ? (tab as FamilyTab) : 'cabinet';
 }
 
 function getInitialFamilySection(): FamilySection {

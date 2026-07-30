@@ -4,8 +4,15 @@ import { canManageFamilyMap } from '../../../lib/family-permissions';
 import { FAMILY_MAP_REFERENCES } from '../../../lib/family-repositories';
 import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../../lib/family-types';
 import { DragonHouseCrest } from './dragon-house-crest';
-import { DragonBackground, DragonBadge, DragonButton, DragonHero, DragonSection } from '../dragon-ui/dragon-ui';
-import type { DragonBackgroundVariant } from '../dragon-ui/dragon-ui';
+import {
+  DragonBackground,
+  DragonBadge,
+  DragonButton,
+  DragonHero,
+  DragonRoomHeader,
+  DragonRoomShell,
+  DragonSection
+} from '../dragon-ui/dragon-ui';
 import { DragonAchievementEngineScreen } from './dragon-achievements';
 import { DragonCalendar } from './dragon-calendar';
 import { DragonEventEngineScreen } from './dragon-events';
@@ -17,6 +24,7 @@ import { FamilyProfile } from './family-profile';
 import { FamilyTabs } from './family-tabs';
 import { PersonalCabinet } from './personal-cabinet';
 import { ResourcesPanel } from './resources-panel';
+import { DRAGON_ROOM_BACKGROUND_VARIANT, getDragonRoomMetadata } from './room-navigation';
 
 function ModuleIntro({
   title,
@@ -33,21 +41,6 @@ function ModuleIntro({
     </DragonSection>
   );
 }
-
-const TAB_BACKGROUND_VARIANT: Record<FamilyTab, DragonBackgroundVariant> = {
-  cabinet: 'dashboard',
-  members: 'members',
-  profile: 'profile',
-  calendar: 'calendar',
-  events: 'events',
-  'tower-defense': 'events',
-  achievements: 'achievements',
-  resources: 'resources',
-  'discord-sync': 'resources',
-  family: 'dashboard',
-  buyers: 'resources',
-  map: 'events'
-};
 
 export function FamilyShell({
   currentUser,
@@ -117,9 +110,11 @@ export function FamilyShell({
   onLogout: () => void;
   onAuthenticatedUserRefresh: () => Promise<FamilyUser | null>;
 }) {
+  const activeRoom = getDragonRoomMetadata(activeTab);
+
   return (
     <main className="dh-shell px-4 py-6">
-      <DragonBackground variant={TAB_BACKGROUND_VARIANT[activeTab]} />
+      <DragonBackground variant={DRAGON_ROOM_BACKGROUND_VARIANT[activeTab]} />
 
       <div className="relative z-10 mx-auto w-full min-w-0 max-w-7xl space-y-4">
         <DragonHero
@@ -138,16 +133,30 @@ export function FamilyShell({
           </div>
         </DragonHero>
 
-        <FamilyTabs activeTab={activeTab} onChange={onTabChange} />
+        <FamilyTabs activeTab={activeTab} onChange={onTabChange} currentUser={currentUser} />
 
         {activeTab === 'cabinet' ? (
-          <PersonalCabinet
-            user={currentUser}
-            posts={posts}
-            onOpenTab={onTabChange}
-            onAvatarChange={onAvatarChange}
-            onAuthenticatedUserRefresh={onAuthenticatedUserRefresh}
-          />
+          <DragonRoomShell
+            className="dh-dragon-room-shell-cabinet"
+            labelledBy="dragon-room-cabinet-title"
+            header={
+              <DragonRoomHeader
+                eyebrow={activeRoom.room}
+                title={activeRoom.label}
+                titleId="dragon-room-cabinet-title"
+                description={activeRoom.description}
+                metadata={<DragonBadge tone="active">{currentUser.rank}</DragonBadge>}
+              />
+            }
+          >
+            <PersonalCabinet
+              user={currentUser}
+              posts={posts}
+              onOpenTab={onTabChange}
+              onAvatarChange={onAvatarChange}
+              onAuthenticatedUserRefresh={onAuthenticatedUserRefresh}
+            />
+          </DragonRoomShell>
         ) : null}
 
         {activeTab === 'profile' ? <FamilyProfile user={currentUser} /> : null}
