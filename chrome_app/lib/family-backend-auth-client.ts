@@ -27,7 +27,7 @@ export type LegacyCreatedAuthUser = {
   rank: number;
   permissions: FamilyPermission[];
   mustChangePassword: boolean;
-  loginProvider?: 'password' | 'discord';
+  loginProvider?: 'password' | 'discord' | 'nickname';
 };
 
 export type LoginResponse = {
@@ -208,6 +208,18 @@ export async function login(loginOrStaticId: string, password: string, rememberM
   return result;
 }
 
+export async function loginWithNickname(nickname: string, rememberMe = true): Promise<LoginResponse> {
+  const response = await fetch(`${getBackendApiBaseUrl().replace(/\/+$/u, '')}/api/auth/nickname-login`, {
+    method: 'POST',
+    credentials: 'omit',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ nickname, rememberMe }),
+  });
+  const result = await parseLoginResponse(response);
+  await setSessionToken(result.token, rememberMe ? 'persistent' : 'session');
+  return result;
+}
+
 export function getDiscordLoginCompletionRedirectUrl(): string | null {
   if (typeof chrome !== 'undefined' && chrome.identity?.getRedirectURL) {
     return chrome.identity.getRedirectURL(DISCORD_LOGIN_REDIRECT_PATH);
@@ -241,22 +253,24 @@ export async function completeDiscordLogin(completionCode: string): Promise<Logi
 
 export async function loginWithDiscord(): Promise<LoginResponse> {
   if (typeof chrome === 'undefined' || !chrome.identity?.launchWebAuthFlow) {
-    throw new Error('Chrome Identity API is not available');
+    throw new AuthOutcomeError(normalizeAuthFailure(503, { error: 'OAUTH_DISABLED' }));
   }
   const redirectTarget = getDiscordLoginCompletionRedirectUrl();
-  if (!redirectTarget) throw new Error('Chrome Identity redirect URL is not available');
+  if (!redirectTarget) throw new AuthOutcomeError(normalizeAuthFailure(503, { error: 'OAUTH_DISABLED' }));
   const start = await startDiscordLogin(redirectTarget);
   const finalUrl = await chrome.identity.launchWebAuthFlow({
     url: start.authorizationUrl,
     interactive: true,
   });
-  if (!finalUrl) throw new Error('Discord login was cancelled');
+  if (!finalUrl) throw new AuthOutcomeError(normalizeAuthFailure(400, { error: 'OAUTH_DENIED' }));
   const url = new URL(finalUrl);
   const status = url.searchParams.get('discordLoginStatus');
   const error = url.searchParams.get('error');
-  if (status === 'error' || error) throw new Error(error ?? 'Discord login failed');
+  if (status === 'error' || error) {
+    throw new AuthOutcomeError(normalizeAuthFailure(400, { error: error ?? 'OAUTH_STATE_INVALID' }));
+  }
   const completionCode = url.searchParams.get('completionCode');
-  if (!completionCode) throw new Error('Discord login completion code is missing');
+  if (!completionCode) throw new AuthOutcomeError(normalizeAuthFailure(400, { error: 'LOGIN_COMPLETION_EXPIRED' }));
   return completeDiscordLogin(completionCode);
 }
 

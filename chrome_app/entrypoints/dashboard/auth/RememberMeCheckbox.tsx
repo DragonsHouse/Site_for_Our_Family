@@ -10,7 +10,7 @@ export function RememberMeCheckbox({
   return (
     <DragonCheckbox
       checked={checked}
-      label="Запам’ятати мене"
+      label="Запам'ятати мене"
       onCheckedChange={onChange}
     />
   );

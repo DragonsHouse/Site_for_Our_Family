@@ -113,6 +113,55 @@ export class FamilyAuthService {
     return { token, expiresAt, user: createAuthenticatedMemberDto(member, sessionShell(expiresAt, now, 'password'), user) };
   }
 
+  async loginWithNickname(nicknameInput: string, options: { rememberMe?: boolean } = {}): Promise<{
+    token: string;
+    expiresAt: string;
+    user: AuthenticatedMemberDto;
+  }> {
+    const nickname = nicknameInput.trim();
+    const rateKey = `nickname:${nickname.toLowerCase() || 'empty'}`;
+    this.assertLoginRateLimit(rateKey);
+
+    const member = nickname ? await this.members.findByNickname(nickname) : null;
+    if (!member) {
+      this.recordFailedLogin(rateKey);
+      throw new FamilyAuthError('invalid_credentials', 'Invalid credentials');
+    }
+    if (member.status !== 'active' || member.deletedAt) {
+      throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
+    }
+
+    const user = await this.repository.findUserByFamilyMemberId(member.id);
+    if (user && !user.isActive) {
+      throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
+    }
+
+    this.loginAttempts.delete(rateKey);
+    const token = createSessionToken();
+    const now = new Date();
+    const ttlMs = options.rememberMe
+      ? this.config.authRememberMeTtlDays * 24 * 60 * 60 * 1000
+      : this.config.authSessionTtlHours * 60 * 60 * 1000;
+    const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
+    await this.repository.createSession({
+      sessionId: randomUUID(),
+      familyMemberId: member.id,
+      tokenHash: hashSessionToken(token),
+      createdAt: now.toISOString(),
+      expiresAt,
+      lastUsedAt: now.toISOString(),
+      revokedAt: null,
+      revokedReason: null,
+      loginProvider: 'nickname',
+    });
+
+    return {
+      token,
+      expiresAt,
+      user: createAuthenticatedMemberDto(member, sessionShell(expiresAt, now, 'nickname'), { mustChangePassword: false }),
+    };
+  }
+
   async authenticateToken(token: string, options: { allowPasswordChangeRequired?: boolean } = {}): Promise<{
     session: FamilySession;
     user: FamilyAuthUser;
@@ -133,7 +182,7 @@ export class FamilyAuthService {
     if (!user) throw new FamilyAuthError('session_invalid', 'Session invalid');
     if (!user.isActive) throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
     const member = await this.loadActiveMember(session.familyMemberId, 'account_disabled');
-    if (user.mustChangePassword && !options.allowPasswordChangeRequired) {
+    if (user.mustChangePassword && session.loginProvider !== 'nickname' && !options.allowPasswordChangeRequired) {
       throw new FamilyAuthError('password_change_required', 'Password change required', 403);
     }
 
@@ -167,7 +216,7 @@ export class FamilyAuthService {
 
   async createSessionForFamilyMember(
     familyMemberId: string,
-    options: { loginProvider: 'discord' | 'password'; rememberMe?: boolean } = { loginProvider: 'password' },
+    options: { loginProvider: FamilySession['loginProvider']; rememberMe?: boolean } = { loginProvider: 'password' },
   ): Promise<{ token: string; expiresAt: string; user: AuthenticatedMemberDto }> {
     const user = await this.repository.findUserByFamilyMemberId(familyMemberId);
     if (!user || !user.isActive) throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
@@ -361,7 +410,7 @@ function normalizeDateOfBirth(input: string): string {
   return dateOfBirth;
 }
 
-export function sanitizeAuthUser(user: FamilyAuthUser, loginProvider?: 'password' | 'discord'): SanitizedFamilyAuthUser {
+export function sanitizeAuthUser(user: FamilyAuthUser, loginProvider?: FamilySession['loginProvider']): SanitizedFamilyAuthUser {
   return {
     familyMemberId: user.familyMemberId,
     login: user.login,

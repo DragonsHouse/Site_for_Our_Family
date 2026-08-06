@@ -44,7 +44,7 @@
   --dh-focus-ring: 0 0 0 3px rgba(255, 26, 0, 0.24);
 }
 
-:is(.dh-shell, .dh-auth-shell) {
+:is(.dh-shell, .dh-auth-shell, .dh-ember-gate) {
   --dh-graphite: #151515;
   --dh-graphite-2: #191919;
   --dh-graphite-3: #1e1e1e;

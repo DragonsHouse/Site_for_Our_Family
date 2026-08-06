@@ -124,6 +124,21 @@ export class PgFamilyMemberRepository implements FamilyMemberRepository {
     return result.rows[0] ? mapMember(result.rows[0]) : null;
   }
 
+  async findByNickname(nickname: string): Promise<FamilyMember | null> {
+    const result = await this.pool.query<MemberRow>(
+      `select m.*, d.discord_user_id, d.discord_username, d.discord_global_name, d.discord_server_nickname,
+              d.discord_avatar, d.guild_id, d.joined_at as discord_joined_at, d.left_at as discord_left_at,
+              d.last_synced_at as discord_last_synced_at, d.verified as discord_verified,
+              d.linked_at as discord_linked_at
+       from family_members m
+       left join discord_account_links d on d.family_member_id = m.id
+       where lower(m.nickname) = lower($1)
+       limit 1`,
+      [nickname.trim()],
+    );
+    return result.rows[0] ? mapMember(result.rows[0]) : null;
+  }
+
   async findByStaticId(staticId: string): Promise<FamilyMember | null> {
     const result = await this.pool.query<MemberRow>('select * from family_members where lower(static_id) = lower($1) limit 1', [
       staticId,

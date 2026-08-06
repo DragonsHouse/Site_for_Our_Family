@@ -12,6 +12,11 @@ const LoginSchema = z.object({
   rememberMe: z.boolean().optional().default(false),
 });
 
+const NicknameLoginSchema = z.object({
+  nickname: z.string().trim().min(1).max(120),
+  rememberMe: z.boolean().optional().default(false),
+});
+
 const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(256),
   newPassword: z.string().min(1).max(256),
@@ -55,6 +60,23 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
     }
     try {
       response.json(await authService.login(parsed.data.loginOrStaticId, parsed.data.password, { rememberMe: parsed.data.rememberMe }));
+    } catch (error) {
+      respondWithAuthError(response, normalizeLoginError(error));
+    }
+  });
+
+  router.post('/auth/nickname-login', async (request, response) => {
+    if (!authService) {
+      sendFamilyAuthOutcome(response, 503, 'database_unavailable');
+      return;
+    }
+    const parsed = NicknameLoginSchema.safeParse(request.body);
+    if (!parsed.success) {
+      sendFamilyAuthOutcome(response, 400, 'invalid_credentials');
+      return;
+    }
+    try {
+      response.json(await authService.loginWithNickname(parsed.data.nickname, { rememberMe: parsed.data.rememberMe }));
     } catch (error) {
       respondWithAuthError(response, normalizeLoginError(error));
     }

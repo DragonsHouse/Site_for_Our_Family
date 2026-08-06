@@ -829,6 +829,8 @@ export type FamilyAssetSlot =
   | 'header_logo'
   | 'family_hub_background'
   | 'login_background'
+  | 'login_portal_background'
+  | 'post_login_background'
   | 'background_dragon'
   | 'quest_help_citizens'
   | 'quest_cleanup'

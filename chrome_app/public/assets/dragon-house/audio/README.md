@@ -1,6 +1,6 @@
-Dragon House loading audio assets.
+Dragon House audio assets.
 
-`fireplace-loop.wav` is a local synthetic ambience loop generated for the Family Hub loading screen. It is intentionally quiet, contains no music, and does not depend on an external URL.
+`dragon_house_portal_fire_dragon_mix.mp3` is the user-provided portal ambience loop for the login portal and Dragon loading ambience. Do not layer additional generated hum, drone, bass, fire, or portal tones over it.
 
 Sprint 1 asset foundation:
 - Keep existing audio files in place until callers are migrated.

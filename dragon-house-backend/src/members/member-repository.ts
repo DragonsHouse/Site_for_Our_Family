@@ -32,6 +32,7 @@ export type FamilyMemberAuditEntry = {
 export interface FamilyMemberRepository {
   list(query: FamilyMemberListQuery): Promise<FamilyMemberListResult>;
   findById(id: string): Promise<FamilyMember | null>;
+  findByNickname(nickname: string): Promise<FamilyMember | null>;
   findByStaticId(staticId: string): Promise<FamilyMember | null>;
   create(input: CreateFamilyMemberInput & { id: string }, actorId: string): Promise<FamilyMember>;
   update(id: string, input: UpdateFamilyMemberInput, expectedVersion: number, actorId: string): Promise<FamilyMember | null>;
@@ -72,6 +73,11 @@ export class MemoryFamilyMemberRepository implements FamilyMemberRepository {
 
   async findById(id: string): Promise<FamilyMember | null> {
     return this.members.get(id) ?? null;
+  }
+
+  async findByNickname(nickname: string): Promise<FamilyMember | null> {
+    const key = nickname.trim().toLowerCase();
+    return [...this.members.values()].find((member) => member.nickname.toLowerCase() === key) ?? null;
   }
 
   async findByStaticId(staticId: string): Promise<FamilyMember | null> {

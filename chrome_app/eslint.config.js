@@ -1,5 +1,15 @@
 export default [
   {
-    ignores: ['.output/**', '.wxt/**', 'node_modules/**']
+    ignores: [
+      '.artifacts/**',
+      '.output/**',
+      '.screenshots/**',
+      '.tmp/**',
+      '.wxt/**',
+      'artifacts/**',
+      'node_modules/**',
+      'public/map-cache/**',
+      'ui-audit-screenshots/**'
+    ]
   }
 ];

@@ -22,7 +22,7 @@ type SessionRow = {
   session_id: string;
   family_member_id: string;
   token_hash: string;
-  login_provider?: 'password' | 'discord';
+  login_provider?: FamilySession['loginProvider'];
   created_at: Date;
   expires_at: Date;
   last_used_at: Date;

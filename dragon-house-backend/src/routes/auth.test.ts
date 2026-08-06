@@ -111,6 +111,58 @@ describe('auth routes', { timeout: 20_000 }, () => {
     expect(meBody).not.toHaveProperty('member');
   });
 
+  it('nickname login creates a persistent bearer session and me restores it without password requirements', async () => {
+    const { baseUrl, authRepository } = await createServerHarness();
+    const existing = await authRepository.findUserByFamilyMemberId(ANASTASIA_MEMBER_ID);
+    if (!existing) throw new Error('Missing auth user');
+    await authRepository.updatePassword(ANASTASIA_MEMBER_ID, existing.passwordHash, true);
+
+    const login = await fetch(`${baseUrl}/api/auth/nickname-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: '  Anastasia_Dragons  ', rememberMe: true }),
+    });
+    const loginBody = (await login.json()) as { token: string; expiresAt: string; user: Record<string, unknown> };
+
+    expect(login.status).toBe(200);
+    expect(loginBody.token).toBeTruthy();
+    expect(loginBody.user).toMatchObject({
+      memberId: ANASTASIA_MEMBER_ID,
+      nickname: 'Anastasia_Dragons',
+      session: { loginProvider: 'nickname', mustChangePassword: false },
+    });
+
+    const me = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${loginBody.token}` },
+    });
+    const meBody = (await me.json()) as Record<string, unknown>;
+
+    expect(me.status).toBe(200);
+    expect(meBody).toMatchObject({
+      memberId: ANASTASIA_MEMBER_ID,
+      session: { loginProvider: 'nickname', mustChangePassword: false },
+    });
+  });
+
+  it('nickname login rejects unknown nicknames without member enumeration data', async () => {
+    const baseUrl = await createServer();
+
+    const login = await fetch(`${baseUrl}/api/auth/nickname-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: 'Unknown_Dragons' }),
+    });
+    const loginBody = (await login.json()) as Record<string, unknown>;
+
+    expect(login.status).toBe(401);
+    expect(loginBody).toMatchObject({
+      error: 'invalid_credentials',
+      outcome: { code: 'invalid_credentials' },
+    });
+    expect(JSON.stringify(loginBody)).not.toContain('Unknown_Dragons');
+    expect(JSON.stringify(loginBody)).not.toContain(ANASTASIA_MEMBER_ID);
+  });
+
   it('keeps successful password login response shape unchanged while exposing mustChangePassword', async () => {
     const { baseUrl, authRepository } = await createServerHarness();
     const existing = await authRepository.findUserByFamilyMemberId(ANASTASIA_MEMBER_ID);

@@ -9,6 +9,10 @@ export const DRAGON_HOUSE_ASSETS = {
   appIcon256: '/icon/256.png',
   appIcon512: '/icon/512.png',
   hallBackground: '/assets/dragon-house/dragon-hall-bg.png',
+  emberGateBackground: '/assets/dragon-house/illustrations/dragon-house-login-entrance.png',
+  loginPortalBackground: '/assets/dragon-house/backgrounds/login-portal-background.png',
+  postLoginBackground: '/assets/dragon-house/backgrounds/post-login-background.png',
+  portalAmbientAudio: '/assets/dragon-house/audio/dragon_house_portal_fire_dragon_mix.mp3',
   futureDragonLayer: '/assets/dragon-house/dragon-3d-placeholder.png',
   questImageBase: '/assets/dragon-house/quests'
 } as const;
@@ -41,8 +45,20 @@ export const FAMILY_ASSET_DEFINITIONS: FamilyAssetDefinition[] = [
   {
     slot: 'login_background',
     title: 'Login background',
-    usedIn: 'Full-screen Dragon House login background',
-    defaultUrl: DRAGON_HOUSE_ASSETS.hallBackground
+    usedIn: 'Full-screen Dragon House Ember Gate login background. Recommended: 3840x2160 or 2560x1440, wide 16:9.',
+    defaultUrl: DRAGON_HOUSE_ASSETS.emberGateBackground
+  },
+  {
+    slot: 'login_portal_background',
+    title: 'Login portal background',
+    usedIn: 'Optional texture/image layer inside the transparent login arch. Replace backgrounds/login-portal-background.png to customize it.',
+    defaultUrl: DRAGON_HOUSE_ASSETS.loginPortalBackground
+  },
+  {
+    slot: 'post_login_background',
+    title: 'Post-login background',
+    usedIn: 'Main Family Hub background asset after authentication. Replace backgrounds/post-login-background.png to customize it.',
+    defaultUrl: DRAGON_HOUSE_ASSETS.postLoginBackground
   },
   {
     slot: 'background_dragon',

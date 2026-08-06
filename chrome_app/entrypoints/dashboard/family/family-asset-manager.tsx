@@ -8,7 +8,8 @@ import {
 import type { FamilyAssetDefinition, FamilyUser } from '../../../lib/family-types';
 import { useFamilyAssetUrl } from './use-family-asset-url';
 
-const MAX_FAMILY_ASSET_BYTES = 50 * 1024 * 1024;
+const MAX_FAMILY_ASSET_MB = 100;
+const MAX_FAMILY_ASSET_BYTES = MAX_FAMILY_ASSET_MB * 1024 * 1024;
 
 function AssetSlotCard({
   definition,
@@ -50,7 +51,7 @@ function AssetSlotCard({
       return;
     }
     if (file.size > MAX_FAMILY_ASSET_BYTES) {
-      setError('Файл завеликий. Максимум 50 MB.');
+      setError(`Файл завеликий. Максимум ${MAX_FAMILY_ASSET_MB} MB.`);
       setStatus('error');
       return;
     }

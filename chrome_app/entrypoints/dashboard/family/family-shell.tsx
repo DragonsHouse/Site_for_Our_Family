@@ -25,6 +25,7 @@ import { FamilyTabs } from './family-tabs';
 import { PersonalCabinet } from './personal-cabinet';
 import { ResourcesPanel } from './resources-panel';
 import { DRAGON_ROOM_BACKGROUND_VARIANT, getDragonRoomMetadata } from './room-navigation';
+import { useFamilyAssetUrl } from './use-family-asset-url';
 
 function ModuleIntro({
   title,
@@ -111,10 +112,11 @@ export function FamilyShell({
   onAuthenticatedUserRefresh: () => Promise<FamilyUser | null>;
 }) {
   const activeRoom = getDragonRoomMetadata(activeTab);
+  const postLoginBackgroundUrl = useFamilyAssetUrl('post_login_background');
 
   return (
     <main className="dh-shell px-4 py-6">
-      <DragonBackground variant={DRAGON_ROOM_BACKGROUND_VARIANT[activeTab]} />
+      <DragonBackground variant={DRAGON_ROOM_BACKGROUND_VARIANT[activeTab]} assetUrl={postLoginBackgroundUrl} />
 
       <div className="relative z-10 mx-auto w-full min-w-0 max-w-7xl space-y-4">
         <DragonHero

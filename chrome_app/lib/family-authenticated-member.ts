@@ -51,7 +51,7 @@ export type AuthenticatedMember = {
     lastSyncedAt: string | null;
   };
   session: {
-    loginProvider: 'password' | 'discord';
+    loginProvider: 'password' | 'discord' | 'nickname';
     expiresAt: string;
     lastUsedAt: string | null;
     mustChangePassword: boolean;
@@ -128,7 +128,7 @@ export function assertAuthenticatedMember(value: unknown): AuthenticatedMember {
     !isNullableString(discord.guildId) ||
     !isNullableString(discord.lastSyncedAt) ||
     !isRecord(session) ||
-    !['password', 'discord'].includes(String(session.loginProvider)) ||
+    !['password', 'discord', 'nickname'].includes(String(session.loginProvider)) ||
     typeof session.expiresAt !== 'string' ||
     !isNullableString(session.lastUsedAt) ||
     typeof session.mustChangePassword !== 'boolean' ||

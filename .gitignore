@@ -73,3 +73,5 @@ id_ed25519.*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+chrome_app/.screenshots/

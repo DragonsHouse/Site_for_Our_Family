@@ -119,7 +119,7 @@ export function createAuthenticatedMemberDto(
       loginProvider: session.loginProvider,
       expiresAt: session.expiresAt,
       lastUsedAt: session.lastUsedAt,
-      mustChangePassword: authUser.mustChangePassword,
+      mustChangePassword: session.loginProvider === 'nickname' ? false : authUser.mustChangePassword,
     },
     onboarding,
     profileCompletion,

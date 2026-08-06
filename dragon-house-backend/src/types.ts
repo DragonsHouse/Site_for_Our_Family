@@ -138,7 +138,7 @@ export type FamilySession = {
   sessionId: string;
   familyMemberId: string;
   tokenHash: string;
-  loginProvider: 'password' | 'discord';
+  loginProvider: 'password' | 'discord' | 'nickname';
   createdAt: string;
   expiresAt: string;
   lastUsedAt: string;
@@ -162,7 +162,7 @@ export type SanitizedFamilyAuthUser = {
   rank: number;
   permissions: FamilyPermission[];
   mustChangePassword: boolean;
-  loginProvider?: 'password' | 'discord';
+  loginProvider?: 'password' | 'discord' | 'nickname';
   member?: {
     id: string;
     nickname: string;

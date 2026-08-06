@@ -30,8 +30,8 @@ export const DRAGON_LOADING_DURATION = {
 };
 
 export const DRAGON_FIRE_AUDIO = {
-  loopUrl: '/assets/dragon-house/audio/fireplace-loop.wav',
+  loopUrl: '/assets/dragon-house/audio/dragon_house_portal_fire_dragon_mix.mp3',
   preferenceKey: 'dragon_house_fire_loading_sound_enabled_v1',
-  volume: 0.12,
+  volume: 0.16,
   fadeStepMs: 90
 };
