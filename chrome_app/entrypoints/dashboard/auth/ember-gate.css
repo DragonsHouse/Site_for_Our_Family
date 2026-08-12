@@ -49,10 +49,41 @@ body,
 .dh-ember-gate {
   --ember-gate-native-width: 1726;
   --ember-gate-native-height: 911;
-  --ember-gate-opening-left: 1132px;
-  --ember-gate-opening-top: 259px;
-  --ember-gate-opening-width: 261px;
-  --ember-gate-opening-height: 518px;
+  --ember-gate-rendered-left: 0;
+  --ember-gate-rendered-top: 0;
+  --ember-gate-rendered-width: 100vw;
+  --ember-gate-rendered-height: 100dvh;
+  --ember-gate-form-left: 1142px;
+  --ember-gate-form-top: 245px;
+  --ember-gate-form-width: 265px;
+  --ember-gate-form-height: 547px;
+  --ember-gate-arch-shape: polygon(
+    0 22.85%,
+    4.53% 14.44%,
+    9.06% 10.24%,
+    13.58% 7.31%,
+    18.11% 5.12%,
+    22.64% 3.47%,
+    27.17% 2.01%,
+    31.7% 0.91%,
+    36.23% 0.37%,
+    40.75% 1.1%,
+    45.28% 2.38%,
+    49.81% 4.2%,
+    54.34% 2.74%,
+    58.87% 1.28%,
+    63.4% 0.18%,
+    67.92% 0.91%,
+    72.45% 2.01%,
+    76.98% 3.29%,
+    81.51% 4.94%,
+    86.04% 7.31%,
+    90.57% 10.05%,
+    95.09% 14.44%,
+    99.62% 23.58%,
+    100% 100%,
+    0 100%
+  );
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -91,181 +122,247 @@ body,
 
 .dh-ember-gate-frame {
   position: absolute;
-  inset: 0;
+  left: var(--ember-gate-rendered-left);
+  top: var(--ember-gate-rendered-top);
   z-index: 2;
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center center;
+  width: var(--ember-gate-rendered-width);
+  height: var(--ember-gate-rendered-height);
+  max-width: none;
+  max-height: none;
   pointer-events: none;
   user-select: none;
 }
 
-.dh-ember-gate-arch-opening {
+.dh-ember-gate-form-panel {
   position: absolute;
+  left: var(--ember-gate-form-left);
+  top: var(--ember-gate-form-top);
+  width: var(--ember-gate-form-width);
+  height: var(--ember-gate-form-height);
+}
+
+.dh-ember-gate-arch-backdrop {
+  position: absolute;
+  left: var(--ember-gate-form-left);
+  top: var(--ember-gate-form-top);
+  width: var(--ember-gate-form-width);
+  height: var(--ember-gate-form-height);
   z-index: 1;
-  left: var(--ember-gate-opening-left);
-  top: var(--ember-gate-opening-top);
-  width: var(--ember-gate-opening-width);
-  height: var(--ember-gate-opening-height);
-  display: grid;
-  align-items: stretch;
-  justify-items: center;
   overflow: hidden;
-  padding: clamp(0.92rem, 1.32vw, 1.26rem) clamp(0.62rem, 1.08vw, 1rem)
-    clamp(0.72rem, 1.08vw, 1.02rem);
+  contain: paint;
+  -webkit-mask-image: url('/assets/dragon-house/illustrations/dragon-house-login-arch-mask.png');
+  mask-image: url('/assets/dragon-house/illustrations/dragon-house-login-arch-mask.png');
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+  clip-path: var(--ember-gate-arch-shape);
   pointer-events: none;
 }
 
-.dh-ember-gate-arch-opening::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  border: 1px solid color-mix(in srgb, var(--dragon-gold) 24%, transparent);
-  border-radius: 999px 999px 0.35rem 0.35rem / 42% 42% 0.35rem 0.35rem;
-  clip-path: polygon(50% 0, 60% 2%, 70% 9%, 79% 20%, 87% 36%, 94% 55%, 100% 72%, 100% 100%, 0 100%, 0 72%, 6% 55%, 13% 36%, 21% 20%, 30% 9%, 40% 2%);
-  background: transparent;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--dragon-text) 6%, transparent),
-    inset 0 0 3.8rem color-mix(in srgb, var(--dragon-obsidian) 88%, transparent),
-    inset 0 -2.7rem 3.1rem color-mix(in srgb, var(--dragon-ember) 14%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--dragon-gold) 10%, transparent);
-  pointer-events: none;
+.dh-ember-gate-arch-backdrop::before {
+  content: none;
 }
 
-.dh-ember-gate-arch-opening::after {
-  content: '';
+.dh-ember-gate-arch-video {
   position: absolute;
   inset: 0;
-  z-index: 2;
-  border-radius: 999px 999px 0.35rem 0.35rem / 42% 42% 0.35rem 0.35rem;
-  clip-path: polygon(50% 0, 60% 2%, 70% 9%, 79% 20%, 87% 36%, 94% 55%, 100% 72%, 100% 100%, 0 100%, 0 72%, 6% 55%, 13% 36%, 21% 20%, 30% 9%, 40% 2%);
-  background:
-    linear-gradient(90deg, transparent, color-mix(in srgb, var(--dragon-gold) 42%, transparent), transparent) 50% 12% / 60% 1px no-repeat,
-    linear-gradient(90deg, transparent, color-mix(in srgb, var(--dragon-gold) 30%, transparent), transparent) 50% 86% / 72% 1px no-repeat,
-    linear-gradient(180deg, color-mix(in srgb, var(--dragon-obsidian) 42%, transparent), transparent 28%, transparent 66%, color-mix(in srgb, var(--dragon-obsidian) 58%, transparent));
-  opacity: 0.9;
-  pointer-events: none;
-}
-
-.dh-ember-gate-portal,
-.dh-ember-gate-portal > div {
-  position: absolute;
-  inset: 0;
+  z-index: 1;
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  border-radius: 999px 999px 0.35rem 0.35rem / 42% 42% 0.35rem 0.35rem;
-  clip-path: polygon(50% 0, 60% 2%, 70% 9%, 79% 20%, 87% 36%, 94% 55%, 100% 72%, 100% 100%, 0 100%, 0 72%, 6% 55%, 13% 36%, 21% 20%, 30% 9%, 40% 2%);
+  -webkit-mask-image: url('/assets/dragon-house/illustrations/dragon-house-login-arch-mask.png');
+  mask-image: url('/assets/dragon-house/illustrations/dragon-house-login-arch-mask.png');
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+  clip-path: var(--ember-gate-arch-shape);
+  object-fit: cover;
+  opacity: 0.92;
   pointer-events: none;
 }
 
-.dh-ember-gate-portal {
-  z-index: 0;
-  clip-path: polygon(50% 0, 60% 2%, 70% 9%, 79% 20%, 87% 36%, 94% 55%, 100% 72%, 100% 100%, 0 100%, 0 72%, 6% 55%, 13% 36%, 21% 20%, 30% 9%, 40% 2%);
-  background:
-    radial-gradient(ellipse at 50% 48%, color-mix(in srgb, var(--dragon-danger) 18%, transparent), transparent 47%),
-    radial-gradient(ellipse at 50% 92%, color-mix(in srgb, var(--dragon-ember) 28%, transparent), transparent 34%),
-    linear-gradient(90deg, color-mix(in srgb, var(--dragon-obsidian) 94%, transparent), transparent 22% 78%, color-mix(in srgb, var(--dragon-obsidian) 94%, transparent)),
-    linear-gradient(180deg, color-mix(in srgb, var(--dragon-obsidian) 96%, black), color-mix(in srgb, var(--dragon-danger) 26%, var(--dragon-obsidian)) 48%, color-mix(in srgb, var(--dragon-obsidian) 82%, black));
-  animation: dh-portal-core-pulse 8s ease-in-out infinite alternate;
-}
-
-.dh-ember-gate-portal-asset {
-  z-index: 0;
-  background-image: var(--ember-gate-portal-asset);
-  background-size: cover;
-  background-position: center;
-  opacity: 0.12;
-  mix-blend-mode: screen;
-}
-
-.dh-ember-gate-portal-fire {
-  z-index: 1;
-  inset: -12% -18% -8%;
-  background:
-    conic-gradient(from 18deg at 50% 68%, transparent 0 12deg, color-mix(in srgb, var(--dragon-ember) 38%, transparent) 20deg 44deg, transparent 58deg 118deg, color-mix(in srgb, var(--dragon-danger) 32%, transparent) 134deg 166deg, transparent 184deg 247deg, color-mix(in srgb, var(--dragon-gold) 16%, transparent) 264deg 282deg, transparent 304deg 360deg),
-    radial-gradient(ellipse at 50% 64%, color-mix(in srgb, var(--dragon-gold) 24%, transparent), transparent 13%, color-mix(in srgb, var(--dragon-ember) 22%, transparent) 29%, transparent 54%),
-    radial-gradient(ellipse at 50% 93%, color-mix(in srgb, var(--dragon-ember) 44%, transparent), transparent 42%);
-  opacity: 0.86;
-  transform-origin: 50% 72%;
-  animation: dh-portal-fire-slow 7.5s ease-in-out infinite alternate;
-}
-
-.dh-ember-gate-portal-smoke {
+.dh-ember-gate-matte-layer {
+  position: absolute;
+  inset: 0;
   z-index: 2;
-  inset: -7% -12%;
-  background:
-    radial-gradient(ellipse at 28% 34%, color-mix(in srgb, var(--dragon-text) 5%, transparent), transparent 34%),
-    radial-gradient(ellipse at 74% 30%, color-mix(in srgb, var(--dragon-text-soft) 4%, transparent), transparent 32%),
-    repeating-linear-gradient(102deg, transparent 0 0.8rem, color-mix(in srgb, var(--dragon-text) 3%, transparent) 0.92rem 1rem, transparent 1.2rem 2.4rem);
-  opacity: 0.62;
-  animation: dh-portal-smoke-drift 10s ease-in-out infinite alternate;
+  box-sizing: border-box;
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  -webkit-mask-image: url('/assets/dragon-house/illustrations/dragon-house-login-arch-mask.png');
+  mask-image: url('/assets/dragon-house/illustrations/dragon-house-login-arch-mask.png');
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+  clip-path: var(--ember-gate-arch-shape);
+  pointer-events: none;
 }
 
-.dh-ember-gate-portal-embers {
-  z-index: 3;
-  inset: -4% 0 -8%;
+.dh-ember-gate-matte-layer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  -webkit-mask-image: url('/assets/dragon-house/illustrations/dragon-house-login-arch-mask.png');
+  mask-image: url('/assets/dragon-house/illustrations/dragon-house-login-arch-mask.png');
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+  clip-path: var(--ember-gate-arch-shape);
   background:
-    radial-gradient(circle at 18% 84%, color-mix(in srgb, var(--dragon-gold) 74%, transparent) 0 0.035rem, transparent 0.09rem),
-    radial-gradient(circle at 32% 62%, color-mix(in srgb, var(--dragon-ember) 64%, transparent) 0 0.032rem, transparent 0.085rem),
-    radial-gradient(circle at 68% 76%, color-mix(in srgb, var(--dragon-gold) 58%, transparent) 0 0.03rem, transparent 0.08rem),
-    radial-gradient(circle at 84% 48%, color-mix(in srgb, var(--dragon-ember) 54%, transparent) 0 0.028rem, transparent 0.078rem),
-    radial-gradient(circle at 54% 88%, color-mix(in srgb, var(--dragon-danger) 64%, transparent) 0 0.04rem, transparent 0.09rem),
-    radial-gradient(circle at 47% 72%, color-mix(in srgb, var(--dragon-gold) 70%, transparent) 0 0.026rem, transparent 0.075rem),
-    radial-gradient(circle at 61% 56%, color-mix(in srgb, var(--dragon-ember) 60%, transparent) 0 0.028rem, transparent 0.078rem);
-  opacity: 0.72;
-  animation: dh-portal-embers-rise 5.5s ease-in-out infinite alternate;
-}
-
-.dh-ember-gate-portal-vignette {
-  z-index: 4;
-  background:
-    radial-gradient(ellipse at 50% 48%, transparent 0 34%, color-mix(in srgb, var(--dragon-obsidian) 40%, transparent) 62%, color-mix(in srgb, var(--dragon-obsidian) 88%, transparent) 100%),
-    linear-gradient(90deg, color-mix(in srgb, var(--dragon-obsidian) 92%, transparent), transparent 30% 70%, color-mix(in srgb, var(--dragon-obsidian) 92%, transparent)),
-    linear-gradient(180deg, color-mix(in srgb, var(--dragon-obsidian) 70%, transparent), transparent 22%, transparent 72%, color-mix(in srgb, var(--dragon-obsidian) 80%, transparent));
+    radial-gradient(ellipse at 74% 34%, rgba(252, 255, 255, 0.22), transparent 28rem),
+    radial-gradient(ellipse at 74% 78%, rgba(255, 126, 44, 0.2), transparent 34rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(159, 218, 226, 0.09) 52%, rgba(28, 27, 26, 0.04));
+  backdrop-filter: blur(10px) saturate(1.12) brightness(1.06);
+  box-shadow:
+    inset 0 0 3.4rem rgba(231, 252, 250, 0.16),
+    inset 0 -2.6rem 3.6rem rgba(255, 122, 34, 0.18);
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 .dh-ember-gate-form-panel {
-  position: relative;
   z-index: 3;
-  width: min(94%, 19.2rem);
-  height: 100%;
   min-height: 0;
+  box-sizing: border-box;
   display: grid;
   align-items: stretch;
+  justify-items: center;
   margin-top: 0;
-  pointer-events: auto;
+  padding: clamp(0.52rem, 0.82vw, 0.78rem) clamp(0.38rem, 0.68vw, 0.62rem)
+    clamp(0.44rem, 0.68vw, 0.66rem);
+  pointer-events: none;
 }
 
 .dh-ember-gate .dh-login-card {
-  width: 100%;
+  width: min(82%, 15.4rem);
   height: 100%;
   min-height: 0;
   position: relative;
+  z-index: 1;
+  isolation: isolate;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: repeat(5, max-content);
   align-items: center;
-  gap: clamp(0.42rem, 0.72vw, 0.78rem);
+  align-content: center;
+  gap: clamp(0.16rem, 0.3vw, 0.34rem);
   border: 0;
   border-radius: 0;
-  background:
-    radial-gradient(ellipse at 50% 47%, color-mix(in srgb, var(--dragon-text) 4%, transparent), transparent 48%),
-    radial-gradient(ellipse at 50% 82%, color-mix(in srgb, var(--dragon-ember) 8%, transparent), transparent 34%),
-    linear-gradient(90deg, transparent, color-mix(in srgb, var(--dragon-gold) 12%, transparent), transparent) 50% 23% / 72% 1px no-repeat,
-    linear-gradient(90deg, transparent, color-mix(in srgb, var(--dragon-gold) 18%, transparent), transparent) 50% 81% / 82% 1px no-repeat;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: none;
   padding: 0;
   color: var(--dragon-text);
   font-family: 'Dragon Cinzel', Cinzel, 'Palatino Linotype', Georgia, serif;
+  pointer-events: auto;
+}
+
+.dh-ember-gate .dh-oauth-gate-card {
+  width: min(90%, 12.4rem);
+  max-height: 92%;
+  align-self: center;
+  justify-self: center;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--dragon-gold) 26%, transparent);
+  border-radius: 0.86rem;
+  background: color-mix(in srgb, var(--dragon-obsidian) 8%, transparent);
+  box-shadow:
+    0 0.52rem 1rem color-mix(in srgb, var(--dragon-obsidian) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--dragon-text) 10%, transparent);
+  padding: clamp(0.56rem, 0.86vw, 0.8rem);
+  backdrop-filter: none;
+  pointer-events: auto;
+}
+
+.dh-ember-gate .dh-oauth-gate-card h1 {
+  font-size: clamp(1rem, 1.25vw, 1.24rem);
+  line-height: 1.14;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+.dh-ember-gate .dh-oauth-gate-card p {
+  text-wrap: balance;
+}
+
+.dh-ember-gate .dh-oauth-gate-card .dh-login-submit {
+  min-width: 0;
+}
+
+.dh-ember-gate .dh-oauth-success-card {
+  width: min(94%, 11.4rem);
+  padding: clamp(0.48rem, 0.76vw, 0.68rem);
+}
+
+.dh-ember-gate .dh-oauth-success-avatar {
+  width: clamp(3.45rem, 5.3vw, 4.1rem);
+  height: clamp(3.45rem, 5.3vw, 4.1rem);
+  border-radius: 0.9rem;
+}
+
+.dh-ember-gate .dh-oauth-success-card p {
+  margin-top: 0.52rem;
+  font-size: clamp(0.55rem, 0.78vw, 0.68rem);
+  line-height: 1.35;
+}
+
+.dh-ember-gate .dh-oauth-success-card p:first-of-type {
+  margin-top: 0.62rem;
+  font-size: clamp(0.46rem, 0.62vw, 0.56rem);
+  letter-spacing: 0.22em;
+}
+
+.dh-ember-gate .dh-oauth-success-card h1 {
+  margin-top: 0.38rem;
+  font-size: clamp(0.78rem, 1vw, 0.98rem);
+  line-height: 1.12;
+}
+
+.dh-ember-gate .dh-oauth-success-badges {
+  margin-top: 0.58rem;
+  gap: 0.28rem;
+  font-size: 0.54rem;
+}
+
+.dh-ember-gate .dh-oauth-success-badges span {
+  padding: 0.18rem 0.48rem;
+}
+
+.dh-ember-gate .dh-oauth-success-submit {
+  margin-top: 0.68rem;
+  min-height: 1.62rem;
+  padding-inline: 0.82rem;
+  font-size: clamp(0.58rem, 0.8vw, 0.68rem);
 }
 
 .dh-ember-gate .dh-login-heading {
   display: grid;
   justify-items: center;
-  gap: clamp(0.18rem, 0.42vw, 0.36rem);
+  gap: clamp(0.1rem, 0.22vw, 0.2rem);
   margin: 0;
   text-align: center;
 }
@@ -273,7 +370,7 @@ body,
 .dh-ember-gate .dh-login-kicker {
   margin: 0;
   color: color-mix(in srgb, var(--dragon-gold) 82%, var(--dragon-text));
-  font-size: clamp(0.54rem, 0.7vw, 0.68rem);
+  font-size: clamp(0.48rem, 0.62vw, 0.6rem);
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -283,7 +380,7 @@ body,
   margin: 0;
   max-width: 12.8em;
   color: color-mix(in srgb, var(--dragon-gold) 62%, var(--dragon-text));
-  font-size: clamp(1.2rem, 1.62vw, 1.58rem);
+  font-size: clamp(1.02rem, 1.38vw, 1.34rem);
   font-weight: 900;
   line-height: 1.08;
   letter-spacing: 0;
@@ -298,9 +395,9 @@ body,
   margin: 0;
   color: color-mix(in srgb, var(--dragon-text-soft) 94%, var(--dragon-gold));
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: clamp(0.66rem, 0.78vw, 0.78rem);
+  font-size: clamp(0.58rem, 0.7vw, 0.68rem);
   font-weight: 750;
-  line-height: 1.42;
+  line-height: 1.28;
   text-align: center;
   text-wrap: balance;
 }
@@ -313,22 +410,22 @@ body,
   display: flex;
   justify-content: center;
   width: 100%;
-  margin-top: clamp(0.12rem, 0.22vw, 0.22rem);
+  margin-top: 0;
 }
 
 .dh-ember-gate .dh-login-form {
-  align-self: center;
+  align-self: start;
   display: grid;
-  gap: clamp(0.38rem, 0.58vw, 0.56rem);
+  gap: clamp(0.24rem, 0.38vw, 0.38rem);
   width: 100%;
 }
 
 .dh-ember-gate .dh-login-form label {
   display: grid;
-  gap: clamp(0.18rem, 0.32vw, 0.28rem);
+  gap: clamp(0.12rem, 0.24vw, 0.22rem);
   color: color-mix(in srgb, var(--dragon-gold) 66%, var(--dragon-text-soft));
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: clamp(0.58rem, 0.68vw, 0.68rem);
+  font-size: clamp(0.5rem, 0.6vw, 0.6rem);
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -336,7 +433,7 @@ body,
 
 .dh-ember-gate .dh-login-form input {
   width: 100%;
-  min-height: clamp(2.15rem, 3vw, 2.68rem);
+  min-height: clamp(1.78rem, 2.48vw, 2.18rem);
   border: 1px solid color-mix(in srgb, var(--dragon-gold) 36%, transparent);
   border-radius: 0.48rem;
   background:
@@ -345,9 +442,9 @@ body,
     linear-gradient(180deg, color-mix(in srgb, var(--dragon-obsidian) 82%, transparent), color-mix(in srgb, var(--dragon-obsidian) 96%, transparent));
   color: var(--dragon-text);
   outline: none;
-  padding: 0 clamp(0.68rem, 0.95vw, 0.9rem);
+  padding: 0 clamp(0.54rem, 0.78vw, 0.74rem);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: clamp(0.76rem, 0.88vw, 0.9rem);
+  font-size: clamp(0.66rem, 0.78vw, 0.8rem);
   font-weight: 700;
   box-shadow:
     inset 0 0.7rem 1.2rem color-mix(in srgb, var(--dragon-obsidian) 52%, transparent),
@@ -373,15 +470,15 @@ body,
 }
 
 .dh-ember-gate .dh-login-password-field input {
-  padding-right: clamp(2.6rem, 3.3vw, 3.1rem);
+  padding-right: clamp(2.22rem, 2.9vw, 2.72rem);
 }
 
 .dh-ember-gate .dh-login-password-toggle {
   position: absolute;
   top: 50%;
   right: clamp(0.32rem, 0.46vw, 0.42rem);
-  width: clamp(1.72rem, 2.2vw, 2rem);
-  min-height: clamp(1.46rem, 2vw, 1.74rem);
+  width: clamp(1.5rem, 1.92vw, 1.78rem);
+  min-height: clamp(1.28rem, 1.72vw, 1.52rem);
   transform: translateY(-50%);
   border: 1px solid color-mix(in srgb, var(--dragon-gold) 22%, transparent);
   border-radius: 0.34rem;
@@ -396,8 +493,8 @@ body,
 }
 
 .dh-ember-gate .dh-login-eye-icon {
-  width: clamp(0.88rem, 1.12vw, 1.05rem);
-  height: clamp(0.88rem, 1.12vw, 1.05rem);
+  width: clamp(0.76rem, 0.98vw, 0.92rem);
+  height: clamp(0.76rem, 0.98vw, 0.92rem);
 }
 
 .dh-ember-gate .dh-login-password-toggle:focus-visible,
@@ -420,7 +517,7 @@ body,
 
 .dh-ember-gate .dh-login-submit {
   position: relative;
-  min-height: clamp(2.25rem, 3.12vw, 2.72rem);
+  min-height: clamp(1.86rem, 2.58vw, 2.24rem);
   border: 1px solid color-mix(in srgb, var(--dragon-gold) 58%, transparent);
   border-radius: 0.5rem;
   background:
@@ -429,7 +526,7 @@ body,
   color: color-mix(in srgb, var(--dragon-text) 96%, var(--dragon-gold));
   cursor: pointer;
   font: inherit;
-  font-size: clamp(0.78rem, 0.9vw, 0.92rem);
+  font-size: clamp(0.68rem, 0.8vw, 0.82rem);
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -464,11 +561,11 @@ body,
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: clamp(0.42rem, 0.58vw, 0.62rem);
+  gap: clamp(0.3rem, 0.48vw, 0.5rem);
   width: 100%;
   color: color-mix(in srgb, var(--dragon-gold) 54%, var(--dragon-text-soft));
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: clamp(0.56rem, 0.66vw, 0.66rem);
+  font-size: clamp(0.5rem, 0.58vw, 0.58rem);
   font-weight: 800;
 }
 
@@ -482,9 +579,9 @@ body,
   grid-template-columns: auto 1fr;
   align-items: center;
   justify-items: center;
-  gap: clamp(0.42rem, 0.64vw, 0.64rem);
+  gap: clamp(0.32rem, 0.5vw, 0.5rem);
   width: 100%;
-  min-height: clamp(2.18rem, 3vw, 2.62rem);
+  min-height: clamp(1.82rem, 2.5vw, 2.18rem);
   border: 1px solid color-mix(in srgb, var(--dragon-gold) 24%, var(--dragon-danger));
   border-radius: 0.5rem;
   background:
@@ -494,7 +591,7 @@ body,
   color: var(--dragon-text);
   cursor: pointer;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: clamp(0.72rem, 0.84vw, 0.86rem);
+  font-size: clamp(0.62rem, 0.74vw, 0.76rem);
   font-weight: 850;
   letter-spacing: 0;
   box-shadow:
@@ -507,8 +604,8 @@ body,
 .dh-ember-gate .dh-login-discord-icon {
   display: grid;
   place-items: center;
-  width: clamp(1.44rem, 1.9vw, 1.72rem);
-  height: clamp(1.44rem, 1.9vw, 1.72rem);
+  width: clamp(1.2rem, 1.62vw, 1.48rem);
+  height: clamp(1.2rem, 1.62vw, 1.48rem);
   border: 1px solid color-mix(in srgb, var(--dragon-text) 10%, transparent);
   border-radius: 0.42rem;
   background:
@@ -521,8 +618,8 @@ body,
 }
 
 .dh-ember-gate .dh-login-discord-mark {
-  width: clamp(0.98rem, 1.28vw, 1.18rem);
-  height: clamp(0.98rem, 1.28vw, 1.18rem);
+  width: clamp(0.82rem, 1.08vw, 1rem);
+  height: clamp(0.82rem, 1.08vw, 1rem);
 }
 
 .dh-ember-gate .dh-login-discord:not(:disabled):hover {
@@ -553,7 +650,7 @@ body,
   align-items: center;
   gap: clamp(0.22rem, 0.36vw, 0.34rem);
   min-width: min(86%, 8.8rem);
-  min-height: clamp(1.42rem, 1.86vw, 1.72rem);
+  min-height: clamp(1.28rem, 1.62vw, 1.48rem);
   border: 1px solid color-mix(in srgb, var(--dragon-gold) 34%, transparent);
   border-radius: 999px;
   background:
@@ -561,7 +658,7 @@ body,
     color-mix(in srgb, var(--dragon-obsidian) 86%, transparent);
   color: color-mix(in srgb, var(--dragon-text) 86%, var(--dragon-gold));
   cursor: pointer;
-  font: 850 clamp(0.58rem, 0.72vw, 0.7rem) system-ui, sans-serif;
+  font: 850 clamp(0.54rem, 0.66vw, 0.64rem) system-ui, sans-serif;
   justify-content: center;
   padding: 0 clamp(0.48rem, 0.72vw, 0.7rem);
   pointer-events: auto;
@@ -600,70 +697,12 @@ body,
   outline-offset: 2px;
 }
 
-@keyframes dh-portal-fire-slow {
-  0% {
-    opacity: 0.72;
-    transform: rotate(-4deg) translateY(0.22rem);
-    background-position: 50% 57%, 50% 64%, 50% 94%;
-  }
-
-  48% {
-    opacity: 0.9;
-    transform: rotate(3deg) translateY(-0.18rem);
-    background-position: 48% 53%, 52% 66%, 50% 90%;
-  }
-
-  100% {
-    opacity: 0.82;
-    transform: rotate(5deg) translateY(-0.28rem);
-    background-position: 53% 52%, 48% 68%, 50% 88%;
-  }
-}
-
-@keyframes dh-portal-core-pulse {
-  0% {
-    opacity: 0.9;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes dh-portal-smoke-drift {
-  0% {
-    opacity: 0.46;
-    transform: translateX(-0.35rem) translateY(0.32rem);
-    background-position: 0 0, 0 0, 0 0;
-  }
-
-  100% {
-    opacity: 0.66;
-    transform: translateX(0.42rem) translateY(-0.44rem);
-    background-position: -1.1rem -1.5rem, 1.2rem -1rem, 1.8rem -2.4rem;
-  }
-}
-
-@keyframes dh-portal-embers-rise {
-  0% {
-    opacity: 0.5;
-    transform: translateY(0.36rem);
-    background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
-  }
-
-  100% {
-    opacity: 0.82;
-    transform: translateY(-1.2rem);
-    background-position: 0 -1rem, 0 -1.7rem, 0 -1.3rem, 0 -1.9rem, 0 -1.2rem, 0 -1.6rem, 0 -1.35rem;
-  }
-}
-
 @media (max-aspect-ratio: 1 / 1) {
-  .dh-ember-gate-arch-opening {
+  .dh-ember-gate-form-panel {
     padding: clamp(0.34rem, 1vw, 0.56rem);
   }
 
-  .dh-ember-gate-form-panel {
+  .dh-ember-gate .dh-login-card {
     width: min(94%, 14.4rem);
   }
 }
@@ -718,14 +757,5 @@ body,
   .dh-ember-gate-sound-icon {
     width: 0.84rem;
     height: 0.84rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dh-ember-gate-portal,
-  .dh-ember-gate-portal-fire,
-  .dh-ember-gate-portal-smoke,
-  .dh-ember-gate-portal-embers {
-    animation: none;
   }
 }

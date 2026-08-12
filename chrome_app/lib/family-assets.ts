@@ -11,6 +11,7 @@ export const DRAGON_HOUSE_ASSETS = {
   hallBackground: '/assets/dragon-house/dragon-hall-bg.png',
   emberGateBackground: '/assets/dragon-house/illustrations/dragon-house-login-entrance.png',
   loginPortalBackground: '/assets/dragon-house/backgrounds/login-portal-background.png',
+  loginPortalMotion: '/assets/dragon-house/backgrounds/login-portal-background.mp4',
   postLoginBackground: '/assets/dragon-house/backgrounds/post-login-background.png',
   portalAmbientAudio: '/assets/dragon-house/audio/dragon_house_portal_fire_dragon_mix.mp3',
   futureDragonLayer: '/assets/dragon-house/dragon-3d-placeholder.png',
