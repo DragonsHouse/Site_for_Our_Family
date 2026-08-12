@@ -31,6 +31,7 @@ temp/
 **/*browser-profile*/
 **/*cdp-profile*/
 ui-audit-screenshots/
+.screenshots/
 
 # Local synchronized map cache
 chrome_app/public/map-cache/

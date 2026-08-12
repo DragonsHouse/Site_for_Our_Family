@@ -181,6 +181,7 @@ function payoutEventKey(questId: string, userId: string) {
 
 function normalizeRewardItems(items: FamilyQuestRewardItem[] | undefined): FamilyQuestRewardItem[] {
   return (items ?? []).map((item, index) => ({
+    ...item,
     id: item.id || `item-${index}-${item.title}`,
     title: item.title,
     quantity: Math.max(1, Number(item.quantity) || 1),
@@ -197,7 +198,10 @@ function normalizeParticipant(
   now: string
 ): FamilyQuestParticipant {
   return {
+    ...participant,
     userId: participant.userId,
+    backendQuestPersonId: participant.backendQuestPersonId ?? null,
+    backendFamilyMemberId: participant.backendFamilyMemberId ?? null,
     nickname: participant.nickname ?? participant.userId,
     type: participant.type ?? type,
     joinedAt: participant.joinedAt ?? now,
@@ -216,7 +220,23 @@ function normalizeParticipant(
     payoutStatus: participant.payoutStatus ?? 'pending',
     paidAt: participant.paidAt ?? null,
     paidBy: participant.paidBy ?? null,
+    paidByFamilyMemberId: participant.paidByFamilyMemberId ?? null,
     payoutEventKey: participant.payoutEventKey ?? payoutEventKey(questId, participant.userId)
+  };
+}
+
+function copyBackendPayoutFields(payout: FamilyQuestPayout | undefined): Partial<FamilyQuestPayout> {
+  if (!payout) return { source: 'local' };
+  return {
+    source: payout.source ?? (payout.backendPayoutId ? 'backend' : 'local'),
+    backendPayoutId: payout.backendPayoutId ?? null,
+    backendQuestPersonId: payout.backendQuestPersonId ?? null,
+    backendFamilyMemberId: payout.backendFamilyMemberId ?? null,
+    paidByFamilyMemberId: payout.paidByFamilyMemberId ?? null,
+    issuedAt: payout.issuedAt ?? null,
+    idempotencyKey: payout.idempotencyKey ?? null,
+    accrualId: payout.accrualId ?? null,
+    accountingTransactionId: payout.accountingTransactionId ?? null
   };
 }
 
@@ -517,6 +537,10 @@ function normalizeQuestTemplate(template: FamilyQuestTemplate): FamilyQuestTempl
   const totalReward = template.totalReward ?? memberRewardPool + familyReward;
   return {
     ...template,
+    source: template.source ?? (template.backendTemplateId || template.backendQuestId ? 'backend' : 'local'),
+    backendTemplateId: template.backendTemplateId ?? null,
+    backendQuestId: template.backendQuestId ?? null,
+    backendCategory: template.backendCategory ?? null,
     totalReward,
     memberRewardPool,
     familyBankShare: familyReward || Math.max(0, totalReward - memberRewardPool),
@@ -539,6 +563,11 @@ function normalizeQuest(quest: FamilyQuest): FamilyQuest {
   const byUser = new Map(people.map((participant) => [participant.userId, participant]));
   return {
     ...quest,
+    source: quest.source ?? (quest.backendQuestId ? 'backend' : 'local'),
+    backendQuestId: quest.backendQuestId ?? null,
+    backendTemplateId: quest.backendTemplateId ?? quest.templateId ?? null,
+    backendCategory: quest.backendCategory ?? null,
+    bestParticipantFamilyMemberId: quest.bestParticipantFamilyMemberId ?? null,
     totalReward,
     memberRewardPool,
     familyBankShare: familyReward || Math.max(0, totalReward - memberRewardPool),
@@ -552,6 +581,7 @@ function normalizeQuest(quest: FamilyQuest): FamilyQuest {
     helpers,
     payouts: (quest.payouts ?? []).map((payout) => ({
       ...payout,
+      ...copyBackendPayoutFields(payout),
       amount: payout.amount ?? byUser.get(payout.userId)?.rewardAmount ?? 0,
       finalAmount: payout.finalAmount ?? payout.amount ?? byUser.get(payout.userId)?.rewardAmount ?? 0,
       rewardPercent: payout.rewardPercent ?? byUser.get(payout.userId)?.rewardPercent ?? null,
@@ -561,6 +591,7 @@ function normalizeQuest(quest: FamilyQuest): FamilyQuest {
       status: payout.status ?? byUser.get(payout.userId)?.payoutStatus ?? 'pending',
       paidBy: payout.paidBy ?? byUser.get(payout.userId)?.paidBy ?? null,
       paidAt: payout.paidAt ?? byUser.get(payout.userId)?.paidAt ?? null,
+      paidByFamilyMemberId: payout.paidByFamilyMemberId ?? byUser.get(payout.userId)?.paidByFamilyMemberId ?? null,
       payoutEventKey: payout.payoutEventKey ?? payoutEventKey(quest.id, payout.userId)
     })),
     status: normalizeQuestStatus(quest.status),
@@ -1178,6 +1209,7 @@ export function calculateQuestRewardPlan(quest: FamilyQuest) {
     const existing = quest.payouts.find((payout) => payout.userId === person.userId);
     return {
       userId: person.userId,
+      ...copyBackendPayoutFields(existing),
       amount,
       finalAmount: amount,
       rewardPercent: percents.get(person.userId) ?? null,
@@ -1236,6 +1268,7 @@ export function applyQuestRewardPlan(quest: FamilyQuest): FamilyQuest {
       payoutStatus: payout.status ?? 'pending',
       paidAt: payout.paidAt ?? null,
       paidBy: payout.paidBy ?? null,
+      paidByFamilyMemberId: payout.paidByFamilyMemberId ?? person.paidByFamilyMemberId ?? null,
       payoutEventKey: payout.payoutEventKey
     };
   };

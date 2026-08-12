@@ -3,6 +3,11 @@ import { DRAGON_HOUSE_HUB_PRODUCT_NAME, DRAGON_HOUSE_HUB_SHORT_NAME } from './li
 
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  vite: () => ({
+    build: {
+      modulePreload: false
+    }
+  }),
   manifest: {
     name: DRAGON_HOUSE_HUB_PRODUCT_NAME,
     short_name: DRAGON_HOUSE_HUB_SHORT_NAME,

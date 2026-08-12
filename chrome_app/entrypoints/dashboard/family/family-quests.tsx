@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FAMILY_ASSET_DEFINITIONS, getQuestTemplateAssetSlot } from '../../../lib/family-assets';
 import {
   addFamilyNotificationOnce,
@@ -7,6 +7,8 @@ import {
   notifyQuestReportAccepted
 } from '../../../lib/family-notifications';
 import { canManageFamilyQuests } from '../../../lib/family-permissions';
+import { FamilyQuestPayoutApiError, issueBackendQuestPayout } from '../../../lib/family-quest-backend-client';
+import { loadFamilyQuestReadState } from '../../../lib/family-quest-read-adapter';
 import {
   applyQuestRewardPlan,
   calculateQuestRewardPlan,
@@ -37,7 +39,18 @@ import type {
   FamilyQuestTemplate,
   FamilyUser
 } from '../../../lib/family-types';
+import {
+  applyBackendPayoutResultToQuest,
+  resolveBackendPayoutTarget
+} from './family-quest-payout-backend';
 import { useFamilyAssetUrl } from './use-family-asset-url';
+
+type BackendPayoutFeedback = {
+  status: 'issuing' | 'success' | 'error';
+  message: string;
+};
+
+const BACKEND_WRITE_PENDING_MESSAGE = 'Ця дія буде доступна після підключення серверного збереження.';
 
 const STATUS_LABELS: Record<FamilyQuestStatus, string> = {
   draft: 'Draft',
@@ -374,19 +387,22 @@ function RewardManager({
   onClose,
   onUpdateQuest,
   onIssueOne,
-  onIssueAll
+  onIssueAll,
+  payoutFeedback
 }: {
   quest: FamilyQuest;
   users: FamilyUser[];
   onClose: () => void;
   onUpdateQuest: (quest: FamilyQuest) => void;
-  onIssueOne: (questId: string, userId: string) => void;
+  onIssueOne: (questId: string, userId: string) => void | Promise<void>;
   onIssueAll: (questId: string) => void;
+  payoutFeedback: Record<string, BackendPayoutFeedback>;
 }) {
   const plan = calculateQuestRewardPlan(quest);
   const people = getFamilyQuestPeople(quest);
   const [itemText, setItemText] = useState<Record<string, string>>({});
   const activeUsers = users.filter((user) => user.accountStatus !== 'inactive');
+  const hasBackendPayouts = plan.payouts.some((payout) => Boolean(resolveBackendPayoutTarget(quest, payout)));
 
   function updatePerson(userId: string, updates: Partial<FamilyQuestParticipant>) {
     const mapPerson = (person: FamilyQuestParticipant) => (person.userId === userId ? { ...person, ...updates } : person);
@@ -470,7 +486,7 @@ function RewardManager({
             <div className="mt-4 flex flex-col gap-2">
               <button type="button" onClick={() => addManualPerson('participant')} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Додати participant</button>
               <button type="button" onClick={() => addManualPerson('helper')} className="rounded-xl border border-orange-500/40 px-3 py-2 text-sm text-orange-100">Додати helper</button>
-              <button type="button" onClick={() => onIssueAll(quest.id)} disabled={!plan.isComplete || plan.errors.length > 0} className="dh-fire-button rounded-xl px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Видати все</button>
+              <button type="button" onClick={() => onIssueAll(quest.id)} disabled={hasBackendPayouts || !plan.isComplete || plan.errors.length > 0} className="dh-fire-button rounded-xl px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Видати все</button>
             </div>
           </section>
 
@@ -480,6 +496,9 @@ function RewardManager({
             </div>
             {people.map((person) => {
               const payout = plan.payouts.find((item) => item.userId === person.userId);
+              const backendTarget = resolveBackendPayoutTarget(quest, payout);
+              const feedback = backendTarget ? payoutFeedback[backendTarget.payoutKey] : null;
+              const isIssuing = feedback?.status === 'issuing';
               return (
                 <div key={person.userId} className="grid grid-cols-[1.1fr_0.7fr_0.7fr_0.8fr_0.7fr_1fr_0.8fr] gap-2 border-t border-white/10 px-3 py-3 text-sm">
                   <div>
@@ -521,7 +540,12 @@ function RewardManager({
                   <div>
                     <div className="text-amber-100">{money(payout?.amount ?? 0)}</div>
                     <div className="text-xs text-slate-400">{payout?.status ?? 'pending'}</div>
-                    <button type="button" onClick={() => onIssueOne(quest.id, person.userId)} disabled={payout?.status === 'paid' || !plan.isComplete || plan.errors.length > 0} className="mt-2 rounded-lg border border-emerald-500/40 px-2 py-1 text-xs text-emerald-100 disabled:opacity-50">Видати</button>
+                    <button type="button" onClick={() => void onIssueOne(quest.id, person.userId)} disabled={isIssuing || payout?.status === 'paid' || !plan.isComplete || plan.errors.length > 0} className="mt-2 rounded-lg border border-emerald-500/40 px-2 py-1 text-xs text-emerald-100 disabled:opacity-50">{isIssuing ? 'Processing...' : 'Видати'}</button>
+                    {feedback ? (
+                      <div className={feedback.status === 'error' ? 'mt-2 text-xs text-red-200' : 'mt-2 text-xs text-emerald-100'}>
+                        {feedback.message}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -799,8 +823,29 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   const [editingTemplate, setEditingTemplate] = useState<FamilyQuestTemplate | null>(null);
   const [editingQuest, setEditingQuest] = useState<FamilyQuest | null>(null);
   const [rewardQuest, setRewardQuest] = useState<FamilyQuest | null>(null);
+  const issuingBackendPayoutsRef = useRef(new Set<string>());
+  const [payoutFeedback, setPayoutFeedback] = useState<Record<string, BackendPayoutFeedback>>({});
+  const [questReadSource, setQuestReadSource] = useState<'backend' | 'local'>('local');
+  const [questReadError, setQuestReadError] = useState<Error | null>(null);
   const [creating, setCreating] = useState(false);
   const canManage = canManageFamilyQuests(currentUser);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+    void loadFamilyQuestReadState(controller.signal).then((state) => {
+      if (cancelled) return;
+      setTemplates(state.templates);
+      setQuests(state.quests);
+      setReports(state.reports);
+      setQuestReadSource(state.source);
+      setQuestReadError(state.error);
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
 
   const categories = useMemo(() => Array.from(new Set(templates.map((template) => template.category))), [templates]);
   const visibleTemplates = useMemo(
@@ -837,26 +882,95 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     return reports.find((report) => report.questId === quest.id) ?? null;
   }
 
+  function isBackendQuest(quest: FamilyQuest | null | undefined) {
+    return quest?.source === 'backend';
+  }
+
+  function isBackendTemplate(template: FamilyQuestTemplate | null | undefined) {
+    return template?.source === 'backend';
+  }
+
+  function preventBackendWrite() {
+    window.alert(BACKEND_WRITE_PENDING_MESSAGE);
+  }
+
+  function startCreatingTemplate() {
+    if (questReadSource === 'backend') {
+      preventBackendWrite();
+      return;
+    }
+    setCreating(true);
+  }
+
+  function startEditingTemplate(template: FamilyQuestTemplate) {
+    if (questReadSource === 'backend' || isBackendTemplate(template)) {
+      preventBackendWrite();
+      return;
+    }
+    setEditingTemplate(template);
+  }
+
+  function startEditingQuest(quest: FamilyQuest) {
+    if (isBackendQuest(quest)) {
+      preventBackendWrite();
+      return;
+    }
+    setEditingQuest(quest);
+  }
+
   function saveTemplate(template: FamilyQuestTemplate) {
+    if (isBackendTemplate(template)) {
+      preventBackendWrite();
+      return;
+    }
     persistTemplates(templates.some((item) => item.id === template.id) ? templates.map((item) => (item.id === template.id ? template : item)) : [template, ...templates]);
     setEditingTemplate(null);
     setCreating(false);
   }
 
   function deleteTemplate(templateId: string) {
+    const template = templates.find((item) => item.id === templateId);
+    if (isBackendTemplate(template)) {
+      preventBackendWrite();
+      return;
+    }
     if (!window.confirm('Delete this quest template and active quest?')) return;
     persistTemplates(templates.filter((template) => template.id !== templateId));
     persistQuests(quests.filter((quest) => quest.templateId !== templateId));
   }
 
   function openRecruiting(template: FamilyQuestTemplate) {
+    if (isBackendTemplate(template)) {
+      preventBackendWrite();
+      return;
+    }
     if (formatCooldown(template.cooldownUntil)) return;
     persistQuests([buildQuestFromTemplate(template, currentUser), ...quests]);
   }
 
   function updateQuest(nextQuest: FamilyQuest) {
+    if (isBackendQuest(nextQuest)) {
+      preventBackendWrite();
+      return;
+    }
     const planned = applyQuestRewardPlan(nextQuest);
     persistQuests(quests.some((quest) => quest.id === planned.id) ? quests.map((quest) => (quest.id === planned.id ? planned : quest)) : [planned, ...quests]);
+    if (rewardQuest?.id === planned.id) setRewardQuest(planned);
+    if (editingQuest?.id === planned.id) setEditingQuest(planned);
+  }
+
+  function persistBackendQuestUpdate(nextQuest: FamilyQuest) {
+    const planned = applyQuestRewardPlan(nextQuest);
+    if (questReadSource === 'backend' || isBackendQuest(planned)) {
+      setQuests((current) => (current.some((quest) => quest.id === planned.id) ? current.map((quest) => (quest.id === planned.id ? planned : quest)) : [planned, ...current]));
+      if (rewardQuest?.id === planned.id) setRewardQuest(planned);
+      if (editingQuest?.id === planned.id) setEditingQuest(planned);
+      return;
+    }
+    const stored = readFamilyQuests();
+    const next = stored.some((quest) => quest.id === planned.id) ? stored.map((quest) => (quest.id === planned.id ? planned : quest)) : [planned, ...stored];
+    saveFamilyQuests(next);
+    setQuests(next);
     if (rewardQuest?.id === planned.id) setRewardQuest(planned);
     if (editingQuest?.id === planned.id) setEditingQuest(planned);
   }
@@ -864,6 +978,10 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   function changeState(questId: string, status: FamilyQuestStatus, comment: string | null = null) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest) return;
+    if (isBackendQuest(quest)) {
+      preventBackendWrite();
+      return;
+    }
     const next = updateFamilyQuestState(quest, status, currentUser.id, comment);
     if (next === quest) {
       window.alert(`Нелогічний перехід стану: ${quest.status} → ${status}`);
@@ -880,6 +998,10 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   function joinQuest(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest || quest.status !== 'recruiting') return;
+    if (isBackendQuest(quest)) {
+      preventBackendWrite();
+      return;
+    }
     const alreadyJoined = getFamilyQuestPeople(quest).some((person) => person.userId === currentUser.id);
     if (alreadyJoined) return;
     const next = upsertQuestPerson(quest, { userId: currentUser.id, nickname: currentUser.nickname, type: 'participant', actor: currentUser.id, addedManually: false });
@@ -899,6 +1021,10 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   function leaveQuest(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest || quest.status !== 'recruiting') return;
+    if (isBackendQuest(quest)) {
+      preventBackendWrite();
+      return;
+    }
     const now = new Date().toISOString();
     const markLeft = (person: FamilyQuestParticipant) => person.userId === currentUser.id ? { ...person, leftAt: now } : person;
     updateQuest(
@@ -914,6 +1040,10 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   function createReport(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest) return;
+    if (isBackendQuest(quest)) {
+      preventBackendWrite();
+      return;
+    }
     try {
       const report = createFamilyQuestReport(quest, currentUser.id, 'Dragon House quest report.');
       persistReports(reports.some((item) => item.id === report.id) ? reports.map((item) => (item.id === report.id ? report : item)) : [report, ...reports]);
@@ -927,17 +1057,25 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   function transferReport(reportId: string) {
     const report = reports.find((item) => item.id === reportId);
     if (!report) return;
+    const quest = quests.find((item) => item.id === report.questId);
+    if (isBackendQuest(quest)) {
+      preventBackendWrite();
+      return;
+    }
     const month = transferQuestReportToAccounting(report, currentUser.id);
     const now = new Date().toISOString();
     const updatedReport = { ...report, transferredToAccountingAt: report.transferredToAccountingAt ?? now, updatedAt: now };
     persistReports(reports.map((item) => (item.id === reportId ? updatedReport : item)));
-    const quest = quests.find((item) => item.id === report.questId);
     if (quest) updateQuest({ ...updateFamilyQuestState(quest, 'sent_to_accounting', currentUser.id), reportSentToAccountingAt: updatedReport.transferredToAccountingAt });
     const bonusPrefix = `bonus-${report.id}-`;
     void Promise.all(month.bonuses.filter((bonus) => bonus.id.startsWith(bonusPrefix)).map((bonus) => notifyBonusCreated(bonus)));
   }
 
   function remind(quest: FamilyQuest) {
+    if (isBackendQuest(quest)) {
+      preventBackendWrite();
+      return;
+    }
     const recipients = getFamilyQuestPeople(quest);
     const now = new Date().toISOString().slice(0, 16);
     void Promise.all(
@@ -974,7 +1112,59 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     window.alert('Внутрішнє нагадування надіслано учасникам квесту');
   }
 
-  function issueOne(questId: string, userId: string) {
+  function backendPayoutErrorMessage(error: unknown) {
+    if (error instanceof FamilyQuestPayoutApiError) {
+      if (error.code === 'QUEST_PAYOUT_UNAUTHORIZED') return 'Немає прав видати цю backend виплату.';
+      if (error.code === 'QUEST_NOT_FOUND') return 'Backend quest не знайдено. Онови список і перевір запис.';
+      if (error.code === 'QUEST_PAYOUT_NOT_FOUND') return 'Backend payout не знайдено. Онови quest перед повтором.';
+      if (error.code === 'QUEST_PAYOUT_MISMATCH') return 'Payout не належить цьому quest. Виплату зупинено.';
+      if (error.code === 'QUEST_PAYOUT_ALREADY_PAID') return 'Цей payout уже оплачено в backend.';
+      if (error.code === 'QUEST_PAYOUT_IDEMPOTENCY_CONFLICT') return 'Idempotency key уже використано для іншої виплати. Виплату зупинено.';
+      if (error.code === 'BACKEND_UNAVAILABLE' || error.code === 'FINANCE_SERVICE_UNAVAILABLE') return 'Backend тимчасово недоступний. Local fallback для backend payout вимкнено.';
+      if (error.code === 'MALFORMED_RESPONSE') return 'Backend повернув неочікувану відповідь. Виплату не позначено local.';
+      return error.message;
+    }
+    return error instanceof Error ? error.message : 'Cannot issue backend payout';
+  }
+
+  async function issueOne(questId: string, userId: string) {
+    const quest = quests.find((item) => item.id === questId);
+    const planned = quest ? applyQuestRewardPlan(quest) : null;
+    const payout = planned?.payouts.find((item) => item.userId === userId);
+    const backendTarget = planned && payout ? resolveBackendPayoutTarget(planned, payout) : null;
+    if (backendTarget) {
+      if (issuingBackendPayoutsRef.current.has(backendTarget.payoutKey)) return;
+      issuingBackendPayoutsRef.current.add(backendTarget.payoutKey);
+      setPayoutFeedback((current) => ({
+        ...current,
+        [backendTarget.payoutKey]: { status: 'issuing', message: 'Issuing through backend...' }
+      }));
+      try {
+        const result = await issueBackendQuestPayout({
+          questId: backendTarget.questId,
+          payoutId: backendTarget.payoutId,
+          idempotencyKey: backendTarget.idempotencyKey
+        });
+        const storedQuest = readFamilyQuests().find((item) => item.id === questId) ?? planned;
+        persistBackendQuestUpdate(applyBackendPayoutResultToQuest(storedQuest, result));
+        setPayoutFeedback((current) => ({
+          ...current,
+          [backendTarget.payoutKey]: {
+            status: 'success',
+            message: result.alreadyIssued ? 'Backend already completed this payout.' : 'Backend payout issued.'
+          }
+        }));
+      } catch (error) {
+        setPayoutFeedback((current) => ({
+          ...current,
+          [backendTarget.payoutKey]: { status: 'error', message: backendPayoutErrorMessage(error) }
+        }));
+      } finally {
+        issuingBackendPayoutsRef.current.delete(backendTarget.payoutKey);
+      }
+      return;
+    }
+
     try {
       const result = issueFamilyQuestPayouts({ questId, actorId: currentUser.id, userIds: [userId] });
       refresh();
@@ -985,6 +1175,16 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   }
 
   function issueAll(questId: string) {
+    const quest = quests.find((item) => item.id === questId);
+    if (isBackendQuest(quest)) {
+      window.alert('Backend-backed payouts must be issued one at a time through backend.');
+      return;
+    }
+    const plan = quest ? calculateQuestRewardPlan(quest) : null;
+    if (quest && plan?.payouts.some((payout) => Boolean(resolveBackendPayoutTarget(quest, payout)))) {
+      window.alert('Backend-backed payouts must be issued one at a time through backend.');
+      return;
+    }
     try {
       const result = issueFamilyQuestPayouts({ questId, actorId: currentUser.id });
       refresh();
@@ -1002,8 +1202,11 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">Dragon House</p>
             <h2 className="mt-1 text-2xl font-semibold text-white">Family quests</h2>
             <p className="mt-2 max-w-3xl text-sm text-slate-400">Локальна quest система Family Hub. Discord integration: not configured.</p>
+            <p className={questReadSource === 'backend' ? 'mt-2 text-xs text-emerald-100' : 'mt-2 text-xs text-amber-100'}>
+              {questReadSource === 'backend' ? 'Backend quests loaded from PostgreSQL.' : questReadError ? 'Backend quests unavailable. Showing local fallback.' : 'Loading backend quests...'}
+            </p>
           </div>
-          {canManage ? <button type="button" onClick={() => setCreating(true)} className="dh-fire-button rounded-xl px-4 py-2 text-sm font-semibold text-white">Create quest</button> : null}
+          {canManage ? <button type="button" onClick={startCreatingTemplate} className="dh-fire-button rounded-xl px-4 py-2 text-sm font-semibold text-white">Create quest</button> : null}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {(['all', ...categories] as Array<FamilyQuestCategory | 'all'>).map((item) => (
@@ -1032,9 +1235,9 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
               onLeave={leaveQuest}
               onOpenRecruiting={openRecruiting}
               onState={changeState}
-              onEditTemplate={setEditingTemplate}
+              onEditTemplate={startEditingTemplate}
               onDeleteTemplate={deleteTemplate}
-              onEditQuest={setEditingQuest}
+              onEditQuest={startEditingQuest}
               onRewardManager={setRewardQuest}
               onCreateReport={createReport}
               onTransferReport={transferReport}
@@ -1107,7 +1310,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
           }}
         />
       ) : null}
-      {rewardQuest ? <RewardManager quest={rewardQuest} users={users} onClose={() => setRewardQuest(null)} onUpdateQuest={updateQuest} onIssueOne={issueOne} onIssueAll={issueAll} /> : null}
+      {rewardQuest ? <RewardManager quest={rewardQuest} users={users} onClose={() => setRewardQuest(null)} onUpdateQuest={updateQuest} onIssueOne={issueOne} onIssueAll={issueAll} payoutFeedback={payoutFeedback} /> : null}
     </section>
   );
 }

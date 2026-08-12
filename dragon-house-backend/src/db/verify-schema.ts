@@ -14,6 +14,15 @@ const requiredTables = [
   'discord_role_mappings',
   'family_audit_log',
   'discord_sync_reports',
+  'family_quest_templates',
+  'family_quests',
+  'family_quest_people',
+  'family_quest_rewards',
+  'family_quest_reports',
+  'family_quest_payouts',
+  'family_quest_audit',
+  'family_member_accruals',
+  'family_accounting_transactions',
 ];
 
 async function tableExists(pool: NonNullable<ReturnType<typeof createPgPool>>, tableName: string) {
@@ -184,6 +193,89 @@ async function runChecks() {
     checks.push({ name: 'discord_sync_reports.idempotency_key column', ok: await columnExists(pool, 'discord_sync_reports', 'idempotency_key') });
     checks.push({ name: 'discord_sync_reports idempotency key unique index', ok: await indexExists(pool, 'idx_discord_sync_reports_idempotency_key') });
     checks.push({ name: 'family_audit_log syncRunId index', ok: await indexExists(pool, 'idx_family_audit_log_sync_run_id') });
+    checks.push({ name: 'family_quest_templates.id primary key', ok: await constraintExists(pool, 'family_quest_templates', 'p', 'id') });
+    checks.push({ name: 'family_quest_templates.template_key unique', ok: await constraintExists(pool, 'family_quest_templates', 'u', 'template_key') });
+    checks.push({ name: 'family_quests.id primary key', ok: await constraintExists(pool, 'family_quests', 'p', 'id') });
+    checks.push({
+      name: 'family_quests.template_id -> family_quest_templates.id',
+      ok: await foreignKeyTargets(pool, 'family_quests', 'template_id', 'family_quest_templates', 'id'),
+    });
+    checks.push({
+      name: 'family_quest_people.quest_id -> family_quests.id',
+      ok: await foreignKeyTargets(pool, 'family_quest_people', 'quest_id', 'family_quests', 'id'),
+    });
+    checks.push({ name: 'family_quest_people active member unique index', ok: await indexExists(pool, 'idx_family_quest_people_active_unique_member') });
+    checks.push({
+      name: 'family_quest_reports.quest_id -> family_quests.id',
+      ok: await foreignKeyTargets(pool, 'family_quest_reports', 'quest_id', 'family_quests', 'id'),
+    });
+    checks.push({
+      name: 'family_quest_payouts.quest_id -> family_quests.id',
+      ok: await foreignKeyTargets(pool, 'family_quest_payouts', 'quest_id', 'family_quests', 'id'),
+    });
+    checks.push({
+      name: 'family_quest_audit.quest_id -> family_quests.id',
+      ok: await foreignKeyTargets(pool, 'family_quest_audit', 'quest_id', 'family_quests', 'id'),
+    });
+    checks.push({
+      name: 'family_member_accruals.family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'family_member_accruals', 'family_member_id', 'family_members', 'id'),
+    });
+    checks.push({
+      name: 'family_accounting_transactions.family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'family_accounting_transactions', 'family_member_id', 'family_members', 'id'),
+    });
+    checks.push({
+      name: 'family_accounting_transactions.quest_id -> family_quests.id',
+      ok: await foreignKeyTargets(pool, 'family_accounting_transactions', 'quest_id', 'family_quests', 'id'),
+    });
+    checks.push({
+      name: 'family_accounting_transactions.accrual_id -> family_member_accruals.id',
+      ok: await foreignKeyTargets(pool, 'family_accounting_transactions', 'accrual_id', 'family_member_accruals', 'id'),
+    });
+    checks.push({
+      name: 'family_accounting_transactions.payout_id -> family_quest_payouts.id',
+      ok: await foreignKeyTargets(pool, 'family_accounting_transactions', 'payout_id', 'family_quest_payouts', 'id'),
+    });
+    checks.push({
+      name: 'family_quest_payouts.accrual_id -> family_member_accruals.id',
+      ok: await foreignKeyTargets(pool, 'family_quest_payouts', 'accrual_id', 'family_member_accruals', 'id'),
+    });
+    checks.push({
+      name: 'family_quest_payouts.accounting_transaction_id -> family_accounting_transactions.id',
+      ok: await foreignKeyTargets(pool, 'family_quest_payouts', 'accounting_transaction_id', 'family_accounting_transactions', 'id'),
+    });
+    checks.push({
+      name: 'family_quest_payouts.issued_by_family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'family_quest_payouts', 'issued_by_family_member_id', 'family_members', 'id'),
+    });
+    for (const column of ['idempotency_key', 'accrual_id', 'accounting_transaction_id', 'issued_at', 'issued_by_family_member_id', 'version']) {
+      checks.push({ name: `family_quest_payouts.${column} column`, ok: await columnExists(pool, 'family_quest_payouts', column) });
+    }
+    for (const indexName of [
+      'idx_family_member_accruals_source_key',
+      'idx_family_member_accruals_member_status',
+      'idx_family_accounting_transactions_source_key',
+      'idx_family_accounting_transactions_member',
+      'idx_family_quest_payouts_payout_event_key',
+      'idx_family_quest_payouts_idempotency_key',
+      'idx_family_quest_payouts_accrual',
+      'idx_family_quest_payouts_accounting_transaction',
+    ]) {
+      checks.push({ name: `${indexName} exists`, ok: await indexExists(pool, indexName) });
+    }
+    for (const indexName of [
+      'idx_family_quest_templates_active',
+      'idx_family_quests_status',
+      'idx_family_quests_template_id',
+      'idx_family_quests_starts_at',
+      'idx_family_quest_rewards_quest',
+      'idx_family_quest_reports_quest',
+      'idx_family_quest_payouts_quest',
+      'idx_family_quest_audit_quest',
+    ]) {
+      checks.push({ name: `${indexName} exists`, ok: await indexExists(pool, indexName) });
+    }
   } finally {
     await pool.end();
   }

@@ -247,24 +247,43 @@ export type FamilyQuestRewardItem = {
   status?: 'prepared' | 'issued';
   issuedAt?: string | null;
   issuedBy?: string | null;
+  backendRewardId?: string | null;
+  backendQuestPersonId?: string | null;
+  rewardType?: 'item' | 'custom';
+  amount?: number | null;
+  currency?: string | null;
+  issuedByFamilyMemberId?: string | null;
 };
 
 export type FamilyQuestPayout = {
   userId: string;
   amount: number;
+  source?: 'backend' | 'local';
+  backendPayoutId?: string | null;
+  backendQuestPersonId?: string | null;
+  backendFamilyMemberId?: string | null;
   status?: FamilyQuestPayoutStatus;
   paidBy?: string | null;
   paidAt?: string | null;
+  paidByFamilyMemberId?: string | null;
+  issuedAt?: string | null;
   rewardPercent?: number | null;
   rewardItems?: FamilyQuestRewardItem[];
   bonusAmount?: number;
   bonusPercent?: number;
   finalAmount?: number;
   payoutEventKey?: string;
+  idempotencyKey?: string | null;
+  accrualId?: string | null;
+  accountingTransactionId?: string | null;
 };
 
 export type FamilyQuestTemplate = {
   id: string;
+  source?: 'backend' | 'local';
+  backendTemplateId?: string | null;
+  backendQuestId?: string | null;
+  backendCategory?: string | null;
   title: string;
   category: FamilyQuestCategory;
   recommendedTeamSize: number;
@@ -293,6 +312,8 @@ export type FamilyQuestTemplate = {
 
 export type FamilyQuestParticipant = {
   userId: string;
+  backendQuestPersonId?: string | null;
+  backendFamilyMemberId?: string | null;
   nickname?: string;
   type?: FamilyQuestParticipationType;
   joinedAt: string;
@@ -311,6 +332,7 @@ export type FamilyQuestParticipant = {
   payoutStatus?: FamilyQuestPayoutStatus;
   paidAt?: string | null;
   paidBy?: string | null;
+  paidByFamilyMemberId?: string | null;
   payoutEventKey?: string;
 };
 
@@ -550,6 +572,11 @@ export interface DiscordFamilyIntegrationService {
 
 export type FamilyQuest = FamilyDiscordQuestFields & FamilySyncMetadata & {
   id: string;
+  source?: 'backend' | 'local';
+  backendQuestId?: string | null;
+  backendTemplateId?: string | null;
+  backendCategory?: string | null;
+  bestParticipantFamilyMemberId?: string | null;
   templateId: string | null;
   title: string;
   description: string;

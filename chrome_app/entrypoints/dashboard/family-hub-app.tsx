@@ -560,18 +560,16 @@ function BirthdaySuccessScreen({ user, onComplete }: { user: FamilyUser; onCompl
 }
 function OAuthLoadingScreen() {
   return (
-    <AuthShell>
-      <section className="dh-auth-card w-full max-w-md rounded-3xl p-6 text-center">
-        <div className="mx-auto flex justify-center">
-          <DragonHouseCrest slot="dragon_house_logo" size="lg" />
-        </div>
-        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">Discord Login</p>
-        <h1 className="mt-2 text-2xl font-semibold text-white">Р’С–РґРєСЂРёРІР°С”РјРѕ РІРѕСЂРѕС‚Р° Dragon HouseвЂ¦</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-300">
-          РџРµСЂРµРІС–СЂСЏС”РјРѕ С‚РІС–Р№ Discord С– С€СѓРєР°С”РјРѕ С‚РµР±Рµ СЃРµСЂРµРґ РЅР°С€РёС….
-        </p>
-      </section>
-    </AuthShell>
+    <section className="dh-auth-card dh-oauth-gate-card w-full max-w-md rounded-3xl p-6 text-center">
+      <div className="mx-auto flex justify-center">
+        <DragonHouseCrest slot="dragon_house_logo" size="lg" />
+      </div>
+      <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">Discord Login</p>
+      <h1 className="mt-2 text-2xl font-semibold text-white">Відкриваємо ворота Dragon House...</h1>
+      <p className="mt-3 text-sm leading-6 text-slate-300">
+        Перевіряємо твій Discord і шукаємо тебе серед наших.
+      </p>
+    </section>
   );
 }
 
@@ -580,36 +578,34 @@ function OAuthSuccessScreen({ user, onEnter }: { user: FamilyUser; onEnter: () =
   const avatarUrl = user.discordAvatarUrl ?? user.avatarDataUrl ?? user.avatarUrl;
 
   return (
-    <AuthShell>
-      <section className="dh-auth-card w-full max-w-md rounded-3xl p-6 text-center">
-        <div className="mx-auto flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl border border-amber-500/35 bg-black/40">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={user.nickname} className="h-full w-full object-cover" />
-          ) : (
-            <DragonHouseCrest slot="dragon_house_logo" size="sm" />
-          )}
-        </div>
-        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">Discord РїС–РґС‚РІРµСЂРґР¶РµРЅРѕ</p>
-        <h1 className="mt-2 text-2xl font-semibold text-white">Р’С–С‚Р°С”РјРѕ РІРґРѕРјР°, {user.nickname}</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-300">
-          РўРІС–Р№ Discord РїС–РґС‚РІРµСЂРґР¶РµРЅРѕ. Р”РѕСЃС‚СѓРї РґРѕ Family Hub РІС–РґРєСЂРёС‚Рѕ.
-        </p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs">
-          <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-3 py-1 text-amber-100">
-            Р Р°РЅРі {user.rankLevel}
+    <section className="dh-auth-card dh-oauth-gate-card dh-oauth-success-card w-full max-w-md rounded-3xl p-6 text-center">
+      <div className="dh-oauth-success-avatar mx-auto flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl border border-amber-500/35 bg-black/40">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={user.nickname} className="h-full w-full object-cover" />
+        ) : (
+          <DragonHouseCrest slot="dragon_house_logo" size="sm" />
+        )}
+      </div>
+      <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">Discord підтверджено</p>
+      <h1 className="mt-2 text-2xl font-semibold text-white">Вітаємо вдома, {user.nickname}</h1>
+      <p className="mt-3 text-sm leading-6 text-slate-300">
+        Твій Discord підтверджено. Доступ до Family Hub відкрито.
+      </p>
+      <div className="dh-oauth-success-badges mt-4 flex flex-wrap justify-center gap-2 text-xs">
+        <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-3 py-1 text-amber-100">
+          Ранг {user.rankLevel}
+        </span>
+        <span className="rounded-full border border-slate-600 bg-black/30 px-3 py-1 text-slate-200">{user.rank}</span>
+        {isElevated ? (
+          <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-emerald-100">
+            Доступ хранителя
           </span>
-          <span className="rounded-full border border-slate-600 bg-black/30 px-3 py-1 text-slate-200">{user.rank}</span>
-          {isElevated ? (
-            <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-emerald-100">
-              РґРѕСЃС‚СѓРї С…СЂР°РЅРёС‚РµР»СЏ
-            </span>
-          ) : null}
-        </div>
-        <button type="button" className="dh-login-submit mt-6 min-w-44 whitespace-nowrap px-6" onClick={onEnter}>
-          РЈРІС–Р№С‚Рё РґРѕ Р»С–РіРІР°
-        </button>
-      </section>
-    </AuthShell>
+        ) : null}
+      </div>
+      <button type="button" className="dh-login-submit dh-oauth-success-submit mt-6 min-w-44 whitespace-nowrap px-6" onClick={onEnter}>
+        Увійти до Hub
+      </button>
+    </section>
   );
 }
 
@@ -1145,9 +1141,9 @@ export function FamilyHubApp() {
   if (authState.status === 'session_expired') {
     return (
       <AuthOutcomeScreen
-        title="РЎРµСЃС–СЏ Р·Р°РІРµСЂС€РёР»Р°СЃСЊ"
-        message="РўРІС–Р№ РїРѕРїРµСЂРµРґРЅС–Р№ РІС…С–Рґ Р±С–Р»СЊС€Рµ РЅРµ Р°РєС‚РёРІРЅРёР№. РЈРІС–Р№РґРё Р·РЅРѕРІСѓ, С‰РѕР± РїРѕРІРµСЂРЅСѓС‚РёСЃСЏ РґРѕ Family Hub."
-        primaryLabel="РЈРІС–Р№С‚Рё Р·РЅРѕРІСѓ"
+        title="Сесія завершилась"
+        message="Твій попередній вхід більше не активний. Увійди знову, щоб повернутися до Family Hub."
+        primaryLabel="Увійти знову"
         onPrimary={() => {
           void clearAuthSession().finally(returnToLogin);
         }}
@@ -1158,11 +1154,11 @@ export function FamilyHubApp() {
   if (authState.status === 'discord_link_required') {
     return (
       <AuthOutcomeScreen
-        title="Discord РЅРµ РїСЂРёРІвЂ™СЏР·Р°РЅРёР№ РґР»СЏ РІС…РѕРґСѓ"
-        message="Р¦РµР№ Discord Р°РєР°СѓРЅС‚ РЅРµ РјР°С” Р°РєС‚РёРІРЅРѕС— РїСЂРёРІвЂ™СЏР·РєРё РґР»СЏ РІС…РѕРґСѓ Сѓ Family Hub. РњРѕР¶РµС€ СѓРІС–Р№С‚Рё С‡РµСЂРµР· nickname Р°Р±Рѕ Р·РІРµСЂРЅСѓС‚РёСЃСЏ РґРѕ Р°РґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂР°."
-        primaryLabel="РЈРІС–Р№С‚Рё С‡РµСЂРµР· nickname"
+        title="Discord не прив'язаний для входу"
+        message="Цей Discord акаунт не має активної прив'язки для входу у Family Hub. Можеш увійти через nickname або звернутися до адміністратора."
+        primaryLabel="Увійти через nickname"
         onPrimary={returnToLogin}
-        secondaryLabel="РЎРїСЂРѕР±СѓРІР°С‚Рё Discord С‰Рµ СЂР°Р·"
+        secondaryLabel="Спробувати Discord ще раз"
         onSecondary={() => void handleDiscordLogin()}
       />
     );
@@ -1203,9 +1199,9 @@ export function FamilyHubApp() {
   if (authState.status === 'account_deactivated') {
     return (
       <AuthOutcomeScreen
-        title="Р”РѕСЃС‚СѓРї РІРёРјРєРЅРµРЅРѕ"
-        message="Р¦РµР№ Family Hub РїСЂРѕС„С–Р»СЊ Р·Р°СЂР°Р· РЅРµР°РєС‚РёРІРЅРёР№. Р—РІРµСЂРЅРёСЃСЏ РґРѕ Р°РґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂР°, СЏРєС‰Рѕ РґРѕСЃС‚СѓРї РїРѕС‚СЂС–Р±РЅРѕ РІС–РґРЅРѕРІРёС‚Рё."
-        primaryLabel="РџРѕРІРµСЂРЅСѓС‚РёСЃСЏ РґРѕ РІС…РѕРґСѓ"
+        title="Доступ вимкнено"
+        message="Цей Family Hub профіль зараз неактивний. Звернися до адміністратора, якщо доступ потрібно відновити."
+        primaryLabel="Повернутися до входу"
         onPrimary={returnToLogin}
       />
     );
@@ -1214,9 +1210,9 @@ export function FamilyHubApp() {
   if (authState.status === 'member_access_denied') {
     return (
       <AuthOutcomeScreen
-        title="Р”РѕСЃС‚СѓРї РЅРµРґРѕСЃС‚СѓРїРЅРёР№"
-        message="Family Hub РЅРµ РјРѕР¶Рµ РІС–РґРєСЂРёС‚Рё РґРѕСЃС‚СѓРї РґР»СЏ С†СЊРѕРіРѕ РІС…РѕРґСѓ. Р—РІРµСЂРЅРёСЃСЏ РґРѕ Р°РґРјС–РЅС–СЃС‚СЂР°С‚РѕСЂР° Р°Р±Рѕ СЃРїСЂРѕР±СѓР№ С–РЅС€РёР№ СЃРїРѕСЃС–Р± РІС…РѕРґСѓ."
-        primaryLabel="РџРѕРІРµСЂРЅСѓС‚РёСЃСЏ РґРѕ РІС…РѕРґСѓ"
+        title="Доступ недоступний"
+        message="Family Hub не може відкрити доступ для цього входу. Звернися до адміністратора або спробуй інший спосіб входу."
+        primaryLabel="Повернутися до входу"
         onPrimary={returnToLogin}
       />
     );
@@ -1225,11 +1221,11 @@ export function FamilyHubApp() {
   if (authState.status === 'auth_unavailable') {
     return (
       <AuthOutcomeScreen
-        title="Family Hub С‚РёРјС‡Р°СЃРѕРІРѕ РЅРµРґРѕСЃС‚СѓРїРЅРёР№"
-        message="РќРµ РІРґР°Р»РѕСЃСЏ РїРµСЂРµРІС–СЂРёС‚Рё РґРѕСЃС‚СѓРї С‡РµСЂРµР· backend Р°Р±Рѕ РјРµСЂРµР¶Сѓ. РЇРєС‰Рѕ РІ С‚РµР±Рµ Р±СѓРІ Р·Р±РµСЂРµР¶РµРЅРёР№ РІС…С–Рґ, РІС–РЅ РЅРµ РѕС‡РёС‰РµРЅРёР№ Р°РІС‚РѕРјР°С‚РёС‡РЅРѕ."
-        primaryLabel="РЎРїСЂРѕР±СѓРІР°С‚Рё С‰Рµ СЂР°Р·"
+        title="Family Hub тимчасово недоступний"
+        message="Не вдалося перевірити доступ через backend або мережу. Якщо в тебе був збережений вхід, він не очищений автоматично."
+        primaryLabel="Спробувати ще раз"
         onPrimary={retryAuthUnavailable}
-        secondaryLabel="РџРѕРІРµСЂРЅСѓС‚РёСЃСЏ РґРѕ РІС…РѕРґСѓ"
+        secondaryLabel="Повернутися до входу"
         onSecondary={returnToLogin}
       />
     );

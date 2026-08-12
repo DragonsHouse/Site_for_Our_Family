@@ -43,6 +43,13 @@ import { MemoryFamilyMemberRepository, type FamilyMemberRepository } from './mem
 import { PgFamilyMemberRepository } from './members/pg-member-repository.js';
 import { FamilyMemberService } from './members/member-service.js';
 import { createFamilyMembersRouter } from './routes/family-members.js';
+import { createFamilyQuestsRouter } from './routes/family-quests.js';
+import { PgFamilyQuestRepository } from './quests/pg-quest-repository.js';
+import { MemoryFamilyQuestRepository, type FamilyQuestRepository } from './quests/quest-repository.js';
+import { FamilyQuestService } from './quests/quest-service.js';
+import { FamilyAccountingReadService } from './accounting/accounting-read-service.js';
+import { FamilyQuestPayoutService } from './accounting/quest-payout-service.js';
+import { createFamilyAccountingRouter } from './routes/family-accounting.js';
 import {
   InMemoryDiscordLoginCompletionRepository,
   PgDiscordLoginCompletionRepository,
@@ -68,6 +75,10 @@ export type AppDependencies = {
   oauthLoginService?: DiscordOAuthLoginService | null;
   memberRepository?: FamilyMemberRepository;
   memberService?: FamilyMemberService | null;
+  questRepository?: FamilyQuestRepository;
+  questService?: FamilyQuestService | null;
+  questPayoutService?: FamilyQuestPayoutService | null;
+  accountingReadService?: FamilyAccountingReadService | null;
   pgPool?: pg.Pool | null;
 };
 
@@ -104,6 +115,27 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
       ? dependencies.memberService
       : memberRepository
         ? new FamilyMemberService(memberRepository, authRepository)
+        : null;
+  const questRepository =
+    dependencies.questRepository ??
+    (pgPool ? new PgFamilyQuestRepository(pgPool) : config.nodeEnv === 'test' ? new MemoryFamilyQuestRepository() : null);
+  const questService =
+    dependencies.questService !== undefined
+      ? dependencies.questService
+      : questRepository
+        ? new FamilyQuestService(questRepository)
+        : null;
+  const questPayoutService =
+    dependencies.questPayoutService !== undefined
+      ? dependencies.questPayoutService
+      : pgPool
+        ? new FamilyQuestPayoutService(pgPool)
+        : null;
+  const accountingReadService =
+    dependencies.accountingReadService !== undefined
+      ? dependencies.accountingReadService
+      : pgPool
+        ? new FamilyAccountingReadService(pgPool)
         : null;
   const loginCompletions =
     dependencies.loginCompletions ??
@@ -154,6 +186,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   app.use('/api', createAuthRouter(authService));
   app.use('/api', createDiscordAuthRouter(config, oauthLoginService));
   app.use('/api', createFamilyMembersRouter(config, authService, memberService));
+  app.use('/api', createFamilyAccountingRouter(config, authService, accountingReadService));
+  app.use('/api', createFamilyQuestsRouter(config, authService, questService, questPayoutService));
   app.use('/api', createDiscordRouter(discordService));
   app.use('/api', createDiscordAccountLinkRouter(config, accountLinks, accountLinkOAuthService, authService));
   app.use('/api', createDiscordSyncRouter(config, authService, memberSyncDryRunService, memberSyncApplyService, discordSyncEngineService));
@@ -180,6 +214,10 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     oauthLoginService,
     memberRepository,
     memberService,
+    questRepository,
+    questService,
+    questPayoutService,
+    accountingReadService,
     pgPool,
   };
 }
