@@ -25,6 +25,20 @@ export type DragonTowerVisualMetadata = {
   markerColor?: string;
 };
 
+export type DragonTowerDefenseDataSource = 'backend' | 'local';
+
+export type DragonTowerDefinition = {
+  id: string;
+  backendTowerId?: string;
+  towerCode: string;
+  towerName: string;
+  location: DragonTowerDefense['tower']['location'];
+  map: DragonTowerMapMetadata;
+  visual?: DragonTowerVisualMetadata;
+  active: boolean;
+  source: DragonTowerDefenseDataSource;
+};
+
 export type DragonGuardContribution = {
   score?: number;
   damageBlocked?: number;
@@ -34,6 +48,8 @@ export type DragonGuardContribution = {
 
 export type DragonGuardResponse = {
   memberId: string;
+  backendResponseId?: string;
+  backendFamilyMemberId?: string;
   response: DragonGuardResponseStatus;
   respondedAt?: string | null;
   note?: string | null;
@@ -42,6 +58,8 @@ export type DragonGuardResponse = {
 
 export type DragonDefenseAttendance = {
   memberId: string;
+  backendAttendanceId?: string;
+  backendFamilyMemberId?: string;
   status: DragonDefenseAttendanceStatus;
   confirmedByMemberId?: string | null;
   confirmedAt?: string | null;
@@ -51,6 +69,8 @@ export type DragonDefenseAttendance = {
 
 export type DragonFireGuardRosterEntry = {
   memberId: string;
+  backendRosterId?: string;
+  backendFamilyMemberId?: string;
   displayName: string;
   avatarUrl?: string | null;
   familyRank: string;
@@ -71,6 +91,7 @@ export type DragonFireGuardRosterEntry = {
     observedAt?: string | null;
     backendPresenceField?: string;
   };
+  source?: DragonTowerDefenseDataSource;
 };
 
 export type DragonTowerDefenseCompletionOutput = {
@@ -124,6 +145,7 @@ export type DragonTowerDefenseStatistics = {
 };
 
 export type DragonTowerDefense = DragonEntity & {
+  dataSource?: DragonTowerDefenseDataSource;
   backendDefenseId: string;
   eventId: string;
   title: string;

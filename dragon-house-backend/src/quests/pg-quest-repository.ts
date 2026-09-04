@@ -12,6 +12,7 @@ import type {
   FamilyQuestTemplateRecord,
 } from './quest-models.js';
 import type { FamilyQuestRepository } from './quest-repository.js';
+import type { UpsertQuestPersonInput } from './quest-repository.js';
 
 type QuestTemplateRow = {
   id: string;
@@ -195,6 +196,84 @@ export class PgFamilyQuestRepository implements FamilyQuestRepository {
 
   async findQuestById(id: string): Promise<FamilyQuestRecord | null> {
     const result = await this.pool.query<QuestRow>('select * from family_quests where id = $1 limit 1', [id]);
+    const quests = await this.hydrateQuests(result.rows);
+    return quests[0] ?? null;
+  }
+
+  async familyMemberExists(id: string): Promise<boolean> {
+    const result = await this.pool.query<{ exists: boolean }>('select exists(select 1 from family_members where id = $1) as exists', [id]);
+    return result.rows[0]?.exists ?? false;
+  }
+
+  async upsertQuestPerson(input: UpsertQuestPersonInput): Promise<FamilyQuestPersonRecord> {
+    const result = await this.pool.query<QuestPersonRow>(
+      `insert into family_quest_people
+        (quest_id, family_member_id, display_name, role, joined_at, added_manually, added_by_family_member_id, metadata, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, false, $6, $7::jsonb, $5, $5)
+       on conflict (quest_id, family_member_id) where family_member_id is not null and left_at is null
+       do update set
+         role = excluded.role,
+         display_name = excluded.display_name,
+         added_by_family_member_id = excluded.added_by_family_member_id,
+         metadata = family_quest_people.metadata || excluded.metadata,
+         updated_at = excluded.updated_at
+       returning *`,
+      [
+        input.questId,
+        input.familyMemberId,
+        input.displayName,
+        input.role,
+        input.joinedAt,
+        input.addedByFamilyMemberId,
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    return mapPerson(result.rows[0]);
+  }
+
+  async removeQuestPerson(questId: string, familyMemberId: string, leftAt: string): Promise<FamilyQuestPersonRecord> {
+    const result = await this.pool.query<QuestPersonRow>(
+      `update family_quest_people
+       set left_at = $3, updated_at = $3
+       where quest_id = $1 and family_member_id = $2 and left_at is null
+       returning *`,
+      [questId, familyMemberId, leftAt],
+    );
+    if (!result.rows[0]) {
+      const existing = await this.pool.query<QuestPersonRow>(
+        `select * from family_quest_people
+         where quest_id = $1 and family_member_id = $2
+         order by updated_at desc
+         limit 1`,
+        [questId, familyMemberId],
+      );
+      if (existing.rows[0]) return mapPerson(existing.rows[0]);
+      throw new Error('Quest person not found');
+    }
+    return mapPerson(result.rows[0]);
+  }
+
+  async updateQuestStatus(
+    id: string,
+    input: { status: FamilyQuestStatus; actorFamilyMemberId: string; now: string; comment?: string | null },
+  ): Promise<FamilyQuestRecord | null> {
+    const current = await this.findQuestById(id);
+    if (!current) return null;
+    const result = await this.pool.query<QuestRow>(
+      `update family_quests
+       set status = $2,
+           ends_at = coalesce(ends_at, $3),
+           updated_at = $3
+       where id = $1
+       returning *`,
+      [id, input.status, input.now],
+    );
+    await this.pool.query(
+      `insert into family_quest_audit
+        (quest_id, actor_family_member_id, action, comment, previous_status, new_status, metadata, created_at)
+       values ($1, $2, $3, $4, $5, $6, '{}'::jsonb, $7)`,
+      [id, input.actorFamilyMemberId, `quest_${input.status}`, input.comment ?? null, current.status, input.status, input.now],
+    );
     const quests = await this.hydrateQuests(result.rows);
     return quests[0] ?? null;
   }

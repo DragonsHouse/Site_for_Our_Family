@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDragonCollection } from '../data/hooks/use-dragon-collection';
 import type { DragonEvent, DragonEventFilters } from './dragon-event-models';
 import type { DragonEventCreateInput, DragonEventUpdateInput } from './dragon-event-repository';
@@ -32,12 +32,15 @@ import type {
   DragonDefenseAttendanceStatus,
   DragonDefenseResult,
   DragonGuardResponseStatus,
+  DragonFireGuardRosterEntry,
+  DragonTowerDefinition,
   DragonTowerDefense,
   DragonTowerDefenseCreateInput,
   DragonTowerDefenseFilters,
   DragonTowerDefenseRosterFilter
 } from './tower-defense-models';
 import type { DragonTowerDefenseUpdateRepositoryInput } from './tower-defense-repository';
+import type { DragonTowerDefenseReadSource as BackendReadSource } from '../../../lib/family-tower-defense-read-adapter.ts';
 
 const DEFAULT_MEMBERS_FILTERS: DragonMembersFilters = {
   search: '',
@@ -55,6 +58,13 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
   const [rosterFilter, setRosterFilter] = useState<DragonTowerDefenseRosterFilter>('all');
   const [selectedDefenseId, setSelectedDefenseId] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
+  const backendReadEnabled = Boolean(dependencies.loadTowerDefenseReadState);
+  const [readSource, setReadSource] = useState<BackendReadSource>(backendReadEnabled ? 'backend_loading' : 'local');
+  const [backendLoading, setBackendLoading] = useState(backendReadEnabled);
+  const [backendError, setBackendError] = useState<Error | null>(null);
+  const [mutating, setMutating] = useState(false);
+  const [towerDefinitions, setTowerDefinitions] = useState<DragonTowerDefinition[]>([]);
+  const [backendRoster, setBackendRoster] = useState<DragonFireGuardRosterEntry[] | null>(null);
 
   const defenseCollection = useDragonCollection<
     DragonTowerDefense,
@@ -95,7 +105,10 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
   );
   const history = useMemo(() => buildDragonDefenseHistory(defenseCollection.items, memberCollection.items), [defenseCollection.items, memberCollection.items]);
   const statistics = useMemo(() => getDragonTowerDefenseStatistics(defenseCollection.items), [defenseCollection.items]);
-  const roster = useMemo(() => buildDragonFireGuardRoster(activeDefense, memberCollection.items), [activeDefense, memberCollection.items]);
+  const roster = useMemo(
+    () => (backendReadEnabled ? backendRoster ?? [] : buildDragonFireGuardRoster(activeDefense, memberCollection.items)),
+    [activeDefense, backendReadEnabled, backendRoster, memberCollection.items]
+  );
   const filteredRoster = useMemo(() => filterDragonFireGuardRoster(roster, rosterFilter), [roster, rosterFilter]);
   const readiness = useMemo(() => (activeDefense ? calculateDragonDefenseReadiness(activeDefense) : null), [activeDefense]);
   const eventProjections = useMemo(
@@ -103,11 +116,60 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     [defenseCollection.items, memberCollection.items]
   );
 
+  const loadBackendReadState = useCallback(async () => {
+    if (!dependencies.loadTowerDefenseReadState) return null;
+    setBackendLoading(true);
+    setBackendError(null);
+    setReadSource('backend_loading');
+    try {
+      const result = await dependencies.loadTowerDefenseReadState({
+        status: filters.status,
+        result: filters.result,
+        priority: filters.priority,
+        tower: filters.tower,
+        commander: filters.commander,
+        participant: filters.participant,
+        search: filters.search
+      });
+      setReadSource(result.source);
+      setTowerDefinitions(result.towers);
+      setBackendRoster(result.roster);
+      defenseCollection.setItems(result.defenses);
+      setBackendError(result.source === 'backend_error' ? result.error : null);
+      return result;
+    } catch (error) {
+      const backendReadError = error instanceof Error ? error : new Error('Tower Defense backend read failed');
+      setReadSource('backend_error');
+      setTowerDefinitions([]);
+      setBackendRoster([]);
+      defenseCollection.setItems([]);
+      setBackendError(backendReadError);
+      return null;
+    } finally {
+      setBackendLoading(false);
+    }
+  }, [dependencies.loadTowerDefenseReadState, filters]);
+
+  useEffect(() => {
+    if (!dependencies.loadTowerDefenseReadState) return;
+    void loadBackendReadState();
+  }, [dependencies.loadTowerDefenseReadState, loadBackendReadState]);
+
   const refresh = useCallback(() => {
-    defenseCollection.refresh();
+    if (dependencies.loadTowerDefenseReadState) void loadBackendReadState();
+    else defenseCollection.refresh();
     eventCollection.refresh();
     memberCollection.refresh();
-  }, [defenseCollection, eventCollection, memberCollection]);
+  }, [defenseCollection, dependencies.loadTowerDefenseReadState, eventCollection, loadBackendReadState, memberCollection]);
+
+  const replaceDefense = useCallback(
+    (saved: DragonTowerDefense) => {
+      defenseCollection.setItems((items) => items.some((item) => item.id === saved.id) ? items.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...items]);
+      eventCollection.setItems((items) => reconcileTowerDefenseEvent(items, saved, memberCollection.items));
+      return saved;
+    },
+    [defenseCollection, eventCollection, memberCollection.items]
+  );
 
   const persistDefense = useCallback(
     async (defense: DragonTowerDefense) => {
@@ -117,59 +179,135 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
       const saved = currentExists
         ? await dependencies.towerDefenseRepository.update(defense.id, defense)
         : await dependencies.towerDefenseRepository.create(defense);
-      defenseCollection.setItems((items) => (currentExists ? items.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...items]));
-      eventCollection.setItems((items) => reconcileTowerDefenseEvent(items, saved, memberCollection.items));
-      return saved;
+      return replaceDefense(saved);
     },
-    [defenseCollection, dependencies.towerDefenseRepository, eventCollection, memberCollection.items]
+    [defenseCollection, dependencies.towerDefenseRepository, replaceDefense]
+  );
+
+  const runMutation = useCallback(
+    async <T,>(operation: () => Promise<T>) => {
+      if (mutating) throw new Error('Tower Defense request is already in progress');
+      setDomainError(null);
+      setMutating(true);
+      try {
+        return await operation();
+      } finally {
+        setMutating(false);
+      }
+    },
+    [mutating]
   );
 
   const createDefense = useCallback(
     async (input: DragonTowerDefenseCreateInput) => {
-      const defense = createDragonTowerDefense(
-        {
-          ...input,
-          eventId: input.eventId ?? buildDragonTowerDefenseEventId(input.id ?? `${input.towerCode}-${input.startsAt}`)
-        },
-        now
-      );
-      return persistDefense(defense);
+      return runMutation(async () => {
+        if (dependencies.backendOperations && readSource === 'backend') {
+          const saved = await dependencies.backendOperations.createDefense(input);
+          return replaceDefense(saved);
+        }
+        if (dependencies.backendOperations && (readSource === 'backend_loading' || readSource === 'backend_error')) {
+          throw new Error('Tower Defense backend is not ready. Retry loading before creating a defense.');
+        }
+        const defense = createDragonTowerDefense(
+          {
+            ...input,
+            eventId: input.eventId ?? buildDragonTowerDefenseEventId(input.id ?? `${input.towerCode}-${input.startsAt}`)
+          },
+          now
+        );
+        return persistDefense(defense);
+      });
     },
-    [now, persistDefense]
+    [dependencies.backendOperations, now, persistDefense, readSource, replaceDefense, runMutation]
   );
 
   const updateDefense = useCallback(
-    async (defense: DragonTowerDefense, updates: Partial<DragonTowerDefenseCreateInput>) => persistDefense(editDragonTowerDefense(defense, updates, now)),
-    [now, persistDefense]
+    async (defense: DragonTowerDefense, updates: Partial<DragonTowerDefenseCreateInput>) => {
+      return runMutation(async () => {
+        if (isBackendDefense(defense)) {
+          if (!dependencies.backendOperations) throw new Error('Tower Defense backend operations are unavailable');
+          return replaceDefense(await dependencies.backendOperations.updateDefense(defense, updates));
+        }
+        return persistDefense(editDragonTowerDefense(defense, updates, now));
+      });
+    },
+    [dependencies.backendOperations, now, persistDefense, replaceDefense, runMutation]
   );
 
   const respond = useCallback(
-    async (defense: DragonTowerDefense, memberId: string, response: DragonGuardResponseStatus, note?: string) =>
-      persistDefense(respondToDragonDefense(defense, memberId, response, now, note)),
-    [now, persistDefense]
+    async (defense: DragonTowerDefense, memberId: string, response: DragonGuardResponseStatus, note?: string) => {
+      return runMutation(async () => {
+        if (isBackendDefense(defense)) {
+          if (!dependencies.backendOperations) throw new Error('Tower Defense backend operations are unavailable');
+          return replaceDefense(await dependencies.backendOperations.respond(defense, memberId, response, note));
+        }
+        return persistDefense(respondToDragonDefense(defense, memberId, response, now, note));
+      });
+    },
+    [dependencies.backendOperations, now, persistDefense, replaceDefense, runMutation]
   );
 
   const withdrawResponse = useCallback(
-    async (defense: DragonTowerDefense, memberId: string) => persistDefense(withdrawDragonDefenseResponse(defense, memberId, now)),
-    [now, persistDefense]
+    async (defense: DragonTowerDefense, memberId: string) => {
+      return runMutation(async () => {
+        if (isBackendDefense(defense)) {
+          if (!dependencies.backendOperations) throw new Error('Tower Defense backend operations are unavailable');
+          return replaceDefense(await dependencies.backendOperations.withdrawResponse(defense));
+        }
+        return persistDefense(withdrawDragonDefenseResponse(defense, memberId, now));
+      });
+    },
+    [dependencies.backendOperations, now, persistDefense, replaceDefense, runMutation]
   );
 
   const confirmAttendance = useCallback(
-    async (defense: DragonTowerDefense, memberId: string, status: DragonDefenseAttendanceStatus, confirmedByMemberId: string, note?: string) =>
-      persistDefense(confirmDragonDefenseAttendance(defense, memberId, status, confirmedByMemberId, now, undefined, note)),
-    [now, persistDefense]
+    async (defense: DragonTowerDefense, memberId: string, status: DragonDefenseAttendanceStatus, confirmedByMemberId: string, note?: string) => {
+      return runMutation(async () => {
+        if (isBackendDefense(defense)) {
+          if (!dependencies.backendOperations) throw new Error('Tower Defense backend operations are unavailable');
+          return replaceDefense(await dependencies.backendOperations.confirmAttendance(defense, memberId, status, note));
+        }
+        return persistDefense(confirmDragonDefenseAttendance(defense, memberId, status, confirmedByMemberId, now, undefined, note));
+      });
+    },
+    [dependencies.backendOperations, now, persistDefense, replaceDefense, runMutation]
   );
 
-  const startDefense = useCallback((defense: DragonTowerDefense) => persistDefense(startDragonDefense(defense, now)), [now, persistDefense]);
+  const startDefense = useCallback(
+    (defense: DragonTowerDefense) => {
+      return runMutation(async () => {
+        if (isBackendDefense(defense)) {
+          if (!dependencies.backendOperations) throw new Error('Tower Defense backend operations are unavailable');
+          return dependencies.backendOperations.startDefense(defense).then(replaceDefense);
+        }
+        return persistDefense(startDragonDefense(defense, now));
+      });
+    },
+    [dependencies.backendOperations, now, persistDefense, replaceDefense, runMutation]
+  );
   const completeDefense = useCallback(
-    (defense: DragonTowerDefense, result: Exclude<DragonDefenseResult, 'pending' | 'cancelled'>, completedByMemberId: string, notes?: string, failureReason?: string) =>
-      persistDefense(completeDragonDefense(defense, result, completedByMemberId, now, notes, failureReason)),
-    [now, persistDefense]
+    (defense: DragonTowerDefense, result: Exclude<DragonDefenseResult, 'pending' | 'cancelled'>, completedByMemberId: string, notes?: string, failureReason?: string) => {
+      return runMutation(async () => {
+        if (isBackendDefense(defense)) {
+          if (!dependencies.backendOperations) throw new Error('Tower Defense backend operations are unavailable');
+          return dependencies.backendOperations.completeDefense(defense, result, notes, failureReason).then(replaceDefense);
+        }
+        return persistDefense(completeDragonDefense(defense, result, completedByMemberId, now, notes, failureReason));
+      });
+    },
+    [dependencies.backendOperations, now, persistDefense, replaceDefense, runMutation]
   );
   const cancelDefense = useCallback(
-    (defense: DragonTowerDefense, cancelledByMemberId: string, reason?: string) =>
-      persistDefense(cancelDragonDefense(defense, cancelledByMemberId, now, reason)),
-    [now, persistDefense]
+    (defense: DragonTowerDefense, cancelledByMemberId: string, reason?: string) => {
+      return runMutation(async () => {
+        if (isBackendDefense(defense)) {
+          if (!dependencies.backendOperations) throw new Error('Tower Defense backend operations are unavailable');
+          return dependencies.backendOperations.cancelDefense(defense, reason).then(replaceDefense);
+        }
+        return persistDefense(cancelDragonDefense(defense, cancelledByMemberId, now, reason));
+      });
+    },
+    [dependencies.backendOperations, now, persistDefense, replaceDefense, runMutation]
   );
 
   return {
@@ -180,9 +318,9 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     setRosterFilter,
     selectedDefense,
     setSelectedDefenseId,
-    loading: defenseCollection.loading || eventCollection.loading || memberCollection.loading,
-    refreshing: defenseCollection.refreshing || eventCollection.refreshing || memberCollection.refreshing,
-    error: defenseCollection.error ?? eventCollection.error ?? memberCollection.error,
+    loading: backendReadEnabled ? backendLoading : defenseCollection.loading || eventCollection.loading || memberCollection.loading,
+    refreshing: backendReadEnabled ? backendLoading : defenseCollection.refreshing || eventCollection.refreshing || memberCollection.refreshing,
+    error: backendReadEnabled ? backendError : defenseCollection.error ?? eventCollection.error ?? memberCollection.error,
     domainError,
     setDomainError,
     refresh,
@@ -198,6 +336,9 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     roster,
     filteredRoster,
     readiness,
+    readSource,
+    mutating,
+    towerDefinitions,
     createDefense,
     updateDefense,
     respond,
@@ -209,4 +350,8 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     buildCompletionOutput: buildTowerDefenseCompletionOutput,
     buildProfileTimeline: buildTowerDefenseProfileTimeline
   };
+}
+
+function isBackendDefense(defense: DragonTowerDefense): boolean {
+  return defense.dataSource === 'backend' || defense.backendMetadata?.dataSource === 'backend';
 }

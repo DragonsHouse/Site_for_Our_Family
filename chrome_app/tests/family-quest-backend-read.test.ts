@@ -248,8 +248,10 @@ describe('Family Quest backend read adapter', () => {
     assert.equal(adapterSource.includes('if (!questResponse.items.length)'), false);
   });
 
-  it('falls back to local reads only on backend failure and does not blindly merge backend and local data', () => {
-    assert.match(adapterSource, /catch \(error\) \{[\s\S]*source: 'local'/u);
+  it('blocks production local fallback on backend failure and does not blindly merge backend and local data', () => {
+    assert.match(adapterSource, /catch \(error\) \{[\s\S]*source: 'backend_error'/u);
+    assert.match(adapterSource, /source: 'dev_local_fallback'/u);
+    assert.match(adapterSource, /FAMILY_QUEST_ALLOW_LOCAL_FALLBACK/u);
     assert.match(adapterSource, /readFamilyQuestTemplates/u);
     assert.match(adapterSource, /readFamilyQuests/u);
     assert.doesNotMatch(adapterSource, /\.\.\.readFamilyQuests\(\).*questResponse|questResponse.*\.\.\.readFamilyQuests\(\)/su);
@@ -275,11 +277,12 @@ describe('Family Quest backend read adapter', () => {
     assert.match(questUiSource, /issueFamilyQuestPayouts\(\{ questId, actorId: currentUser\.id, userIds: \[userId\] \}\)/u);
   });
 
-  it('loads backend quest state asynchronously without breaking local fallback rendering', () => {
+  it('loads backend quest state asynchronously without production local fallback rendering', () => {
     assert.match(questUiSource, /useEffect\(\(\) => \{/u);
     assert.match(questUiSource, /loadFamilyQuestReadState\(controller\.signal\)/u);
     assert.match(questUiSource, /setQuestReadSource\(state\.source\)/u);
-    assert.match(questUiSource, /Backend quests unavailable\. Showing local fallback\./u);
+    assert.match(questUiSource, /useState<FamilyQuestReadSource>\('backend_loading'\)/u);
+    assert.match(questUiSource, /Backend quests unavailable\. Retry after the backend is reachable\./u);
   });
 
   it('keeps this read adapter test in the frontend suite', () => {

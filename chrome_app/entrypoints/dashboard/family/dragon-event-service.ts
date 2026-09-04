@@ -1,4 +1,4 @@
-import type { DragonCalendarCategory, DragonCalendarEvent, DragonCalendarPriority } from './calendar-models';
+import type { DragonCalendarCategory, DragonCalendarEvent, DragonCalendarPriority, DragonCalendarSourceModule } from './calendar-models';
 import type { DragonBirthdayData } from './birthday-models';
 import type {
   DragonEvent,
@@ -221,7 +221,8 @@ export function mapDragonEventsToCalendarEvents(events: DragonEvent[]): DragonCa
       createdBy: event.creator.name,
       hall: event.location.label,
       attachments: [],
-      activity: event.source.sourceModule
+      activity: event.source.sourceModule,
+      sourceModule: calendarSourceModule(event.source.sourceModule)
     }));
 }
 
@@ -248,6 +249,13 @@ export function getDragonEventTypeLabel(type: DragonEventType) {
 export function getLocalDateKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function calendarSourceModule(sourceModule: DragonEvent['source']['sourceModule']): DragonCalendarSourceModule {
+  if (sourceModule === 'tower_defense') return 'tower_defense';
+  if (sourceModule === 'quest_board') return 'family_quests';
+  if (sourceModule === 'birthday') return 'birthday';
+  return 'family_events';
 }
 
 function getObservedBirthdayInYear(month: number, day: number, year: number) {

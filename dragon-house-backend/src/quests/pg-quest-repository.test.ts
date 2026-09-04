@@ -67,7 +67,7 @@ class FakePool {
         ],
       };
     }
-    if (sql.includes('from family_quest_people')) {
+    if (sql.includes('from family_quest_people') || sql.includes('insert into family_quest_people')) {
       return {
         rows: [
           {
@@ -143,5 +143,24 @@ describe('PgFamilyQuestRepository', () => {
       ],
     });
     expect(pool.calls.some((call) => call.sql.includes('status = $1'))).toBe(true);
+  });
+
+  it('matches the active member partial unique index when upserting quest people', async () => {
+    const pool = new FakePool();
+    const repository = new PgFamilyQuestRepository(pool as never);
+
+    await repository.upsertQuestPerson({
+      questId: '10000000-0000-4000-8000-000000000001',
+      familyMemberId: 'member-id',
+      displayName: 'Member_Dragons',
+      role: 'participant',
+      joinedAt: now.toISOString(),
+      addedByFamilyMemberId: 'owner-id',
+      metadata: { source: 'discord' },
+    });
+
+    expect(pool.calls[0]?.sql).toContain(
+      'on conflict (quest_id, family_member_id) where family_member_id is not null and left_at is null',
+    );
   });
 });

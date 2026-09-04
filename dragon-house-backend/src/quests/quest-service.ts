@@ -1,4 +1,5 @@
 import type { FamilyAuthContext } from '../types.js';
+import type { FamilyMemberRepository } from '../members/member-repository.js';
 import { FamilyQuestError } from './quest-errors.js';
 import type {
   FamilyQuestListQuery,
@@ -142,7 +143,10 @@ export type FamilyQuestAuditDto = {
 };
 
 export class FamilyQuestService {
-  constructor(private readonly repository: FamilyQuestRepository) {}
+  constructor(
+    private readonly repository: FamilyQuestRepository,
+    private readonly memberRepository: FamilyMemberRepository | null = null,
+  ) {}
 
   async listTemplates(auth: FamilyAuthContext): Promise<{ items: FamilyQuestTemplateDto[] }> {
     this.assertCanRead(auth);
@@ -161,10 +165,84 @@ export class FamilyQuestService {
     return toQuestDto(quest);
   }
 
+  async joinQuest(
+    id: string,
+    input: { role: 'participant' | 'helper'; note?: string | null; metadata?: Record<string, unknown> },
+    auth: FamilyAuthContext,
+    now = new Date(),
+  ): Promise<FamilyQuestPersonDto> {
+    this.assertCanRead(auth);
+    const quest = await this.requireQuest(id);
+    this.assertQuestOpenForParticipation(quest);
+    await this.assertMemberExists(auth.familyMemberId);
+    const member = this.memberRepository ? await this.memberRepository.findById(auth.familyMemberId) : null;
+    const person = await this.repository.upsertQuestPerson({
+      questId: id,
+      familyMemberId: auth.familyMemberId,
+      displayName: member?.nickname ?? auth.familyMemberId,
+      role: input.role,
+      joinedAt: now.toISOString(),
+      addedByFamilyMemberId: auth.familyMemberId,
+      metadata: {
+        ...(input.metadata ?? {}),
+        source: input.metadata?.source ?? 'api',
+        note: input.note ?? undefined,
+      },
+    });
+    return toPersonDto(person);
+  }
+
+  async withdrawQuest(id: string, auth: FamilyAuthContext, now = new Date()): Promise<FamilyQuestPersonDto> {
+    this.assertCanRead(auth);
+    const quest = await this.requireQuest(id);
+    this.assertQuestOpenForParticipation(quest);
+    const person = await this.repository.removeQuestPerson(id, auth.familyMemberId, now.toISOString());
+    return toPersonDto(person);
+  }
+
+  async completeQuest(id: string, input: { comment?: string | null }, auth: FamilyAuthContext, now = new Date()): Promise<FamilyQuestDto> {
+    this.assertCanManage(auth);
+    const quest = await this.requireQuest(id);
+    if (['completed', 'reported', 'sent_to_accounting', 'paid', 'cooldown', 'stopped'].includes(quest.status)) {
+      throw new FamilyQuestError('QUEST_INVALID_TRANSITION', 'Quest is already closed.', 409, { status: quest.status });
+    }
+    const updated = await this.repository.updateQuestStatus(id, {
+      status: 'completed',
+      actorFamilyMemberId: auth.familyMemberId,
+      now: now.toISOString(),
+      comment: input.comment ?? null,
+    });
+    if (!updated) throw new FamilyQuestError('QUEST_NOT_FOUND', 'Quest not found', 404);
+    return toQuestDto(updated);
+  }
+
+  private async requireQuest(id: string): Promise<FamilyQuestRecord> {
+    const quest = await this.repository.findQuestById(id);
+    if (!quest) throw new FamilyQuestError('QUEST_NOT_FOUND', 'Quest not found', 404);
+    return quest;
+  }
+
+  private assertQuestOpenForParticipation(quest: FamilyQuestRecord): void {
+    if (['completed', 'reported', 'sent_to_accounting', 'paid', 'cooldown', 'stopped'].includes(quest.status)) {
+      throw new FamilyQuestError('QUEST_INVALID_TRANSITION', 'Cannot change participation for a closed quest.', 409, { status: quest.status });
+    }
+  }
+
+  private async assertMemberExists(id: string): Promise<void> {
+    if (!(await this.repository.familyMemberExists(id))) {
+      throw new FamilyQuestError('QUEST_MEMBER_NOT_FOUND', 'Family member not found.', 404, { familyMemberId: id });
+    }
+  }
+
   private assertCanRead(auth: FamilyAuthContext): void {
     if (auth.status !== 'active') {
       throw new FamilyQuestError('QUEST_PERMISSION_DENIED', 'Inactive members cannot view quests', 403);
     }
+  }
+
+  private assertCanManage(auth: FamilyAuthContext): void {
+    if (auth.role === 'owner' || auth.rank >= 8 || auth.permissions.includes('manage_family_quests')) return;
+    throw new FamilyQuestError('QUEST_PERMISSION_DENIED', 'Permission denied.', 403);
   }
 }
 

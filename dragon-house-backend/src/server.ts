@@ -17,6 +17,12 @@ if (missingDiscordConfig.length > 0) {
   logger.warn('discord_integration_disabled', { missing: missingDiscordConfig, status: discordService.getStatus().status });
 }
 
+if (config.discord.orchestration.enabled) {
+  discordService.connect().catch(() => {
+    logger.error('discord_orchestration_connect_failed', { reason: 'Discord gateway connection failed' });
+  });
+}
+
 if (pgPool) {
   try {
     await verifyDatabaseConnection(pgPool);

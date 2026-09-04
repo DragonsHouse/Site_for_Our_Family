@@ -60,11 +60,11 @@ export function canManageFamilyQuests(user: FamilyUser) {
 }
 
 export function canViewAccounting(user: FamilyUser) {
-  return user.rankLevel >= 8 || hasFamilyPermission(user, 'manage_accounting');
+  return user.rankLevel >= 8 || hasFamilyPermission(user, 'manage_accounting') || hasFamilyPermission(user, 'manage_treasury');
 }
 
 export function canManageAccounting(user: FamilyUser) {
-  return hasFamilyPermission(user, 'manage_accounting');
+  return user.rankLevel >= 8 || hasFamilyPermission(user, 'manage_accounting') || hasFamilyPermission(user, 'manage_treasury');
 }
 
 export function canViewBonus(user: FamilyUser, bonus: FamilyBonus) {
@@ -84,7 +84,7 @@ export function canManageFamilyAssets(user: FamilyUser) {
 }
 
 export function canManageDiscordIntegration(user: FamilyUser) {
-  return hasFamilyPermission(user, 'manage_discord_integration');
+  return user.rankLevel >= 8 || hasFamilyPermission(user, 'manage_discord_integration');
 }
 
 export function canManageBackups(user: FamilyUser) {

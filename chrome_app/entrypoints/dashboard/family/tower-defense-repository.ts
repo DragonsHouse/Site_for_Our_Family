@@ -22,3 +22,13 @@ export const mockDragonTowerDefenseRepository: DragonTowerDefenseRepository = cr
   ...input,
   id: input.id ?? globalThis.crypto?.randomUUID?.() ?? `tower-defense-${Date.now()}`
 }));
+
+export const emptyDragonTowerDefenseRepository: DragonTowerDefenseRepository = createMockRepository<
+  DragonTowerDefense,
+  DragonTowerDefenseCreateRepositoryInput,
+  DragonTowerDefenseUpdateRepositoryInput,
+  Partial<DragonTowerDefenseFilters>
+>([], (input) => ({
+  ...input,
+  id: input.id ?? globalThis.crypto?.randomUUID?.() ?? `tower-defense-${Date.now()}`
+}));

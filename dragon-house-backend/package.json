@@ -15,6 +15,7 @@
     "db:reset:dev": "tsx src/db/reset-dev.ts",
     "data:migrate:dry-run": "tsx src/data-migration/dry-run.ts",
     "family:bootstrap-owner": "tsx src/members/bootstrap-owner.ts",
+    "discord:register-commands": "tsx src/discord/register-commands.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",

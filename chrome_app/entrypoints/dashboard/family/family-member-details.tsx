@@ -7,6 +7,7 @@ import {
 } from '../../../lib/family-member-directory-client';
 import type { FamilyUser } from '../../../lib/family-types';
 import { DragonHouseCrest } from './dragon-house-crest';
+import { FamilyMemberActivityPanel } from './family-member-activity-panel';
 
 type DetailsState =
   | { status: 'loading'; member: FamilyMemberPublicDetails | null }
@@ -231,6 +232,8 @@ function LoadedDetails({
           ))}
         </div>
       </section>
+
+      <FamilyMemberActivityPanel memberId={member.memberId} />
     </div>
   );
 }

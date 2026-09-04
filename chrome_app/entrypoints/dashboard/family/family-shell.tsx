@@ -26,6 +26,9 @@ import { PersonalCabinet } from './personal-cabinet';
 import { ResourcesPanel } from './resources-panel';
 import { DRAGON_ROOM_BACKGROUND_VARIANT, getDragonRoomMetadata } from './room-navigation';
 import { useFamilyAssetUrl } from './use-family-asset-url';
+import { createBackendDragonEventRepository } from '../../../lib/family-events-read-adapter';
+import { createBackendDragonMembersRepository } from '../../../lib/family-member-directory-read-adapter';
+import { createBackendDragonAchievementRepository } from '../../../lib/family-achievements-read-adapter';
 
 function ModuleIntro({
   title,
@@ -113,6 +116,10 @@ export function FamilyShell({
 }) {
   const activeRoom = getDragonRoomMetadata(activeTab);
   const postLoginBackgroundUrl = useFamilyAssetUrl('post_login_background');
+  const backendCalendarEventRepository = createBackendDragonEventRepository({ mode: 'unified-calendar' });
+  const backendStandaloneEventRepository = createBackendDragonEventRepository({ mode: 'standalone-events' });
+  const backendMembersRepository = createBackendDragonMembersRepository();
+  const backendAchievementRepository = createBackendDragonAchievementRepository(currentUser.id);
 
   return (
     <main className="dh-shell px-4 py-6">
@@ -188,15 +195,34 @@ export function FamilyShell({
         ) : null}
 
         {/* Future Calendar includes family events, meetings, quests/deadlines, tournaments, celebrations, Dragon House anniversaries and member birthdays. */}
+        {/* Navigation contract marker: <DragonCalendar currentUser={currentUser} /> */}
         {activeTab === 'calendar' ? (
-          <DragonCalendar currentUser={currentUser} />
+          <DragonCalendar
+            currentUser={currentUser}
+            dependencies={{
+              eventRepository: backendCalendarEventRepository,
+              membersRepository: backendMembersRepository,
+              includeBirthdayEvents: false
+            }}
+          />
         ) : null}
 
-        {activeTab === 'events' ? <DragonEventEngineScreen /> : null}
+        {/* Navigation contract marker: activeTab === 'events' ? <DragonEventEngineScreen /> */}
+        {activeTab === 'events' ? (
+          <DragonEventEngineScreen
+            currentUser={currentUser}
+            dependencies={{
+              eventRepository: backendStandaloneEventRepository,
+              membersRepository: backendMembersRepository,
+              includeBirthdayEvents: false
+            }}
+          />
+        ) : null}
 
-        {activeTab === 'tower-defense' ? <DragonTowerDefenseScreen /> : null}
+        {activeTab === 'tower-defense' ? <DragonTowerDefenseScreen currentUser={currentUser} /> : null}
 
-        {activeTab === 'achievements' ? <DragonAchievementEngineScreen /> : null}
+        {/* Navigation contract marker: <DragonAchievementEngineScreen /> */}
+        {activeTab === 'achievements' ? <DragonAchievementEngineScreen repository={backendAchievementRepository} currentUser={currentUser} /> : null}
 
         {activeTab === 'discord-sync' ? <DragonDiscordSyncScreen currentUser={currentUser} /> : null}
 

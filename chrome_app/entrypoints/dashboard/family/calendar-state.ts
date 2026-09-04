@@ -18,13 +18,15 @@ const DEFAULT_FILTERS: DragonCalendarFilters = {
   category: 'all',
   member: '',
   dateFrom: '',
-  dateTo: ''
+  dateTo: '',
+  sourceModule: 'all'
 };
 
 export type DragonCalendarStateDependencies = {
   eventRepository: DragonEventRepository;
   membersRepository: DragonMembersRepository;
   now?: Date;
+  includeBirthdayEvents?: boolean;
 };
 
 export function useDragonCalendarState(dependencies: DragonCalendarStateDependencies) {
@@ -44,8 +46,8 @@ export function useDragonCalendarState(dependencies: DragonCalendarStateDependen
     todayKey
   });
   const birthdayDragonEvents = useMemo(
-    () => buildDragonBirthdayEvents(birthdayState.birthdays, anchorDate.getFullYear(), todayKey),
-    [anchorDate, birthdayState.birthdays, todayKey]
+    () => dependencies.includeBirthdayEvents === false ? [] : buildDragonBirthdayEvents(birthdayState.birthdays, anchorDate.getFullYear(), todayKey),
+    [anchorDate, birthdayState.birthdays, dependencies.includeBirthdayEvents, todayKey]
   );
   const dragonEvents = useMemo(() => mergeDragonEvents(collection.items, birthdayDragonEvents), [birthdayDragonEvents, collection.items]);
   const events = useMemo(
@@ -68,12 +70,12 @@ export function useDragonCalendarState(dependencies: DragonCalendarStateDependen
     todayKey,
     filters,
     setFilters,
-    loading: collection.loading || birthdayState.loading,
-    refreshing: collection.refreshing || birthdayState.refreshing,
-    error: collection.error ?? birthdayState.error,
+    loading: collection.loading || (dependencies.includeBirthdayEvents !== false && birthdayState.loading),
+    refreshing: collection.refreshing || (dependencies.includeBirthdayEvents !== false && birthdayState.refreshing),
+    error: collection.error ?? (dependencies.includeBirthdayEvents !== false ? birthdayState.error : null),
     refresh: () => {
       collection.refresh();
-      birthdayState.refresh();
+      if (dependencies.includeBirthdayEvents !== false) birthdayState.refresh();
     },
     dragonEvents,
     events,

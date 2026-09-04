@@ -44,6 +44,9 @@ const EnvSchema = z.object({
   DISCORD_QUEST_INFO_CHANNEL_ID: z.string().trim().optional().default(''),
   DISCORD_QUEST_ANNOUNCEMENTS_CHANNEL_ID: z.string().trim().optional().default(''),
   DISCORD_QUEST_PAYMENTS_CHANNEL_ID: z.string().trim().optional().default(''),
+  DISCORD_TOWER_GUARD_CHANNEL_ID: z.string().trim().optional().default(''),
+  DISCORD_EVENTS_CHANNEL_ID: z.string().trim().optional().default(''),
+  DISCORD_ADMIN_LOG_CHANNEL_ID: z.string().trim().optional().default(''),
   DISCORD_ACCOUNTING_CHANNEL_ID: z.string().trim().optional().default(''),
   DISCORD_FAMILY_PHOTOS_CHANNEL_ID: z.string().trim().optional().default(''),
   DISCORD_SYNC_PROTECTED_OWNER_MEMBER_ID: z.string().trim().optional().default(''),
@@ -54,6 +57,7 @@ const EnvSchema = z.object({
   DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(6),
   DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(2),
   DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
+  DISCORD_ORCHESTRATION_ENABLED: EnvBoolean.default(false),
 });
 
 export type AppEnv = z.infer<typeof EnvSchema>;
@@ -67,6 +71,9 @@ export type DiscordChannelConfig = {
   questInfo: string | null;
   questAnnouncements: string | null;
   questPayments: string | null;
+  towerGuard: string | null;
+  events: string | null;
+  adminLog: string | null;
   accounting: string | null;
   familyPhotos: string | null;
 };
@@ -111,6 +118,9 @@ export type AppConfig = {
       dryRunRateLimitPerMinute: number;
       applyRateLimitPerHour: number;
       reportRateLimitPerMinute: number;
+    };
+    orchestration: {
+      enabled: boolean;
     };
     channels: DiscordChannelConfig;
   };
@@ -165,6 +175,9 @@ export function maskConfigForDiagnostics(env: AppEnv): Record<string, string | n
     DISCORD_QUEST_INFO_CHANNEL_ID: nullable(env.DISCORD_QUEST_INFO_CHANNEL_ID),
     DISCORD_QUEST_ANNOUNCEMENTS_CHANNEL_ID: nullable(env.DISCORD_QUEST_ANNOUNCEMENTS_CHANNEL_ID),
     DISCORD_QUEST_PAYMENTS_CHANNEL_ID: nullable(env.DISCORD_QUEST_PAYMENTS_CHANNEL_ID),
+    DISCORD_TOWER_GUARD_CHANNEL_ID: nullable(env.DISCORD_TOWER_GUARD_CHANNEL_ID),
+    DISCORD_EVENTS_CHANNEL_ID: nullable(env.DISCORD_EVENTS_CHANNEL_ID),
+    DISCORD_ADMIN_LOG_CHANNEL_ID: nullable(env.DISCORD_ADMIN_LOG_CHANNEL_ID),
     DISCORD_ACCOUNTING_CHANNEL_ID: nullable(env.DISCORD_ACCOUNTING_CHANNEL_ID),
     DISCORD_FAMILY_PHOTOS_CHANNEL_ID: nullable(env.DISCORD_FAMILY_PHOTOS_CHANNEL_ID),
     DISCORD_SYNC_PROTECTED_OWNER_MEMBER_ID: nullable(env.DISCORD_SYNC_PROTECTED_OWNER_MEMBER_ID),
@@ -175,6 +188,7 @@ export function maskConfigForDiagnostics(env: AppEnv): Record<string, string | n
     DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE: env.DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE,
     DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR: env.DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR,
     DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE: env.DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE,
+    DISCORD_ORCHESTRATION_ENABLED: String(env.DISCORD_ORCHESTRATION_ENABLED),
   };
 }
 
@@ -233,6 +247,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
         applyRateLimitPerHour: env.DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR,
         reportRateLimitPerMinute: env.DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE,
       },
+      orchestration: {
+        enabled: env.DISCORD_ORCHESTRATION_ENABLED,
+      },
       channels: {
         welcome: nullable(env.DISCORD_WELCOME_CHANNEL_ID),
         nicknameChange: nullable(env.DISCORD_NICKNAME_CHANGE_CHANNEL_ID),
@@ -242,6 +259,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
         questInfo: nullable(env.DISCORD_QUEST_INFO_CHANNEL_ID),
         questAnnouncements: nullable(env.DISCORD_QUEST_ANNOUNCEMENTS_CHANNEL_ID),
         questPayments: nullable(env.DISCORD_QUEST_PAYMENTS_CHANNEL_ID),
+        towerGuard: nullable(env.DISCORD_TOWER_GUARD_CHANNEL_ID),
+        events: nullable(env.DISCORD_EVENTS_CHANNEL_ID),
+        adminLog: nullable(env.DISCORD_ADMIN_LOG_CHANNEL_ID),
         accounting: nullable(env.DISCORD_ACCOUNTING_CHANNEL_ID),
         familyPhotos: nullable(env.DISCORD_FAMILY_PHOTOS_CHANNEL_ID),
       },

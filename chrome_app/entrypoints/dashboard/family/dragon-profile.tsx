@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import type { FamilyUser } from '../../../lib/family-types';
+import { createBackendDragonAchievementRepository } from '../../../lib/family-achievements-read-adapter';
 import {
   DragonAvatar,
   DragonBadge,
@@ -11,13 +13,18 @@ import {
   DragonSection
 } from '../dragon-ui/dragon-ui';
 import { DragonAchievementCard, DragonActivityHeatmap, DragonStatisticCard, DragonTimeline } from './dragon-profile-components';
+import { FamilyMemberActivityPanel } from './family-member-activity-panel';
+import { FamilyPersonalAccountingPanel } from './family-personal-accounting-panel';
 import { formatDragonBirthday } from './birthday-service';
 import { DRAGON_PROFILE_STATUS_META } from './profile-models';
 import { formatDragonProfileDate } from './profile-service';
 import { useDragonProfileState } from './profile-state';
+import { useDragonAchievementState } from './achievement-state';
 
 export function DragonProfile({ user }: { user: FamilyUser }) {
   const chamber = useDragonProfileState(user);
+  const achievementRepository = useMemo(() => createBackendDragonAchievementRepository(user.id), [user.id]);
+  const profileAchievements = useDragonAchievementState(achievementRepository);
   const { profile } = chamber;
   const identity = profile.identity;
   const statusMeta = DRAGON_PROFILE_STATUS_META[identity.currentStatus];
@@ -79,13 +86,13 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
       <section className="dh-profile-command-stats" aria-label="Dragon Profile command totals">
         <DragonCard>
           <span className="dh-dragon-eyebrow">Unlocked seals</span>
-          <strong>{chamber.primaryStats.achievementsUnlocked}</strong>
-          <p>achievements active in this chamber</p>
+          <strong>{profileAchievements.statistics.unlocked}</strong>
+          <p>backend achievement awards</p>
         </DragonCard>
         <DragonCard>
           <span className="dh-dragon-eyebrow">Legendary</span>
-          <strong>{chamber.primaryStats.legendaryAchievements}</strong>
-          <p>legendary seals tracked for future backend</p>
+          <strong>{profileAchievements.statistics.legendaryCount}</strong>
+          <p>legendary backend seals</p>
         </DragonCard>
         <DragonCard>
           <span className="dh-dragon-eyebrow">Permissions</span>
@@ -98,6 +105,9 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
           <p>mock heatmap energy</p>
         </DragonCard>
       </section>
+
+      <FamilyPersonalAccountingPanel memberId={user.id} />
+      <FamilyMemberActivityPanel memberId={user.id} />
 
       <DragonSection eyebrow="DRAGON IDENTITY" title="Identity command seal">
         <div className="dh-profile-identity-grid">
@@ -131,8 +141,10 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
       </DragonSection>
 
       <DragonSection eyebrow="ACHIEVEMENTS" title="Seals and hidden honors">
+        {profileAchievements.loading ? <DragonLoader label="Profile achievements are loading" /> : null}
+        {profileAchievements.error ? <DragonRetry title="Profile achievements did not load" description={profileAchievements.error.message} onRetry={profileAchievements.refresh} /> : null}
         <div className="dh-profile-achievement-grid">
-          {chamber.achievements.map((achievement) => (
+          {profileAchievements.achievements.map((achievement) => (
             <DragonAchievementCard key={achievement.id} achievement={achievement} />
           ))}
         </div>

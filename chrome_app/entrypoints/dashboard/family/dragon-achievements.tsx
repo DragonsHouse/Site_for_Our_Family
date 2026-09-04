@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DragonBadge,
   DragonButton,
@@ -6,8 +6,10 @@ import {
   DragonDialog,
   DragonEmptyState,
   DragonInput,
+  DragonLoader,
   DragonPanel,
   DragonProgress,
+  DragonRetry,
   DragonSection,
   DragonSelect,
   DragonTabs
@@ -27,6 +29,17 @@ import {
   getRecentDragonAchievementUnlocks
 } from './achievement-service';
 import { useDragonAchievementState } from './achievement-state';
+import type { DragonAchievementRepository } from './achievement-repository';
+import type { FamilyUser } from '../../../lib/family-types';
+import type { BackendRewardQueueItemDto } from '../../../lib/family-achievements-backend-response';
+import {
+  approveBackendRewardGrant,
+  cancelBackendRewardGrant,
+  getBackendLeaderboard,
+  issueBackendRewardGrant,
+  listBackendPendingRewards
+} from '../../../lib/family-achievements-backend-client';
+import { formatRewardValue, getRewardSourceLabel, getRewardStatusLabel } from '../../../lib/family-rewards-display';
 
 const CATEGORY_TABS: Array<{ key: DragonAchievementCategory | 'all'; label: string; room?: string }> = [
   { key: 'all', label: 'All', room: 'Engine' },
@@ -39,10 +52,21 @@ const CATEGORY_TABS: Array<{ key: DragonAchievementCategory | 'all'; label: stri
 
 const RARITIES: Array<DragonAchievementRarity | 'all'> = ['all', 'common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
 
-export function DragonAchievementEngineScreen() {
-  const engine = useDragonAchievementState();
+export function DragonAchievementEngineScreen({ repository, currentUser }: { repository?: DragonAchievementRepository; currentUser?: FamilyUser }) {
+  const engine = useDragonAchievementState(repository);
   const [selectedAchievement, setSelectedAchievement] = useState<DragonAchievement | null>(null);
+  const [leaderboard, setLeaderboard] = useState<Awaited<ReturnType<typeof getBackendLeaderboard>> | null>(null);
+  const [leaderboardError, setLeaderboardError] = useState<Error | null>(null);
   const recentUnlocks = useMemo(() => getRecentDragonAchievementUnlocks(engine.achievements, 4), [engine.achievements]);
+
+  const refreshLeaderboard = () => {
+    setLeaderboardError(null);
+    getBackendLeaderboard({ period: 'current_month', category: 'overall' })
+      .then(setLeaderboard)
+      .catch((error) => setLeaderboardError(error instanceof Error ? error : new Error('Leaderboard backend request failed.')));
+  };
+
+  useEffect(refreshLeaderboard, []);
 
   return (
     <div className="dh-achievement-engine" data-dragon-achievement-engine="frontend">
@@ -55,8 +79,25 @@ export function DragonAchievementEngineScreen() {
         <DragonAchievementProgressSummary statistics={engine.statistics} />
       </DragonPanel>
 
+      {engine.loading ? <DragonLoader label="Achievement catalog is loading" /> : null}
+      {engine.error ? <DragonRetry title="Achievements did not load" description={engine.error.message} onRetry={engine.refresh} /> : null}
       <DragonAchievementFilters filters={engine.filters} onChange={engine.setFilters} />
       <DragonAchievementGallery achievements={engine.visibleAchievements} onSelect={setSelectedAchievement} />
+
+      {currentUser && canManageRewards(currentUser) ? <DragonRewardApprovalQueue /> : null}
+
+      <DragonSection eyebrow="LEADERBOARD" title="Current month ranking">
+        {leaderboardError ? <DragonRetry title="Leaderboard did not load" description={leaderboardError.message} onRetry={refreshLeaderboard} /> : null}
+        <div className="dh-achievement-recent-grid" data-leaderboard-source="backend">
+          {leaderboard?.items.length ? leaderboard.items.slice(0, 5).map((entry) => (
+            <DragonCard key={entry.familyMemberId}>
+              <span className="dh-dragon-eyebrow">Place {entry.place}</span>
+              <strong>{entry.displayName}</strong>
+              <p>{entry.score} authoritative activity points</p>
+            </DragonCard>
+          )) : !leaderboardError ? <DragonEmptyState title="No leaderboard activity" description="No authoritative activity is available for this period." /> : null}
+        </div>
+      </DragonSection>
 
       <DragonSection eyebrow="RECENT UNLOCKS" title="Freshly awakened seals">
         <div className="dh-achievement-recent-grid">
@@ -68,6 +109,74 @@ export function DragonAchievementEngineScreen() {
 
       {selectedAchievement ? <DragonAchievementDetails achievement={selectedAchievement} onClose={() => setSelectedAchievement(null)} /> : null}
     </div>
+  );
+}
+
+function DragonRewardApprovalQueue() {
+  const [items, setItems] = useState<BackendRewardQueueItemDto[]>([]);
+  const [status, setStatus] = useState<'earned' | 'approved' | 'all'>('earned');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [mutatingId, setMutatingId] = useState<string | null>(null);
+
+  const refresh = () => {
+    setLoading(true);
+    setError(null);
+    listBackendPendingRewards({ status, limit: 50 })
+      .then((response) => setItems(response.items))
+      .catch((failure) => setError(failure instanceof Error ? failure : new Error('Reward queue backend request failed.')))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(refresh, [status]);
+
+  const mutate = (grantId: string, action: 'approve' | 'issue' | 'cancel') => {
+    if (mutatingId) return;
+    setMutatingId(grantId);
+    const request = action === 'approve' ? approveBackendRewardGrant : action === 'issue' ? issueBackendRewardGrant : cancelBackendRewardGrant;
+    request(grantId)
+      .then(refresh)
+      .catch((failure) => setError(failure instanceof Error ? failure : new Error('Reward mutation failed.')))
+      .finally(() => setMutatingId(null));
+  };
+
+  return (
+    <DragonSection eyebrow="REWARDS" title="Pending reward approvals">
+      <div className="dh-achievement-filter-row">
+        <DragonSelect value={status} onChange={(event) => setStatus(event.target.value as typeof status)} aria-label="Filter reward approval queue">
+          <option value="earned">Awaiting approval</option>
+          <option value="approved">Approved</option>
+          <option value="all">All statuses</option>
+        </DragonSelect>
+        <DragonButton type="button" variant="secondary" onClick={refresh} disabled={loading}>
+          Retry
+        </DragonButton>
+      </div>
+      {loading ? <DragonLoader label="Reward queue is loading" /> : null}
+      {error ? <DragonRetry title="Reward queue did not load" description={error.message} onRetry={refresh} /> : null}
+      {!loading && !error && !items.length ? <DragonEmptyState title="No pending rewards" description="Backend returned an empty reward queue." /> : null}
+      <div className="dh-achievement-recent-grid" data-reward-queue-source="backend">
+        {items.map((grant) => (
+          <DragonCard key={grant.id}>
+            <span className="dh-dragon-eyebrow">{getRewardSourceLabel(grant.sourceModule)}</span>
+            <strong>{grant.member?.displayName ?? grant.familyMemberId}</strong>
+            <p>{grant.reward.name} · {formatRewardValue(grant)}</p>
+            <p>{getRewardStatusLabel(grant)}</p>
+            <div className="dh-achievement-filter-row">
+              <DragonButton type="button" variant="secondary" disabled={mutatingId === grant.id || grant.status !== 'earned'} onClick={() => mutate(grant.id, 'approve')}>
+                Approve
+              </DragonButton>
+              <DragonButton type="button" variant="primary" disabled={mutatingId === grant.id || grant.status !== 'approved'} onClick={() => mutate(grant.id, 'issue')}>
+                Issue
+              </DragonButton>
+              <DragonButton type="button" variant="ghost" disabled={mutatingId === grant.id || grant.status === 'issued' || grant.status === 'cancelled'} onClick={() => mutate(grant.id, 'cancel')}>
+                Cancel
+              </DragonButton>
+            </div>
+          </DragonCard>
+        ))}
+      </div>
+    </DragonSection>
   );
 }
 
@@ -241,6 +350,10 @@ export function DragonAchievementProgressSummary({ statistics }: { statistics: D
       </p>
     </div>
   );
+}
+
+function canManageRewards(user: FamilyUser): boolean {
+  return user.role === 'owner' || user.rankLevel >= 8 || user.permissions.includes('manage_rewards') || user.permissions.includes('manage_accounting') || user.permissions.includes('manage_family_economy');
 }
 
 export function DragonAchievementNotification({ achievement }: { achievement: DragonAchievement }) {

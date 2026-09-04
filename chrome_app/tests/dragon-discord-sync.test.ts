@@ -139,7 +139,7 @@ describe('Dragon Discord Synchronization Engine frontend', () => {
     assert.match(roomNavigationSource, /key: 'tower-defense'/);
     assert.match(roomNavigationSource, /key: 'discord-sync'/);
     assert.match(shellSource, /activeTab === 'events' \? <DragonEventEngineScreen \/>/);
-    assert.match(shellSource, /activeTab === 'tower-defense' \? <DragonTowerDefenseScreen \/>/);
+    assert.match(shellSource, /activeTab === 'tower-defense' \? <DragonTowerDefenseScreen currentUser=\{currentUser\} \/>/);
     assert.match(shellSource, /activeTab === 'discord-sync' \? <DragonDiscordSyncScreen currentUser=\{currentUser\} \/>/);
   });
 

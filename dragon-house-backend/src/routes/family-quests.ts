@@ -82,16 +82,11 @@ export function createFamilyQuestsRouter(
       return respondValidation(response, 'Issue payout requires valid questId, payoutId, confirm=true, and idempotencyKey.');
     }
     try {
-      response.json(
-        await payoutService.issueQuestPayout(
-          {
-            questId: questId.data,
-            payoutId: payoutId.data,
-            issuedByFamilyMemberId: request.familyAuth.familyMemberId,
-            idempotencyKey: body.data.idempotencyKey,
-          },
-          request.familyAuth,
-        ),
+      throw new FinanceError(
+        'ACCOUNTING_PAYMENT_PROOF_REQUIRED',
+        'Quest payouts must be paid through an accounting payout batch with screenshot proof.',
+        409,
+        { questId: questId.data, payoutId: payoutId.data, canonicalFlow: 'accounting_payout_batch' },
       );
     } catch (error) {
       respondFinanceError(response, error);

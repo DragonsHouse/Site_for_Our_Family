@@ -6,9 +6,9 @@ import {
   notifyBonusPaid,
   notifyQuestReportAccepted
 } from '../../../lib/family-notifications';
-import { canManageFamilyQuests } from '../../../lib/family-permissions';
+import { canManageDiscordIntegration, canManageFamilyQuests } from '../../../lib/family-permissions';
 import { FamilyQuestPayoutApiError, issueBackendQuestPayout } from '../../../lib/family-quest-backend-client';
-import { loadFamilyQuestReadState } from '../../../lib/family-quest-read-adapter';
+import { loadFamilyQuestReadState, type FamilyQuestReadSource } from '../../../lib/family-quest-read-adapter';
 import {
   applyQuestRewardPlan,
   calculateQuestRewardPlan,
@@ -43,6 +43,7 @@ import {
   applyBackendPayoutResultToQuest,
   resolveBackendPayoutTarget
 } from './family-quest-payout-backend';
+import { DiscordPublishPanel } from './discord-publish-panel';
 import { useFamilyAssetUrl } from './use-family-asset-url';
 
 type BackendPayoutFeedback = {
@@ -384,6 +385,7 @@ function QuestEditor({
 function RewardManager({
   quest,
   users,
+  currentUser,
   onClose,
   onUpdateQuest,
   onIssueOne,
@@ -392,6 +394,7 @@ function RewardManager({
 }: {
   quest: FamilyQuest;
   users: FamilyUser[];
+  currentUser: FamilyUser;
   onClose: () => void;
   onUpdateQuest: (quest: FamilyQuest) => void;
   onIssueOne: (questId: string, userId: string) => void | Promise<void>;
@@ -443,12 +446,17 @@ function RewardManager({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Керування нагородами</p>
             <h3 className="mt-1 text-xl font-semibold text-white">{quest.title}</h3>
-            <p className="mt-1 text-sm text-slate-400">Discord integration: not configured</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">
             Закрити
           </button>
         </div>
+
+        {canManageDiscordIntegration(currentUser) && quest.backendQuestId ? (
+          <div className="mt-4">
+            <DiscordPublishPanel target="quest" sourceId={quest.backendQuestId} />
+          </div>
+        ) : null}
 
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           <div className="dh-card rounded-2xl p-3 text-sm"><span className="text-slate-500">Total</span><div className="text-lg font-semibold text-white">{money(quest.totalReward)}</div></div>
@@ -825,7 +833,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   const [rewardQuest, setRewardQuest] = useState<FamilyQuest | null>(null);
   const issuingBackendPayoutsRef = useRef(new Set<string>());
   const [payoutFeedback, setPayoutFeedback] = useState<Record<string, BackendPayoutFeedback>>({});
-  const [questReadSource, setQuestReadSource] = useState<'backend' | 'local'>('local');
+  const [questReadSource, setQuestReadSource] = useState<FamilyQuestReadSource>('backend_loading');
   const [questReadError, setQuestReadError] = useState<Error | null>(null);
   const [creating, setCreating] = useState(false);
   const canManage = canManageFamilyQuests(currentUser);
@@ -1203,7 +1211,13 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
             <h2 className="mt-1 text-2xl font-semibold text-white">Family quests</h2>
             <p className="mt-2 max-w-3xl text-sm text-slate-400">Локальна quest система Family Hub. Discord integration: not configured.</p>
             <p className={questReadSource === 'backend' ? 'mt-2 text-xs text-emerald-100' : 'mt-2 text-xs text-amber-100'}>
-              {questReadSource === 'backend' ? 'Backend quests loaded from PostgreSQL.' : questReadError ? 'Backend quests unavailable. Showing local fallback.' : 'Loading backend quests...'}
+              {questReadSource === 'backend'
+                ? 'Backend quests loaded from PostgreSQL.'
+                : questReadSource === 'dev_local_fallback'
+                  ? 'Backend quests unavailable. Showing dev local fallback.'
+                  : questReadError
+                    ? 'Backend quests unavailable. Retry after the backend is reachable.'
+                    : 'Loading backend quests...'}
             </p>
           </div>
           {canManage ? <button type="button" onClick={startCreatingTemplate} className="dh-fire-button rounded-xl px-4 py-2 text-sm font-semibold text-white">Create quest</button> : null}
@@ -1310,7 +1324,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
           }}
         />
       ) : null}
-      {rewardQuest ? <RewardManager quest={rewardQuest} users={users} onClose={() => setRewardQuest(null)} onUpdateQuest={updateQuest} onIssueOne={issueOne} onIssueAll={issueAll} payoutFeedback={payoutFeedback} /> : null}
+      {rewardQuest ? <RewardManager quest={rewardQuest} users={users} currentUser={currentUser} onClose={() => setRewardQuest(null)} onUpdateQuest={updateQuest} onIssueOne={issueOne} onIssueAll={issueAll} payoutFeedback={payoutFeedback} /> : null}
     </section>
   );
 }

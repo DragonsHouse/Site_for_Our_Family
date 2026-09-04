@@ -15,8 +15,17 @@ import {
 } from './family-repositories.ts';
 import type { FamilyQuest, FamilyQuestReport, FamilyQuestTemplate } from './family-types.ts';
 
+export type FamilyQuestReadSource = 'backend_loading' | 'backend' | 'backend_error' | 'dev_local_fallback' | 'local';
+
+type FamilyQuestSourceEnvironment = {
+  mode?: string;
+  dev?: boolean;
+  prod?: boolean;
+  allowLocalFallback?: string;
+};
+
 export type FamilyQuestReadState = {
-  source: 'backend' | 'local';
+  source: FamilyQuestReadSource;
   templates: FamilyQuestTemplate[];
   quests: FamilyQuest[];
   reports: FamilyQuestReport[];
@@ -29,6 +38,8 @@ export type FamilyQuestReadDependencies = {
   readLocalTemplates?: typeof readFamilyQuestTemplates;
   readLocalQuests?: typeof readFamilyQuests;
   readLocalReports?: typeof readFamilyQuestReports;
+  allowDevLocalFallback?: boolean;
+  env?: FamilyQuestSourceEnvironment;
 };
 
 export async function loadFamilyQuestReadState(signal?: AbortSignal, dependencies: FamilyQuestReadDependencies = {}): Promise<FamilyQuestReadState> {
@@ -48,12 +59,41 @@ export async function loadFamilyQuestReadState(signal?: AbortSignal, dependencie
       error: null,
     };
   } catch (error) {
+    const backendError = error instanceof Error ? error : new Error('Backend quest read failed');
+    if (!(dependencies.allowDevLocalFallback ?? isFamilyQuestLocalFallbackAllowed(dependencies.env))) {
+      return {
+        source: 'backend_error',
+        templates: [],
+        quests: [],
+        reports: [],
+        error: backendError,
+      };
+    }
     return {
-      source: 'local',
+      source: 'dev_local_fallback',
       templates: (dependencies.readLocalTemplates ?? readFamilyQuestTemplates)(),
       quests: (dependencies.readLocalQuests ?? readFamilyQuests)(),
       reports: (dependencies.readLocalReports ?? readFamilyQuestReports)(),
-      error: error instanceof Error ? error : new Error('Backend quest read failed'),
+      error: backendError,
     };
+  }
+}
+
+export function isFamilyQuestLocalFallbackAllowed(env: FamilyQuestSourceEnvironment = getImportMetaEnv()): boolean {
+  if (env.prod || env.mode === 'production') return false;
+  return env.dev === true && env.allowLocalFallback === 'true';
+}
+
+function getImportMetaEnv(): FamilyQuestSourceEnvironment {
+  try {
+    const env = (import.meta as unknown as { env?: Record<string, unknown> }).env ?? {};
+    return {
+      mode: String(env.MODE ?? ''),
+      dev: env.DEV === true,
+      prod: env.PROD === true,
+      allowLocalFallback: String(env.FAMILY_QUEST_ALLOW_LOCAL_FALLBACK ?? '')
+    };
+  } catch {
+    return {};
   }
 }

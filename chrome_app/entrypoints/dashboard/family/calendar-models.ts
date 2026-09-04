@@ -11,6 +11,7 @@ export type DragonCalendarCategory =
   | 'personal';
 
 export type DragonCalendarPriority = 'low' | 'normal' | 'high' | 'critical';
+export type DragonCalendarSourceModule = 'family_events' | 'tower_defense' | 'family_quests' | 'birthday';
 
 export type DragonCalendarParticipant = {
   id: string;
@@ -37,6 +38,7 @@ export type DragonCalendarEvent = DragonEntity & {
   hall: string;
   attachments: DragonCalendarAttachment[];
   activity: string;
+  sourceModule?: DragonCalendarSourceModule;
 };
 
 export type DragonCalendarFilters = {
@@ -45,6 +47,7 @@ export type DragonCalendarFilters = {
   member: string;
   dateFrom: string;
   dateTo: string;
+  sourceModule: DragonCalendarSourceModule | 'all';
 };
 
 export type DragonCalendarDay = {

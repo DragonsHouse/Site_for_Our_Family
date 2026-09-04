@@ -50,6 +50,9 @@ export function createTestConfig(overrides: TestConfigOverrides = {}): AppConfig
         applyRateLimitPerHour: overrides.discord?.sync?.applyRateLimitPerHour ?? 1000,
         reportRateLimitPerMinute: overrides.discord?.sync?.reportRateLimitPerMinute ?? 1000,
       },
+      orchestration: {
+        enabled: overrides.discord?.orchestration?.enabled ?? false,
+      },
       channels: {
         welcome: overrides.discord?.channels?.welcome ?? null,
         nicknameChange: overrides.discord?.channels?.nicknameChange ?? null,
@@ -59,6 +62,9 @@ export function createTestConfig(overrides: TestConfigOverrides = {}): AppConfig
         questInfo: overrides.discord?.channels?.questInfo ?? null,
         questAnnouncements: overrides.discord?.channels?.questAnnouncements ?? null,
         questPayments: overrides.discord?.channels?.questPayments ?? null,
+        towerGuard: overrides.discord?.channels?.towerGuard ?? null,
+        events: overrides.discord?.channels?.events ?? null,
+        adminLog: overrides.discord?.channels?.adminLog ?? null,
         accounting: overrides.discord?.channels?.accounting ?? null,
         familyPhotos: overrides.discord?.channels?.familyPhotos ?? null,
       },

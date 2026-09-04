@@ -20,6 +20,7 @@ export type FamilyPermission =
   | 'manage_news'
   | 'view_family_history'
   | 'manage_family_economy'
+  | 'manage_rewards'
   | 'manage_family_quests'
   | 'manage_family_assets'
   | 'manage_discord_integration'

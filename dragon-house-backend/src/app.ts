@@ -33,8 +33,16 @@ import {
   PgDiscordRoleMappingRepository,
   type DiscordRoleMappingRepository,
 } from './discord/role-mapping-repository.js';
+import { DiscordIdentityResolver } from './discord/identity-resolver.js';
+import {
+  InMemoryDiscordOrchestrationRepository,
+  PgDiscordOrchestrationRepository,
+  type DiscordOrchestrationRepository,
+} from './discord/orchestration-repository.js';
+import { DiscordOrchestrationService } from './discord/orchestration-service.js';
 import { createDiscordAccountLinkRouter } from './routes/discord-account-link.js';
 import { createDiscordRouter } from './routes/discord.js';
+import { createDiscordOrchestrationRouter } from './routes/discord-orchestration.js';
 import { createDiscordSyncRouter } from './routes/discord-sync.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createDiscordAuthRouter } from './routes/auth-discord.js';
@@ -48,8 +56,29 @@ import { PgFamilyQuestRepository } from './quests/pg-quest-repository.js';
 import { MemoryFamilyQuestRepository, type FamilyQuestRepository } from './quests/quest-repository.js';
 import { FamilyQuestService } from './quests/quest-service.js';
 import { FamilyAccountingReadService } from './accounting/accounting-read-service.js';
+import { FamilyAccountingService } from './accounting/accounting-service.js';
 import { FamilyQuestPayoutService } from './accounting/quest-payout-service.js';
+import { PgRewardFinanceService, type RewardFinanceHandoff } from './accounting/reward-finance-service.js';
 import { createFamilyAccountingRouter } from './routes/family-accounting.js';
+import { createFamilyTowerDefenseRouter } from './routes/family-tower-defense.js';
+import { PgTowerDefenseRepository } from './tower-defense/pg-tower-defense-repository.js';
+import { MemoryTowerDefenseRepository, type TowerDefenseRepository } from './tower-defense/tower-defense-repository.js';
+import { TowerDefenseService } from './tower-defense/tower-defense-service.js';
+import { MemberActivityService } from './member-activity/member-activity-service.js';
+import { createFamilyMemberActivityRouter } from './routes/family-member-activity.js';
+import { PgFamilyEventRepository } from './family-events/pg-family-event-repository.js';
+import { MemoryFamilyEventRepository, type FamilyEventRepository } from './family-events/family-event-repository.js';
+import { FamilyEventService } from './family-events/family-event-service.js';
+import { createFamilyEventsRouter } from './routes/family-events.js';
+import { FamilyCalendarService } from './calendar/family-calendar-service.js';
+import { createFamilyCalendarRouter } from './routes/family-calendar.js';
+import { PgAchievementRepository } from './achievements/pg-achievement-repository.js';
+import { MemoryAchievementRepository, type AchievementRepository } from './achievements/achievement-repository.js';
+import { AchievementService } from './achievements/achievement-service.js';
+import { createFamilyAchievementsRouter } from './routes/family-achievements.js';
+import { PgRewardAllocationRepository } from './achievements/pg-reward-allocation-repository.js';
+import { MemoryRewardAllocationRepository, type RewardAllocationRepository } from './achievements/reward-allocation-repository.js';
+import { RewardAllocationService } from './achievements/reward-allocation-service.js';
 import {
   InMemoryDiscordLoginCompletionRepository,
   PgDiscordLoginCompletionRepository,
@@ -68,6 +97,8 @@ export type AppDependencies = {
   memberSyncDryRunService?: DiscordMemberSyncDryRunService | null;
   discordSyncAuditRepository?: DiscordSyncAuditRepository;
   discordSyncEngineService?: DiscordSyncEngineService | null;
+  discordOrchestrationRepository?: DiscordOrchestrationRepository;
+  discordOrchestrationService?: DiscordOrchestrationService | null;
   accountLinkOAuthService?: DiscordAccountLinkOAuthService;
   authRepository?: FamilyAuthRepository;
   authService?: FamilyAuthService | null;
@@ -79,6 +110,18 @@ export type AppDependencies = {
   questService?: FamilyQuestService | null;
   questPayoutService?: FamilyQuestPayoutService | null;
   accountingReadService?: FamilyAccountingReadService | null;
+  accountingService?: FamilyAccountingService | null;
+  towerDefenseRepository?: TowerDefenseRepository;
+  towerDefenseService?: TowerDefenseService | null;
+  familyEventRepository?: FamilyEventRepository;
+  familyEventService?: FamilyEventService | null;
+  familyCalendarService?: FamilyCalendarService | null;
+  memberActivityService?: MemberActivityService | null;
+  achievementRepository?: AchievementRepository;
+  achievementService?: AchievementService | null;
+  rewardAllocationRepository?: RewardAllocationRepository;
+  rewardAllocationService?: RewardAllocationService | null;
+  rewardFinanceService?: RewardFinanceHandoff | null;
   pgPool?: pg.Pool | null;
 };
 
@@ -123,7 +166,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     dependencies.questService !== undefined
       ? dependencies.questService
       : questRepository
-        ? new FamilyQuestService(questRepository)
+        ? new FamilyQuestService(questRepository, memberRepository)
         : null;
   const questPayoutService =
     dependencies.questPayoutService !== undefined
@@ -136,6 +179,64 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
       ? dependencies.accountingReadService
       : pgPool
         ? new FamilyAccountingReadService(pgPool)
+        : null;
+  const accountingService =
+    dependencies.accountingService !== undefined
+      ? dependencies.accountingService
+      : pgPool
+        ? new FamilyAccountingService(pgPool)
+        : null;
+  const towerDefenseRepository =
+    dependencies.towerDefenseRepository ??
+    (pgPool ? new PgTowerDefenseRepository(pgPool) : config.nodeEnv === 'test' ? new MemoryTowerDefenseRepository() : null);
+  const towerDefenseService =
+    dependencies.towerDefenseService !== undefined
+      ? dependencies.towerDefenseService
+      : towerDefenseRepository
+        ? new TowerDefenseService(towerDefenseRepository)
+        : null;
+  const familyEventRepository =
+    dependencies.familyEventRepository ??
+    (pgPool ? new PgFamilyEventRepository(pgPool) : config.nodeEnv === 'test' ? new MemoryFamilyEventRepository() : null);
+  const familyEventService =
+    dependencies.familyEventService !== undefined
+      ? dependencies.familyEventService
+      : familyEventRepository
+        ? new FamilyEventService(familyEventRepository)
+        : null;
+  const familyCalendarService =
+    dependencies.familyCalendarService !== undefined
+      ? dependencies.familyCalendarService
+      : new FamilyCalendarService(familyEventRepository, towerDefenseRepository, questRepository);
+  const achievementRepository =
+    dependencies.achievementRepository ??
+    (pgPool ? new PgAchievementRepository(pgPool) : config.nodeEnv === 'test' ? new MemoryAchievementRepository() : null);
+  const rewardFinanceService =
+    dependencies.rewardFinanceService !== undefined
+      ? dependencies.rewardFinanceService
+      : pgPool
+        ? new PgRewardFinanceService(pgPool)
+        : null;
+  const rewardAllocationRepository =
+    dependencies.rewardAllocationRepository ??
+    (pgPool ? new PgRewardAllocationRepository(pgPool) : config.nodeEnv === 'test' ? new MemoryRewardAllocationRepository() : null);
+  const achievementService =
+    dependencies.achievementService !== undefined
+      ? dependencies.achievementService
+      : achievementRepository && memberRepository && questRepository && towerDefenseRepository && familyEventRepository
+        ? new AchievementService(achievementRepository, memberRepository, questRepository, towerDefenseRepository, familyEventRepository, rewardFinanceService, rewardAllocationRepository)
+        : null;
+  const rewardAllocationService =
+    dependencies.rewardAllocationService !== undefined
+      ? dependencies.rewardAllocationService
+      : rewardAllocationRepository && achievementRepository && memberRepository && towerDefenseRepository && familyEventRepository
+        ? new RewardAllocationService(rewardAllocationRepository, achievementRepository, memberRepository, towerDefenseRepository, familyEventRepository)
+        : null;
+  const memberActivityService =
+    dependencies.memberActivityService !== undefined
+      ? dependencies.memberActivityService
+      : memberRepository && questRepository && towerDefenseRepository
+        ? new MemberActivityService(memberRepository, questRepository, towerDefenseRepository, accountingReadService, familyEventRepository, achievementRepository, achievementService)
         : null;
   const loginCompletions =
     dependencies.loginCompletions ??
@@ -174,6 +275,27 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     dependencies.discordSyncEngineService !== undefined
       ? dependencies.discordSyncEngineService
       : new DiscordSyncEngineService(memberSyncDryRunService, memberSyncApplyService, roleMappings, discordSyncAuditRepository, config);
+  const discordOrchestrationRepository =
+    dependencies.discordOrchestrationRepository ??
+    (pgPool ? new PgDiscordOrchestrationRepository(pgPool) : new InMemoryDiscordOrchestrationRepository());
+  const discordOrchestrationService =
+    dependencies.discordOrchestrationService !== undefined
+      ? dependencies.discordOrchestrationService
+      : memberRepository
+        ? new DiscordOrchestrationService(
+            config,
+            new DiscordIdentityResolver(accountLinks, memberRepository),
+            discordOrchestrationRepository,
+            discordService,
+            questService,
+            towerDefenseService,
+            familyEventService,
+          )
+        : null;
+  if (discordOrchestrationService) {
+    discordService.registerButtonInteractionHandler((request) => discordOrchestrationService.handleInteraction(request));
+    discordService.registerCommandInteractionHandler((request) => discordOrchestrationService.handleCommand(request));
+  }
 
   app.disable('x-powered-by');
   if (config.trustProxy) app.set('trust proxy', 1);
@@ -186,9 +308,15 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   app.use('/api', createAuthRouter(authService));
   app.use('/api', createDiscordAuthRouter(config, oauthLoginService));
   app.use('/api', createFamilyMembersRouter(config, authService, memberService));
-  app.use('/api', createFamilyAccountingRouter(config, authService, accountingReadService));
+  app.use('/api', createFamilyAccountingRouter(config, authService, accountingReadService, accountingService));
+  app.use('/api', createFamilyMemberActivityRouter(config, authService, memberActivityService));
+  app.use('/api', createFamilyAchievementsRouter(config, authService, achievementService));
+  app.use('/api', createFamilyEventsRouter(config, authService, familyEventService, rewardAllocationService, achievementService));
+  app.use('/api', createFamilyCalendarRouter(config, authService, familyCalendarService));
   app.use('/api', createFamilyQuestsRouter(config, authService, questService, questPayoutService));
+  app.use('/api', createFamilyTowerDefenseRouter(config, authService, towerDefenseService, rewardAllocationService, achievementService));
   app.use('/api', createDiscordRouter(discordService));
+  app.use('/api', createDiscordOrchestrationRouter(config, authService, discordOrchestrationService));
   app.use('/api', createDiscordAccountLinkRouter(config, accountLinks, accountLinkOAuthService, authService));
   app.use('/api', createDiscordSyncRouter(config, authService, memberSyncDryRunService, memberSyncApplyService, discordSyncEngineService));
 
@@ -207,6 +335,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     memberSyncDryRunService,
     discordSyncAuditRepository,
     discordSyncEngineService,
+    discordOrchestrationRepository,
+    discordOrchestrationService,
     accountLinkOAuthService,
     authRepository,
     authService,
@@ -218,6 +348,18 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     questService,
     questPayoutService,
     accountingReadService,
+    accountingService,
+    towerDefenseRepository,
+    towerDefenseService,
+    familyEventRepository,
+    familyEventService,
+    familyCalendarService,
+    memberActivityService,
+    achievementRepository,
+    achievementService,
+    rewardAllocationRepository,
+    rewardAllocationService,
+    rewardFinanceService,
     pgPool,
   };
 }

@@ -4684,6 +4684,36 @@ body {
   }
 }
 
+.dh-accounting-profile-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.8rem 0 1rem;
+}
+
+.dh-accounting-profile-tabs button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(8, 10, 18, 0.42);
+  color: rgba(226, 232, 240, 0.86);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.4rem 0.75rem;
+}
+
+.dh-accounting-profile-tabs button.is-active,
+.dh-accounting-profile-tabs button[aria-selected='true'] {
+  border-color: rgba(255, 90, 0, 0.48);
+  background: rgba(139, 0, 0, 0.22);
+  color: #fff7ed;
+  box-shadow: 0 0 18px rgba(255, 26, 0, 0.14);
+}
+
+.dh-accounting-profile-tabs button:focus-visible {
+  outline: 2px solid rgba(255, 90, 0, 0.82);
+  outline-offset: 2px;
+}
+
 @keyframes dh-final-flare {
   0% {
     filter: brightness(1);

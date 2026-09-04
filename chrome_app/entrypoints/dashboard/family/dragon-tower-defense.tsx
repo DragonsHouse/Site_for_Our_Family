@@ -16,6 +16,7 @@ import {
   DragonTextarea
 } from '../dragon-ui/dragon-ui';
 import {
+  createBackendDragonTowerDefenseStateDependencies,
   createMockDragonTowerDefenseStateDependencies,
   type DragonTowerDefenseStateDependencies
 } from './tower-defense-composition';
@@ -34,10 +35,15 @@ import type {
   DragonFireGuardRosterEntry,
   DragonGuardResponseStatus,
   DragonTowerDefense,
+  DragonTowerDefinition,
   DragonTowerDefenseCreateInput,
   DragonTowerDefenseRosterFilter,
   DragonTowerDefenseStatistics
 } from './tower-defense-models';
+import type { FamilyUser } from '../../../lib/family-types';
+import { canManageDiscordIntegration } from '../../../lib/family-permissions';
+import { FamilyRewardAllocationPanel } from './family-reward-allocation-panel';
+import { DiscordPublishPanel } from './discord-publish-panel';
 
 type TowerDefenseDialog = 'create' | 'edit' | 'details' | 'respond' | 'attendance' | 'complete' | 'cancel' | null;
 
@@ -74,11 +80,18 @@ const ROSTER_FILTERS: Array<{ key: DragonTowerDefenseRosterFilter; label: string
 ];
 
 export function DragonTowerDefenseScreen({
-  dependencies
+  dependencies,
+  currentUser
 }: {
   dependencies?: DragonTowerDefenseStateDependencies;
+  currentUser?: FamilyUser | null;
 }) {
-  const stateDependencies = useMemo(() => dependencies ?? createMockDragonTowerDefenseStateDependencies(), [dependencies]);
+  const backendDependencyMode = Boolean(currentUser ?? dependencies?.backendOperations ?? dependencies?.loadTowerDefenseReadState);
+  const currentFamilyMemberId = currentUser?.id ?? dependencies?.currentFamilyMemberId ?? (backendDependencyMode ? '' : 'anastasia');
+  const stateDependencies = useMemo(
+    () => dependencies ?? (currentUser ? createBackendDragonTowerDefenseStateDependencies(currentUser.id) : createMockDragonTowerDefenseStateDependencies()),
+    [currentUser, dependencies]
+  );
   const state = useDragonTowerDefenseState(stateDependencies);
   const [dialog, setDialog] = useState<TowerDefenseDialog>(null);
   const [dialogDefense, setDialogDefense] = useState<DragonTowerDefense | null>(null);
@@ -91,6 +104,12 @@ export function DragonTowerDefenseScreen({
   const closeDialog = () => {
     setDialog(null);
     setDialogDefense(null);
+  };
+  const requireCurrentFamilyMemberId = () => {
+    if (state.readSource !== 'backend') return currentFamilyMemberId;
+    if (currentFamilyMemberId) return currentFamilyMemberId;
+    state.setDomainError('Tower Defense backend requires an authenticated family member.');
+    return null;
   };
 
   if (state.loading) return <DragonTowerDefenseLoadingState />;
@@ -122,6 +141,7 @@ export function DragonTowerDefenseScreen({
             <DragonDefenseDetails
               defense={state.activeDefense}
               readiness={calculateDragonDefenseReadiness(state.activeDefense)}
+              currentUser={currentUser ?? undefined}
               onEdit={() => openDialog('edit', state.activeDefense)}
               onStart={() => void state.startDefense(state.activeDefense!)}
               onComplete={() => openDialog('complete', state.activeDefense)}
@@ -169,13 +189,16 @@ export function DragonTowerDefenseScreen({
         defense={dialogDefense}
         onClose={closeDialog}
         onCreate={(input) => {
+          if (state.readSource === 'backend' && !requireCurrentFamilyMemberId()) return;
           void state.createDefense(input).then(closeDialog).catch((error: Error) => state.setDomainError(error.message));
         }}
         onEdit={(defense, input) => {
           void state.updateDefense(defense, input).then(closeDialog).catch((error: Error) => state.setDomainError(error.message));
         }}
         onRespond={(defense, response, note) => {
-          void state.respond(defense, 'anastasia', response, note).then(closeDialog).catch((error: Error) => state.setDomainError(error.message));
+          const memberId = requireCurrentFamilyMemberId();
+          if (!memberId) return;
+          void state.respond(defense, memberId, response, note).then(closeDialog).catch((error: Error) => state.setDomainError(error.message));
         }}
         onAttendance={(defense, memberId, status) => {
           void state.confirmAttendance(defense, memberId, status, defense.commanderMemberId).then(closeDialog).catch((error: Error) => state.setDomainError(error.message));
@@ -186,6 +209,11 @@ export function DragonTowerDefenseScreen({
         onCancel={(defense, reason) => {
           void state.cancelDefense(defense, defense.commanderMemberId, reason).then(closeDialog).catch((error: Error) => state.setDomainError(error.message));
         }}
+        towers={state.towerDefinitions}
+        currentFamilyMemberId={currentFamilyMemberId}
+        backendMode={state.readSource === 'backend'}
+        mutating={state.mutating}
+        currentUser={currentUser ?? undefined}
       />
     </div>
   );
@@ -242,6 +270,7 @@ export function DragonDefenseHero({
 export function DragonDefenseDetails({
   defense,
   readiness,
+  currentUser,
   onEdit,
   onStart,
   onComplete,
@@ -249,12 +278,16 @@ export function DragonDefenseDetails({
 }: {
   defense: DragonTowerDefense;
   readiness: DragonDefenseReadiness;
+  currentUser?: FamilyUser;
   onEdit: () => void;
   onStart: () => void;
   onComplete: () => void;
   onCancel: () => void;
 }) {
   const readinessValue = getReadinessProgress(defense, readiness);
+  const closed = defense.status === 'completed' || defense.status === 'cancelled';
+  const canManageRewards = canManageTowerRewardAllocations(currentUser, defense);
+  const canManageDiscord = Boolean(currentUser && canManageDiscordIntegration(currentUser));
 
   return (
     <div className="dh-tower-active">
@@ -280,7 +313,16 @@ export function DragonDefenseDetails({
           <DragonButton type="button" onClick={onComplete} disabled={defense.status !== 'active'}>Завершити</DragonButton>
           <DragonButton type="button" variant="danger" onClick={onCancel} disabled={defense.status === 'completed' || defense.status === 'cancelled'}>Скасувати</DragonButton>
         </div>
+        {canManageDiscord ? <DiscordPublishPanel target="tower" sourceId={defense.backendDefenseId} /> : null}
       </DragonCard>
+      {currentUser && defense.backendDefenseId ? (
+        <FamilyRewardAllocationPanel
+          sourceModule="tower_defense"
+          sourceId={defense.backendDefenseId}
+          canManage={canManageRewards}
+          closed={closed}
+        />
+      ) : null}
     </div>
   );
 }
@@ -507,15 +549,32 @@ function DragonStat({ label, value }: { label: string; value: string | number })
 
 export function DragonDefenseForm({
   defense,
-  onSubmit
+  onSubmit,
+  towers = [],
+  currentFamilyMemberId,
+  currentUser,
+  backendMode = false,
+  mutating = false
 }: {
   defense?: DragonTowerDefense | null;
   onSubmit: (input: DragonTowerDefenseCreateInput) => void;
+  towers?: DragonTowerDefinition[];
+  currentFamilyMemberId?: string;
+  currentUser?: FamilyUser;
+  backendMode?: boolean;
+  mutating?: boolean;
 }) {
+  const activeBackendTowers = towers.filter((tower) => tower.active);
+  const defaultTower = defense
+    ? towers.find((tower) => tower.id === defense.tower.towerId || tower.backendTowerId === defense.tower.towerId)
+    : activeBackendTowers[0] ?? towers[0];
   const [title, setTitle] = useState(defense?.title ?? 'Захист вишки: New Signal');
-  const [towerName, setTowerName] = useState(defense?.tower.towerName ?? 'New Signal Tower');
-  const [towerCode, setTowerCode] = useState(defense?.tower.towerCode ?? 'NEW-01');
-  const [location, setLocation] = useState(defense?.tower.location.label ?? 'GTA map sector');
+  const [selectedTowerId, setSelectedTowerId] = useState(defaultTower?.id ?? defense?.tower.towerId ?? '');
+  const selectedTower = towers.find((tower) => tower.id === selectedTowerId) ?? defaultTower;
+  const backendSubmitBlocked = backendMode && (!selectedTower || activeBackendTowers.length === 0 || !currentFamilyMemberId);
+  const [towerName, setTowerName] = useState(defense?.tower.towerName ?? selectedTower?.towerName ?? 'New Signal Tower');
+  const [towerCode, setTowerCode] = useState(defense?.tower.towerCode ?? selectedTower?.towerCode ?? 'NEW-01');
+  const [location, setLocation] = useState(defense?.tower.location.label ?? selectedTower?.location.label ?? 'GTA map sector');
   const [startsAt, setStartsAt] = useState(toLocalInputValue(defense?.startsAt ?? new Date(Date.now() + 60 * 60 * 1000).toISOString()));
   const [minimumGuardCount, setMinimumGuardCount] = useState(String(defense?.minimumGuardCount ?? 3));
   const [recommendedGuardCount, setRecommendedGuardCount] = useState(String(defense?.recommendedGuardCount ?? 5));
@@ -526,28 +585,30 @@ export function DragonDefenseForm({
       className="dh-tower-form"
       onSubmit={(event) => {
         event.preventDefault();
+        if (backendSubmitBlocked) return;
         const min = Number(minimumGuardCount);
         const recommended = Math.max(Number(recommendedGuardCount), min);
+        const towerId = backendMode && selectedTower ? selectedTower.id : defense?.tower.towerId ?? `tower-${towerCode.toLowerCase()}`;
         onSubmit({
           id: defense?.id,
           backendDefenseId: defense?.backendDefenseId,
           eventId: defense?.eventId,
           title,
           description,
-          towerId: defense?.tower.towerId ?? `tower-${towerCode.toLowerCase()}`,
-          towerName,
-          towerCode,
-          location: { label: location },
-          map: defense?.tower.map ?? {},
-          visual: defense?.tower.visual,
+          towerId,
+          towerName: backendMode && selectedTower ? selectedTower.towerName : towerName,
+          towerCode: backendMode && selectedTower ? selectedTower.towerCode : towerCode,
+          location: backendMode && selectedTower ? selectedTower.location : { label: location },
+          map: backendMode && selectedTower ? selectedTower.map : defense?.tower.map ?? {},
+          visual: backendMode && selectedTower ? selectedTower.visual : defense?.tower.visual,
           status: defense?.status ?? 'scheduled',
           priority: defense?.priority ?? 'high',
           scheduledAt: defense?.scheduledAt,
           startsAt: fromLocalInputValue(startsAt),
           timezone: defense?.timezone ?? 'Europe/Kiev',
           wave: defense?.wave ?? 1,
-          commanderMemberId: defense?.commanderMemberId ?? 'anastasia',
-          createdByMemberId: defense?.createdByMemberId ?? 'anastasia',
+          commanderMemberId: defense?.commanderMemberId ?? currentFamilyMemberId ?? '',
+          createdByMemberId: defense?.createdByMemberId ?? currentFamilyMemberId ?? '',
           minimumGuardCount: min,
           recommendedGuardCount: recommended,
           maximumGuardCount: Math.max(recommended, defense?.maximumGuardCount ?? 8),
@@ -566,6 +627,17 @@ export function DragonDefenseForm({
       <label>Рекомендовано<DragonInput type="number" min={1} value={recommendedGuardCount} onChange={(event) => setRecommendedGuardCount(event.target.value)} required /></label>
       <label className="dh-tower-form-wide">Опис<DragonTextarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
       <DragonButton type="submit">Зберегти захист</DragonButton>
+      {backendMode && activeBackendTowers.length === 0 ? <DragonEmptyState title="No active backend towers" description="Backend returned an empty family_towers list." /> : null}
+      {backendMode && !currentFamilyMemberId ? <DragonEmptyState title="Authenticated member required" description="Tower Defense writes require a real familyMemberId." /> : null}
+      {backendMode && towers.length > 0 ? (
+        <label>Вишка
+          <DragonSelect value={selectedTowerId} onChange={(event) => setSelectedTowerId(event.target.value)} required>
+            {activeBackendTowers.map((tower) => (
+              <option key={tower.id} value={tower.id}>{tower.towerCode} / {tower.towerName}</option>
+            ))}
+          </DragonSelect>
+        </label>
+      ) : null}
     </form>
   );
 }
@@ -596,10 +668,12 @@ export function DragonAttendanceEditor({
 
 export function DragonDefenseResultDialog({
   defense,
+  currentUser,
   onComplete,
   onClose
 }: {
   defense: DragonTowerDefense;
+  currentUser?: FamilyUser;
   onComplete: (result: Exclude<DragonDefenseResult, 'pending' | 'cancelled'>, notes: string, failureReason?: string) => void;
   onClose: () => void;
 }) {
@@ -620,6 +694,15 @@ export function DragonDefenseResultDialog({
     >
       <div className="dh-dialog-stack">
         <p>{defense.tower.towerName}</p>
+        {currentUser && defense.backendDefenseId ? (
+          <FamilyRewardAllocationPanel
+            sourceModule="tower_defense"
+            sourceId={defense.backendDefenseId}
+            canManage={false}
+            closed={false}
+            summaryOnly
+          />
+        ) : null}
         <label>Результат
           <DragonSelect value={result} onChange={(event) => setResult(event.target.value as Exclude<DragonDefenseResult, 'pending' | 'cancelled'>)}>
             <option value="defended">Вишку захищено</option>
@@ -642,7 +725,12 @@ function DragonTowerDefenseDialogs({
   onRespond,
   onAttendance,
   onComplete,
-  onCancel
+  onCancel,
+  towers = [],
+  currentFamilyMemberId,
+  currentUser,
+  backendMode = false,
+  mutating = false
 }: {
   dialog: TowerDefenseDialog;
   defense: DragonTowerDefense | null;
@@ -653,6 +741,11 @@ function DragonTowerDefenseDialogs({
   onAttendance: (defense: DragonTowerDefense, memberId: string, status: DragonDefenseAttendanceStatus) => void;
   onComplete: (defense: DragonTowerDefense, result: Exclude<DragonDefenseResult, 'pending' | 'cancelled'>, notes: string, failureReason?: string) => void;
   onCancel: (defense: DragonTowerDefense, reason?: string) => void;
+  towers?: DragonTowerDefinition[];
+  currentFamilyMemberId?: string;
+  currentUser?: FamilyUser;
+  backendMode?: boolean;
+  mutating?: boolean;
 }) {
   const [response, setResponse] = useState<DragonGuardResponseStatus>('joining');
   const [note, setNote] = useState('');
@@ -661,7 +754,7 @@ function DragonTowerDefenseDialogs({
   if (dialog === 'create') {
     return (
       <DragonDialog title="Створити захист вишки" onClose={onClose}>
-        <DragonDefenseForm onSubmit={onCreate} />
+        <DragonDefenseForm onSubmit={onCreate} towers={towers} currentFamilyMemberId={currentFamilyMemberId} backendMode={backendMode} mutating={mutating} />
       </DragonDialog>
     );
   }
@@ -671,7 +764,17 @@ function DragonTowerDefenseDialogs({
   if (dialog === 'edit') {
     return (
       <DragonDialog title="Редагувати захист" onClose={onClose}>
-        <DragonDefenseForm defense={defense} onSubmit={(input) => onEdit(defense, input)} />
+        <div className="dh-dialog-stack">
+          <DragonDefenseForm defense={defense} onSubmit={(input) => onEdit(defense, input)} towers={towers} currentFamilyMemberId={currentFamilyMemberId} backendMode={backendMode} mutating={mutating} />
+          {currentUser && defense.backendDefenseId ? (
+            <FamilyRewardAllocationPanel
+              sourceModule="tower_defense"
+              sourceId={defense.backendDefenseId}
+              canManage={canManageTowerRewardAllocations(currentUser, defense)}
+              closed={defense.status === 'completed' || defense.status === 'cancelled'}
+            />
+          ) : null}
+        </div>
       </DragonDialog>
     );
   }
@@ -679,7 +782,7 @@ function DragonTowerDefenseDialogs({
   if (dialog === 'details') {
     return (
       <DragonDialog title={defense.title} onClose={onClose}>
-        <DragonDefenseDetails defense={defense} readiness={calculateDragonDefenseReadiness(defense)} onEdit={onClose} onStart={onClose} onComplete={onClose} onCancel={onClose} />
+        <DragonDefenseDetails defense={defense} readiness={calculateDragonDefenseReadiness(defense)} currentUser={currentUser} onEdit={onClose} onStart={onClose} onComplete={onClose} onCancel={onClose} />
       </DragonDialog>
     );
   }
@@ -713,7 +816,7 @@ function DragonTowerDefenseDialogs({
   }
 
   if (dialog === 'complete') {
-    return <DragonDefenseResultDialog defense={defense} onClose={onClose} onComplete={(result, notes, failureReason) => onComplete(defense, result, notes, failureReason)} />;
+    return <DragonDefenseResultDialog defense={defense} currentUser={currentUser} onClose={onClose} onComplete={(result, notes, failureReason) => onComplete(defense, result, notes, failureReason)} />;
   }
 
   if (dialog === 'cancel') {
@@ -732,6 +835,16 @@ function DragonTowerDefenseDialogs({
   }
 
   return null;
+}
+
+function canManageTowerRewardAllocations(user: FamilyUser | null | undefined, defense: DragonTowerDefense): boolean {
+  return Boolean(user && (
+    user.role === 'owner' ||
+    user.rankLevel >= 8 ||
+    user.permissions.includes('manage_rewards') ||
+    user.permissions.includes('manage_events') ||
+    defense.commanderMemberId === user.id
+  ));
 }
 
 function DragonTowerDefenseLoadingState() {

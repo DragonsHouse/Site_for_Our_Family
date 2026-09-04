@@ -55,13 +55,18 @@ export type FamilyMemberDirectoryQuery = {
 };
 
 export class FamilyMemberDirectoryError extends Error {
+  readonly status: number;
+  readonly code: string;
+
   constructor(
-    readonly status: number,
-    readonly code: string,
+    status: number,
+    code: string,
     message: string,
   ) {
     super(message);
     this.name = 'FamilyMemberDirectoryError';
+    this.status = status;
+    this.code = code;
   }
 }
 

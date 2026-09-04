@@ -48,8 +48,9 @@ export function filterDragonCalendarEvents(events: DragonCalendarEvent[], filter
         event.participants.some((participant) => participant.id === filters.member || participant.name === filters.member);
       const matchesFrom = !filters.dateFrom || event.date >= filters.dateFrom;
       const matchesTo = !filters.dateTo || event.date <= filters.dateTo;
+      const matchesSource = filters.sourceModule === 'all' || (event.sourceModule ?? 'family_events') === filters.sourceModule;
 
-      return matchesSearch && matchesCategory && matchesMember && matchesFrom && matchesTo;
+      return matchesSearch && matchesCategory && matchesMember && matchesFrom && matchesTo && matchesSource;
     })
     .sort(compareEvents);
 }

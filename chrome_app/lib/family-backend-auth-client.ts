@@ -39,22 +39,28 @@ export type LoginResponse = {
 export type AuthSessionMode = 'session' | 'persistent';
 
 export class StaticIdValidationError extends Error {
+  readonly fields: { staticId?: string };
+
   constructor(
     message: string,
-    readonly fields: { staticId?: string } = {},
+    fields: { staticId?: string } = {},
   ) {
     super(message);
     this.name = 'StaticIdValidationError';
+    this.fields = fields;
   }
 }
 
 export class BirthdayValidationError extends Error {
+  readonly fields: { dateOfBirth?: string };
+
   constructor(
     message: string,
-    readonly fields: { dateOfBirth?: string } = {},
+    fields: { dateOfBirth?: string } = {},
   ) {
     super(message);
     this.name = 'BirthdayValidationError';
+    this.fields = fields;
   }
 }
 

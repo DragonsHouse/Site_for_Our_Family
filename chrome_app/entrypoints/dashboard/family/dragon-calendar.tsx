@@ -24,7 +24,8 @@ import {
   type DragonCalendarCategory,
   type DragonCalendarDay,
   type DragonCalendarEvent,
-  type DragonCalendarPriority
+  type DragonCalendarPriority,
+  type DragonCalendarSourceModule
 } from './calendar-models';
 import { createMockDragonCalendarStateDependencies } from './calendar-composition';
 import { useDragonCalendarState } from './calendar-state';
@@ -45,6 +46,13 @@ const CATEGORY_OPTIONS: Array<{ value: DragonCalendarCategory | 'all'; label: st
     value: value as DragonCalendarCategory,
     label: `${meta.glyph} ${meta.label}`
   }))
+];
+const SOURCE_OPTIONS: Array<{ value: DragonCalendarSourceModule | 'all'; label: string }> = [
+  { value: 'all', label: 'All sources' },
+  { value: 'family_events', label: 'Family Events' },
+  { value: 'tower_defense', label: 'Tower Defense' },
+  { value: 'family_quests', label: 'Family Quests' },
+  { value: 'birthday', label: 'Birthdays' }
 ];
 
 function formatEventTime(event: DragonCalendarEvent) {
@@ -132,7 +140,7 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
         <DragonSection
           eyebrow="CHRONICLE FILTERS"
           title="Пошук у хроніках"
-          description="Фільтри працюють поверх mock repository та готові до майбутнього backend-підключення."
+          description="Filters apply to the authoritative calendar feed while keeping each source module separate."
         >
           <div className="dh-calendar-filters">
             <label>
@@ -159,7 +167,21 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
               </DragonSelect>
             </label>
             <label>
-              <span>Учасник</span>
+              <span>Source</span>
+              <DragonSelect
+                value={calendar.filters.sourceModule}
+                onChange={(event) => calendar.setFilters((filters) => ({ ...filters, sourceModule: event.currentTarget.value as DragonCalendarSourceModule | 'all' }))}
+                aria-label="Filter by calendar source"
+              >
+                {SOURCE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </DragonSelect>
+            </label>
+            <label>
+              <span>Member</span>
               <DragonSelect
                 value={calendar.filters.member}
                 onChange={(event) => calendar.setFilters((filters) => ({ ...filters, member: event.currentTarget.value }))}
@@ -232,6 +254,7 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
                             <button key={event.id} type="button" className={`dh-calendar-event-chip ${meta.className}`} onClick={() => calendar.setSelectedEvent(event)}>
                               <span aria-hidden="true">{meta.glyph}</span>
                               <strong>{event.title}</strong>
+                              <small>{sourceLabel(event.sourceModule)}</small>
                             </button>
                           );
                         })}
@@ -261,6 +284,7 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
                             <span aria-hidden="true">{meta.glyph}</span>
                             <strong>{formatEventTime(event)}</strong>
                             <span>{event.title}</span>
+                            <small>{sourceLabel(event.sourceModule)}</small>
                           </button>
                         );
                       })
@@ -286,6 +310,7 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
                         <strong>{event.title}</strong>
                         <small>{formatEventTime(event)} · {event.hall}</small>
                         <DragonBadge tone={meta.tone}>{meta.label}</DragonBadge>
+                        <DragonBadge tone={sourceTone(event.sourceModule)}>{sourceLabel(event.sourceModule)}</DragonBadge>
                       </button>
                     </DragonCard>
                   );
@@ -327,6 +352,10 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
                 <dd>{DRAGON_CALENDAR_CATEGORY_META[calendar.selectedEvent.category].label}</dd>
               </div>
               <div>
+                <dt>Source</dt>
+                <dd>{sourceLabel(calendar.selectedEvent.sourceModule)}</dd>
+              </div>
+              <div>
                 <dt>Пріоритет</dt>
                 <dd>{PRIORITY_LABEL[calendar.selectedEvent.priority]}</dd>
               </div>
@@ -355,4 +384,18 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
       ) : null}
     </div>
   );
+}
+
+function sourceLabel(sourceModule?: DragonCalendarSourceModule) {
+  if (sourceModule === 'tower_defense') return 'Tower Defense';
+  if (sourceModule === 'family_quests') return 'Family Quest';
+  if (sourceModule === 'birthday') return 'Birthday';
+  return 'Family Event';
+}
+
+function sourceTone(sourceModule?: DragonCalendarSourceModule): 'ember' | 'gold' | 'success' | 'muted' | 'danger' {
+  if (sourceModule === 'tower_defense') return 'danger';
+  if (sourceModule === 'family_quests') return 'ember';
+  if (sourceModule === 'birthday') return 'success';
+  return 'gold';
 }
