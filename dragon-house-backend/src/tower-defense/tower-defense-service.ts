@@ -178,11 +178,15 @@ export class TowerDefenseService {
     if (defense.status === 'completed' || defense.status === 'cancelled') {
       throw new TowerDefenseError('INVALID_TRANSITION', 'Defense is already closed.', 409, { status: defense.status });
     }
+    const startsAtTime = new Date(defense.startsAt).getTime();
+    const endedAt = Number.isFinite(startsAtTime) && now.getTime() >= startsAtTime
+      ? defense.endedAt ?? now.toISOString()
+      : defense.endedAt;
     const updated = await this.repository.updateDefense(defenseId, {
       status: 'cancelled',
       result: 'cancelled',
       phase: 'closed',
-      endedAt: defense.endedAt ?? now.toISOString(),
+      endedAt,
       notes: input.reason ?? defense.notes,
       completedByFamilyMemberId: auth.familyMemberId,
       completedAt: now.toISOString(),

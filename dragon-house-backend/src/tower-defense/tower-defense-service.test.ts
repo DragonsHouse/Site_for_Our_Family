@@ -86,7 +86,11 @@ describe('TowerDefenseService', () => {
   it('cancels open defenses but not closed defenses', async () => {
     const service = serviceWith();
 
-    await expect(service.cancelDefense(defenseId, { reason: 'rain' }, ownerAuth, new Date(now))).resolves.toMatchObject({ status: 'cancelled', result: 'cancelled' });
+    await expect(service.cancelDefense(defenseId, { reason: 'rain' }, ownerAuth, new Date(now))).resolves.toMatchObject({
+      status: 'cancelled',
+      result: 'cancelled',
+      endedAt: null,
+    });
     await expect(service.cancelDefense(defenseId, { reason: 'again' }, ownerAuth, new Date(now))).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
   });
 });
