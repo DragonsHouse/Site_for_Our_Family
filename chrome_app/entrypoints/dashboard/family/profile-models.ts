@@ -124,18 +124,18 @@ export const DRAGON_PROFILE_STATUS_META: Record<
   DragonProfileStatus,
   { label: string; tone: 'ember' | 'gold' | 'success' | 'muted' | 'danger'; className: string }
 > = {
-  online: { label: 'Online', tone: 'success', className: 'dh-profile-status-online' },
-  offline: { label: 'Offline', tone: 'muted', className: 'dh-profile-status-offline' },
-  away: { label: 'Away', tone: 'gold', className: 'dh-profile-status-away' },
-  in_voice: { label: 'In Voice', tone: 'ember', className: 'dh-profile-status-voice' },
-  recently_active: { label: 'Recently Active', tone: 'success', className: 'dh-profile-status-recent' }
+  online: { label: 'Онлайн', tone: 'success', className: 'dh-profile-status-online' },
+  offline: { label: 'Недоступний', tone: 'muted', className: 'dh-profile-status-offline' },
+  away: { label: 'Відійшов', tone: 'gold', className: 'dh-profile-status-away' },
+  in_voice: { label: 'У голосі', tone: 'ember', className: 'dh-profile-status-voice' },
+  recently_active: { label: 'Нещодавно активний', tone: 'success', className: 'dh-profile-status-recent' }
 };
 
 export const DRAGON_ACHIEVEMENT_RARITY_META: Record<
   DragonProfileAchievementRarity,
   { label: string; tone: 'ember' | 'gold' | 'success' | 'muted' | 'danger'; className: string }
 > = {
-  common: { label: 'Common', tone: 'muted', className: 'dh-achievement-common' },
-  rare: { label: 'Rare', tone: 'success', className: 'dh-achievement-rare' },
-  legendary: { label: 'Legendary', tone: 'gold', className: 'dh-achievement-legendary' }
+  common: { label: 'Звичайна', tone: 'muted', className: 'dh-achievement-common' },
+  rare: { label: 'Рідкісна', tone: 'success', className: 'dh-achievement-rare' },
+  legendary: { label: 'Легендарна', tone: 'gold', className: 'dh-achievement-legendary' }
 };

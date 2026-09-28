@@ -48,11 +48,11 @@ const CATEGORY_OPTIONS: Array<{ value: DragonCalendarCategory | 'all'; label: st
   }))
 ];
 const SOURCE_OPTIONS: Array<{ value: DragonCalendarSourceModule | 'all'; label: string }> = [
-  { value: 'all', label: 'All sources' },
-  { value: 'family_events', label: 'Family Events' },
-  { value: 'tower_defense', label: 'Tower Defense' },
-  { value: 'family_quests', label: 'Family Quests' },
-  { value: 'birthday', label: 'Birthdays' }
+  { value: 'all', label: 'Усі джерела' },
+  { value: 'family_events', label: 'Сімейні події' },
+  { value: 'tower_defense', label: 'Оборона вишок' },
+  { value: 'family_quests', label: 'Сімейні квести' },
+  { value: 'birthday', label: 'Дні народження' }
 ];
 
 function formatEventTime(event: DragonCalendarEvent) {
@@ -79,19 +79,19 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
   return (
     <div className="dh-calendar-room">
       <DragonHero
-        eyebrow="HALL OF CHRONICLES"
-        title="Dragon Calendar"
+        eyebrow="Хроніки Dragon House"
+        title="Календар"
         description="Зал хронік Dragon House: сімейні дати, ради, квести, ритуали, ресурси й особисті печаті в одному живому календарі."
       >
         <div className="dh-calendar-hero-seals" aria-label="Поточний стан календаря">
-          <DragonBadge tone="gold">Production Calendar</DragonBadge>
+          <DragonBadge tone="gold">Сімейний календар</DragonBadge>
           <DragonBadge tone="success">{currentUser.nickname}</DragonBadge>
         </div>
       </DragonHero>
 
       <DragonPanel variant="ceremonial" className="dh-calendar-command-panel">
         <div className="dh-calendar-command-main">
-          <p className="dh-dragon-eyebrow">CURRENT CHRONICLE</p>
+          <p className="dh-dragon-eyebrow">Поточна хроніка</p>
           <h2>{title}</h2>
         </div>
         <div className="dh-calendar-command-actions" aria-label="Навігація календаря">
@@ -114,23 +114,23 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
 
       <section className="dh-calendar-stats" aria-label="Швидка статистика Dragon Calendar">
         <DragonCard>
-          <span className="dh-dragon-eyebrow">Events</span>
+          <span className="dh-dragon-eyebrow">Події</span>
           <strong>{calendar.stats.totalEvents}</strong>
           <p>подій у поточному місяці</p>
           <DragonProgress value={Math.min(calendar.stats.totalEvents * 16, 100)} label="Щільність подій поточного місяця" />
         </DragonCard>
         <DragonCard>
-          <span className="dh-dragon-eyebrow">Family Calendar</span>
+          <span className="dh-dragon-eyebrow">Сімейний календар</span>
           <strong>{calendar.stats.birthdaysThisMonth}</strong>
           <p>днів народження цього місяця</p>
         </DragonCard>
         <DragonCard>
-          <span className="dh-dragon-eyebrow">Upcoming</span>
+          <span className="dh-dragon-eyebrow">Заплановано</span>
           <strong>{calendar.stats.upcomingEvents}</strong>
           <p>майбутніх печатей</p>
         </DragonCard>
         <DragonCard>
-          <span className="dh-dragon-eyebrow">Recent Activity</span>
+          <span className="dh-dragon-eyebrow">Остання активність</span>
           <strong>{calendar.stats.recentActivity}</strong>
           <p>останній запис у хроніках</p>
         </DragonCard>
@@ -138,9 +138,9 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
 
       <div className="dh-calendar-workbench">
         <DragonSection
-          eyebrow="CHRONICLE FILTERS"
+          eyebrow="Фільтри хроніки"
           title="Пошук у хроніках"
-          description="Filters apply to the authoritative calendar feed while keeping each source module separate."
+          description="Фільтри застосовуються до календаря з backend, не змішуючи джерела подій."
         >
           <div className="dh-calendar-filters">
             <label>
@@ -167,11 +167,11 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
               </DragonSelect>
             </label>
             <label>
-              <span>Source</span>
+              <span>Джерело</span>
               <DragonSelect
                 value={calendar.filters.sourceModule}
                 onChange={(event) => calendar.setFilters((filters) => ({ ...filters, sourceModule: event.currentTarget.value as DragonCalendarSourceModule | 'all' }))}
-                aria-label="Filter by calendar source"
+                aria-label="Фільтр за джерелом календаря"
               >
                 {SOURCE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -181,7 +181,7 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
               </DragonSelect>
             </label>
             <label>
-              <span>Member</span>
+              <span>Учасник</span>
               <DragonSelect
                 value={calendar.filters.member}
                 onChange={(event) => calendar.setFilters((filters) => ({ ...filters, member: event.currentTarget.value }))}
@@ -245,7 +245,7 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
                     >
                       <div className="dh-calendar-day-head">
                         <span>{day.dayNumber}</span>
-                        {day.events.some((event) => event.category === 'birthday') ? <DragonBadge tone="success">Birthday</DragonBadge> : null}
+                        {day.events.some((event) => event.category === 'birthday') ? <DragonBadge tone="success">День народження</DragonBadge> : null}
                       </div>
                       <div className="dh-calendar-day-events">
                         {day.events.slice(0, 3).map((event) => {
@@ -352,7 +352,7 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
                 <dd>{DRAGON_CALENDAR_CATEGORY_META[calendar.selectedEvent.category].label}</dd>
               </div>
               <div>
-                <dt>Source</dt>
+                <dt>Джерело</dt>
                 <dd>{sourceLabel(calendar.selectedEvent.sourceModule)}</dd>
               </div>
               <div>
@@ -368,15 +368,15 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
                 <dd>{calendar.selectedEvent.hall}</dd>
               </div>
             </dl>
-            <DragonDivider label="Future Slots" />
+            <DragonDivider label="Матеріали події" />
             <div className="dh-calendar-dialog-placeholders">
               <DragonCard>
-                <strong>Attachments</strong>
-                <p>{calendar.selectedEvent.attachments.length ? `${calendar.selectedEvent.attachments.length} placeholder ready` : 'Місце для майбутніх файлів і посилань.'}</p>
+                <strong>Файли та посилання</strong>
+                <p>{calendar.selectedEvent.attachments.length ? `Додано матеріалів: ${calendar.selectedEvent.attachments.length}` : 'Матеріали ще не додані.'}</p>
               </DragonCard>
               <DragonCard>
-                <strong>Comments</strong>
-                <p>Місце для майбутніх сімейних коментарів без backend-запитів у цьому етапі.</p>
+                <strong>Коментарі</strong>
+                <p>Коментарі ведуться через опис, нотатки й відповіді учасників у подіях.</p>
               </DragonCard>
             </div>
           </div>
@@ -387,10 +387,10 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
 }
 
 function sourceLabel(sourceModule?: DragonCalendarSourceModule) {
-  if (sourceModule === 'tower_defense') return 'Tower Defense';
-  if (sourceModule === 'family_quests') return 'Family Quest';
-  if (sourceModule === 'birthday') return 'Birthday';
-  return 'Family Event';
+  if (sourceModule === 'tower_defense') return 'Оборона вишок';
+  if (sourceModule === 'family_quests') return 'Сімейний квест';
+  if (sourceModule === 'birthday') return 'День народження';
+  return 'Сімейна подія';
 }
 
 function sourceTone(sourceModule?: DragonCalendarSourceModule): 'ember' | 'gold' | 'success' | 'muted' | 'danger' {

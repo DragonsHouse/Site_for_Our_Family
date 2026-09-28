@@ -18,6 +18,7 @@ export type DragonAchievementCategory =
 
 export type DragonAchievementRewardType =
   | 'xp'
+  | 'money'
   | 'role_unlock'
   | 'badge'
   | 'decoration'
@@ -91,34 +92,34 @@ export type DragonAchievementStatistics = {
 };
 
 export const DRAGON_ACHIEVEMENT_CATEGORY_LABELS: Record<DragonAchievementCategory, string> = {
-  tower_defense: 'Tower Defense',
-  quest: 'Quest',
-  meeting: 'Meeting',
-  attendance: 'Attendance',
-  activity: 'Activity',
-  community: 'Community',
-  leadership: 'Leadership',
+  tower_defense: 'Оборона вишок',
+  quest: 'Квести',
+  meeting: 'Зустрічі',
+  attendance: 'Відвідування',
+  activity: 'Активність',
+  community: 'Спільнота',
+  leadership: 'Лідерство',
   discord: 'Discord',
-  events: 'Events',
-  seasonal: 'Seasonal',
-  founder: 'Founder',
-  special: 'Special'
+  events: 'Події',
+  seasonal: 'Сезонні',
+  founder: 'Засновники',
+  special: 'Особливі'
 };
 
 export const DRAGON_ACHIEVEMENT_RARITY_META: Record<
   DragonAchievementRarity,
   { label: string; score: number; tone: 'ember' | 'gold' | 'success' | 'muted' | 'danger'; className: string }
 > = {
-  common: { label: 'Common', score: 1, tone: 'muted', className: 'dh-engine-rarity-common' },
-  uncommon: { label: 'Uncommon', score: 2, tone: 'success', className: 'dh-engine-rarity-uncommon' },
-  rare: { label: 'Rare', score: 3, tone: 'success', className: 'dh-engine-rarity-rare' },
-  epic: { label: 'Epic', score: 4, tone: 'ember', className: 'dh-engine-rarity-epic' },
-  legendary: { label: 'Legendary', score: 5, tone: 'gold', className: 'dh-engine-rarity-legendary' },
-  mythic: { label: 'Mythic', score: 6, tone: 'danger', className: 'dh-engine-rarity-mythic' }
+  common: { label: 'Звичайна', score: 1, tone: 'muted', className: 'dh-engine-rarity-common' },
+  uncommon: { label: 'Незвичайна', score: 2, tone: 'success', className: 'dh-engine-rarity-uncommon' },
+  rare: { label: 'Рідкісна', score: 3, tone: 'success', className: 'dh-engine-rarity-rare' },
+  epic: { label: 'Епічна', score: 4, tone: 'ember', className: 'dh-engine-rarity-epic' },
+  legendary: { label: 'Легендарна', score: 5, tone: 'gold', className: 'dh-engine-rarity-legendary' },
+  mythic: { label: 'Міфічна', score: 6, tone: 'danger', className: 'dh-engine-rarity-mythic' }
 };
 
 export const DRAGON_ACHIEVEMENT_VISIBILITY_LABELS: Record<DragonAchievementVisibility, string> = {
-  visible: 'Visible',
-  hidden: 'Hidden',
-  secret: 'Secret'
+  visible: 'Відкрита',
+  hidden: 'Прихована',
+  secret: 'Таємна'
 };

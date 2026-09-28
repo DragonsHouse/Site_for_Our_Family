@@ -11,93 +11,100 @@ export type DragonRoomNavigationItem = {
   background: DragonBackgroundVariant;
   requiredPermission?: FamilyPermission;
   minimumRankLevel?: number;
+  hideFromProductionNavigation?: boolean;
 };
+
+const SHOW_LEGACY_ROOMS =
+  (import.meta as { env?: Record<string, string | boolean | undefined> }).env?.DEV === true ||
+  (import.meta as { env?: Record<string, string | boolean | undefined> }).env?.VITE_DRAGON_HOUSE_SHOW_LEGACY_ROOMS === 'true';
 
 export const DRAGON_ROOM_NAVIGATION: DragonRoomNavigationItem[] = [
   {
     key: 'cabinet',
-    label: 'Dashboard',
-    room: 'Entrance Hall',
-    description: 'Personal command surface and account overview.',
+    label: 'Кабінет і профіль',
+    room: 'Вхідна зала',
+    description: 'Особистий кабінет, профіль, активність, нагороди й виплати в одному місці.',
     background: 'dashboard'
   },
   {
     key: 'members',
-    label: 'Members',
-    room: 'Hall of Guardians',
-    description: 'Family directory, Dragon roles and member presence.',
+    label: 'Учасники',
+    room: 'Зала вартових',
+    description: 'Список сімʼї, ролі, ранги та статуси учасників.',
     background: 'members'
   },
   {
     key: 'profile',
-    label: 'Profile',
-    room: 'Dragon Chamber',
-    description: 'Personal identity, rank, timeline and permissions.',
-    background: 'profile'
+    label: 'Профіль',
+    room: 'Зала профілю',
+    description: 'Профіль обʼєднано з особистим кабінетом.',
+    background: 'profile',
+    hideFromProductionNavigation: true
+  },
+  {
+    key: 'family',
+    label: 'Сімʼя',
+    room: 'Зала полумʼя',
+    description: 'Сімейний огляд, правила, ранги, квести та керування.',
+    background: 'dashboard'
   },
   {
     key: 'calendar',
-    label: 'Calendar',
-    room: 'Hall of Chronicles',
-    description: 'Family events, birthdays and shared planning.',
+    label: 'Календар',
+    room: 'Зала хронік',
+    description: 'Події, оборона вишок, квести та спільне планування.',
     background: 'calendar'
   },
   {
     key: 'events',
-    label: 'Events',
-    room: 'Event Watch',
-    description: 'Dragon Event Engine and cross-module event stream.',
+    label: 'Події',
+    room: 'Варта подій',
+    description: 'Сімейні події, участь, присутність і Discord-публікації.',
     background: 'events'
   },
   {
     key: 'tower-defense',
-    label: 'Р’РѕРіРЅСЏРЅР° РІР°СЂС‚Р°',
-    room: 'War Chamber',
-    description: 'Tower Defense readiness and roster coordination.',
+    label: 'Оборона вишок',
+    room: 'Військова зала',
+    description: 'Готовність вишок, відповіді варти та підтверджена участь.',
     background: 'events'
   },
   {
     key: 'achievements',
-    label: 'Achievements',
-    room: 'Seal Engine',
-    description: 'Achievement engine, rewards and future unlocks.',
+    label: 'Нагороди',
+    room: 'Зала відзнак',
+    description: 'Досягнення, нагороди та історія отриманих відзнак.',
     background: 'achievements'
   },
   {
     key: 'resources',
-    label: 'Resources',
-    room: 'Treasury',
-    description: 'Family resources and reference material.',
-    background: 'resources'
-  },
-  {
-    key: 'discord-sync',
-    label: 'Discord Sync',
-    room: 'Sync Chamber',
-    description: 'Discord synchronization diagnostics and apply flow.',
-    background: 'resources',
-    requiredPermission: 'manage_discord_integration'
-  },
-  {
-    key: 'family',
-    label: 'Family',
-    room: 'Hall of Flame',
-    description: 'Legacy family management rooms and content.',
-    background: 'dashboard'
-  },
-  {
-    key: 'buyers',
-    label: 'Buyers',
-    room: 'Trade Vault',
-    description: 'Buyer tools inside the Dragon House shell.',
+    label: 'Ресурси',
+    room: 'Скарбниця',
+    description: 'Матеріали та корисні посилання Dragon House.',
     background: 'resources'
   },
   {
     key: 'map',
-    label: 'Map',
-    room: 'War Table',
-    description: 'Territory references and map tools.',
+    label: 'Карта',
+    room: 'Військовий стіл',
+    description: 'Карта, території, зони та довідкові посилання.',
     background: 'events'
+  },
+  {
+    key: 'discord-sync',
+    label: 'Discord-синхронізація',
+    room: 'Зала синхронізації',
+    description: 'Перевірка Discord-звʼязку, публікацій і синхронізації ролей.',
+    background: 'resources',
+    requiredPermission: 'manage_discord_integration'
+  },
+  {
+    key: 'buyers',
+    label: 'Покупці',
+    room: 'Торгова скарбниця',
+    description: 'Допоміжний legacy-інструмент покупців.',
+    background: 'resources',
+    hideFromProductionNavigation: true
   }
 ];
 
@@ -119,16 +126,20 @@ export function canAccessDragonRoom(user: FamilyUser, item: DragonRoomNavigation
 }
 
 export function getDragonRoomNavigationItems(user: FamilyUser): Array<DragonRoomRailItem<FamilyTab>> {
-  return DRAGON_ROOM_NAVIGATION.map((item) => ({
-    key: item.key,
-    label: item.label,
-    room: item.room,
-    description: item.description,
-    locked: false,
-    ariaLabel: `${item.label}, ${item.room}${canAccessDragonRoom(user, item) ? '' : ', access limited inside room'}`
-  }));
+  return DRAGON_ROOM_NAVIGATION.filter((item) => item.key !== 'profile' && (SHOW_LEGACY_ROOMS || !item.hideFromProductionNavigation)).map((item) => {
+    const canAccess = canAccessDragonRoom(user, item);
+    return {
+      key: item.key,
+      label: item.label,
+      room: item.room,
+      description: item.description,
+      locked: !canAccess,
+      ariaLabel: `${item.label}, ${item.room}${canAccess ? '' : ', доступ обмежений у кімнаті'}`
+    };
+  });
 }
 
 export function getDragonRoomMetadata(tab: FamilyTab) {
-  return DRAGON_ROOM_NAVIGATION.find((item) => item.key === tab) ?? DRAGON_ROOM_NAVIGATION[0];
+  const normalizedTab = tab === 'profile' ? 'cabinet' : tab;
+  return DRAGON_ROOM_NAVIGATION.find((item) => item.key === normalizedTab) ?? DRAGON_ROOM_NAVIGATION[0];
 }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { FamilyAuthService } from '../auth/auth-service.js';
 import type { AppConfig } from '../config/env.js';
+import type { DiscordService } from '../discord/discord-service.js';
 import type { FamilyAccountingService } from '../accounting/accounting-service.js';
 import type { FamilyAccountingReadService } from '../accounting/accounting-read-service.js';
 import { FinanceError, FINANCE_ERROR_MESSAGES } from '../accounting/finance-errors.js';
@@ -12,6 +13,7 @@ export function createFamilyAccountingRouter(
   authService: FamilyAuthService | null,
   accountingReadService: FamilyAccountingReadService | null,
   accountingService: FamilyAccountingService | null = null,
+  discordService: DiscordService | null = null,
 ): Router {
   const router = Router();
   const requireAuth = requireFamilyAuthContext(config, authService);
@@ -51,6 +53,58 @@ export function createFamilyAccountingRouter(
       response.json(await accountingService.getPayableSummary(request.familyAuth));
     } catch (error) {
       respondFinanceError(response, error);
+    }
+  });
+
+  router.get('/family/accounting/monthly-summary', async (request, response) => {
+    if (!request.familyAuth || !accountingService) return respondServiceUnavailable(response);
+    try {
+      response.json(await accountingService.getMonthlySummary({
+        year: positiveInt(request.query.year, new Date().getUTCFullYear(), 2020, 2100),
+        month: positiveInt(request.query.month, new Date().getUTCMonth() + 1, 1, 12),
+      }, request.familyAuth));
+    } catch (error) {
+      respondFinanceError(response, error);
+    }
+  });
+
+  router.get('/family/accounting/discord-feed', async (request, response) => {
+    if (!request.familyAuth) return respondServiceUnavailable(response);
+    if (!discordService) {
+      return response.json({
+        status: 'unavailable',
+        channelId: config.discord.channels.accounting,
+        lastSyncedAt: new Date().toISOString(),
+        items: [],
+        error: 'Discord service is unavailable',
+      });
+    }
+    if (!config.discord.channels.accounting) {
+      return response.json({
+        status: 'not_configured',
+        channelId: null,
+        lastSyncedAt: new Date().toISOString(),
+        items: [],
+        error: 'DISCORD_ACCOUNTING_CHANNEL_ID is not configured',
+      });
+    }
+    try {
+      const items = await discordService.fetchAccountingMessages(20);
+      response.json({
+        status: 'synced',
+        channelId: config.discord.channels.accounting,
+        lastSyncedAt: new Date().toISOString(),
+        items,
+        error: null,
+      });
+    } catch (error) {
+      response.json({
+        status: 'error',
+        channelId: config.discord.channels.accounting,
+        lastSyncedAt: new Date().toISOString(),
+        items: [],
+        error: error instanceof Error ? error.message : 'Discord accounting feed is unavailable',
+      });
     }
   });
 

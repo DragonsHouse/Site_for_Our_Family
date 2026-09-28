@@ -131,8 +131,7 @@ export const FAMILY_MAP_REFERENCES: FamilyMapReference[] = [
     url: 'https://drive.google.com/drive/folders/1X72vyid16sr9IEb-W21hM2O1dptEMUCM?usp=sharing',
     type: 'redux_update_rpf',
     status: 'planned',
-    notes:
-      'Reference layer підготовлено. Для реальної інтеграції потрібен конкретний формат карти/assets з update.rpf; файл не завантажується і не парситься автоматично.'
+    notes: 'Шар Redux v1.36 підключено як довідковий ресурс. Зони й позначки редагуються вручну в модулі мапи, без автоматичного завантаження update.rpf.'
   }
 ];
 
@@ -424,7 +423,7 @@ export const DEFAULT_FAMILY_CONTENT_BLOCKS: FamilyEditableContentBlock[] = [
   {
     id: 'home-intro',
     title: "Внутрішній штаб сім’ї",
-    body: 'Лігво, новини, квести, скарбниця і доступи.',
+    body: 'Лігво Dragon House: новини, квести, скарбниця, учасники, набір, ролі, премії та керування внутрішніми процесами.',
     contact: 'Dragon House',
     updatedBy: 'system',
     updatedAt: '2026-07-07T00:00:00.000Z'
@@ -432,7 +431,7 @@ export const DEFAULT_FAMILY_CONTENT_BLOCKS: FamilyEditableContentBlock[] = [
   {
     id: 'home-alert',
     title: 'Важливе',
-    body: 'Важливе: сімейні квести тепер мають набір, учасників і звіти для бухгалтерії.',
+    body: 'Важливе: премії, квести, виплати й набір ведуться через Family Hub. Текстові блоки редагує тільки власниця.',
     contact: 'Anastasia_Dragons',
     updatedBy: 'system',
     updatedAt: '2026-07-07T00:00:00.000Z'
@@ -440,7 +439,7 @@ export const DEFAULT_FAMILY_CONTENT_BLOCKS: FamilyEditableContentBlock[] = [
   {
     id: 'recruitment-info',
     title: 'Набір у Dragon House',
-    body: 'Dragon House приймає активних гравців, які поважають сім’ю, дисципліну та внутрішні правила лігва.',
+    body: 'Dragon House приймає активних гравців, які поважають сім’ю, дисципліну та внутрішні правила лігва.\n\nПотрібні напрями:\n- Каптери: участь у каптах, вишках, стаках і бойових активностях.\n- Фармери: стабільний фарм ресурсів, допомога складу й економіці.\n- Рекрутери: приведення нових людей, первинна перевірка та передача кандидатів старшим.\n- HR: адаптація новачків, пояснення правил, контроль активності й комунікація.\n\nЗа приведення активної людини старші можуть виписати премію. Рішення, сума і причина фіксуються в бухгалтерії.',
     contact: 'Anastasia_Dragons / Marcel_Dragons',
     updatedBy: 'Anastasia_Dragons',
     updatedAt: '2026-07-07T00:00:00.000Z'
@@ -811,9 +810,41 @@ export function readFamilyContentBlocks(): FamilyEditableContentBlock[] {
   const merged = DEFAULT_FAMILY_CONTENT_BLOCKS.map((fallback) => ({
     ...fallback,
     ...byId.get(fallback.id)
-  }));
+  })).map((block) => {
+    const refreshed = refreshDefaultContentBlock(block);
+    if (refreshed !== block) changed = true;
+    return refreshed;
+  });
   if (changed) writeJson(FAMILY_CONTENT_BLOCKS_KEY, merged);
   return merged;
+}
+
+function refreshDefaultContentBlock(block: FamilyEditableContentBlock): FamilyEditableContentBlock {
+  const fallback = DEFAULT_FAMILY_CONTENT_BLOCKS.find((item) => item.id === block.id);
+  if (!fallback) return block;
+  const isKnownOldRecruitment =
+    block.id === 'recruitment-info' &&
+    block.body === 'Dragon House приймає активних гравців, які поважають сім’ю, дисципліну та внутрішні правила лігва.';
+  const isKnownOldHomeIntro =
+    block.id === 'home-intro' &&
+    block.body === 'Лігво, новини, квести, скарбниця і доступи.';
+  const isKnownOldHomeAlert =
+    block.id === 'home-alert' &&
+    block.body === 'Важливе: сімейні квести тепер мають набір, учасників і звіти для бухгалтерії.';
+  const isUneditedSystemBlock = block.updatedBy === 'system' && block.body !== fallback.body;
+
+  if (isKnownOldRecruitment || isKnownOldHomeIntro || isKnownOldHomeAlert || isUneditedSystemBlock) {
+    return {
+      ...block,
+      title: fallback.title,
+      body: fallback.body,
+      contact: fallback.contact,
+      updatedBy: fallback.updatedBy,
+      updatedAt: fallback.updatedAt
+    };
+  }
+
+  return block;
 }
 
 export function saveFamilyContentBlocks(blocks: FamilyEditableContentBlock[]) {

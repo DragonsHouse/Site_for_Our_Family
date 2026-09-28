@@ -105,7 +105,7 @@ describe('family achievements backend integration', () => {
     assert.match(achievementUi, /mutatingId/u);
     assert.doesNotMatch(achievementUi, /mockDragonAchievementRepository/u);
     assert.match(achievementUi, /DragonRetry/u);
-    assert.match(achievementUi, /No leaderboard activity/u);
+    assert.match(achievementUi, /Рейтинг поки порожній/u);
   });
 
   it('keeps reward reconciliation as backend operations without a local mutation fallback', () => {

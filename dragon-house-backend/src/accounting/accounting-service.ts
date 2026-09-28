@@ -127,6 +127,58 @@ export type PayableSummary = {
   }>;
 };
 
+export type MonthlyAccountingSummary = {
+  year: number;
+  month: number;
+  startsAt: string;
+  endsAt: string;
+  currency: string;
+  totals: {
+    income: number;
+    expenses: number;
+    payouts: number;
+    adjustments: number;
+    net: number;
+    questFamilyIncome: number;
+    questMemberRewards: number;
+    questTotalRewards: number;
+  };
+  quests: {
+    completedCount: number;
+    withDiscordProjectionCount: number;
+    items: Array<{
+      id: string;
+      title: string;
+      status: string;
+      completedAt: string;
+      totalReward: number;
+      memberRewardPool: number;
+      familyReward: number;
+      participantCount: number;
+      helperCount: number;
+      discordMessageId: string | null;
+      discordChannelId: string | null;
+      discordSyncedAt: string | null;
+    }>;
+    topMembers: Array<{
+      familyMemberId: string | null;
+      displayName: string;
+      completedQuests: number;
+      earnedAmount: number;
+    }>;
+  };
+  transactions: Array<{
+    id: string;
+    type: 'income' | 'expense' | 'payout' | 'adjustment';
+    amount: number;
+    currency: string;
+    reason: string;
+    createdAt: string;
+    memberName: string | null;
+    questTitle: string | null;
+  }>;
+};
+
 export type PaymentProofContent = {
   id: string;
   originalFilename: string;
@@ -932,8 +984,8 @@ export class FamilyAccountingService {
         payerNicknameSnapshot: payer.nickname,
         payerRoleSnapshot: payer.role,
       });
-      await client.query('commit');
       await writePaymentProofFile(proof.storage_key, proofPayload.data);
+      await client.query('commit');
       return { item: mapBatchItem(paid.rows[0]), transaction: mapTransaction(transaction.rows[0]) };
     } catch (error) {
       await client.query('rollback');
@@ -998,6 +1050,176 @@ export class FamilyAccountingService {
       groups.set(row.family_member_id, group);
     }
     return { items: [...groups.values()].sort((left, right) => right.totalOutstanding - left.totalOutstanding || left.nickname.localeCompare(right.nickname)) };
+  }
+
+  async getMonthlySummary(input: { year: number; month: number }, auth: FamilyAuthContext): Promise<MonthlyAccountingSummary> {
+    requireAccountingManager(auth);
+    if (!Number.isInteger(input.year) || input.year < 2020 || input.year > 2100 || !Number.isInteger(input.month) || input.month < 1 || input.month > 12) {
+      throw new FinanceError('VALIDATION_ERROR', 'Invalid accounting month.', 422);
+    }
+    const startsAt = new Date(Date.UTC(input.year, input.month - 1, 1));
+    const endsAt = new Date(Date.UTC(input.year, input.month, 1));
+    const [questResult, topResult, transactionResult] = await Promise.all([
+      this.pool.query<{
+        id: string;
+        title: string;
+        status: string;
+        completed_at: Date;
+        total_reward: string;
+        member_reward_pool: string;
+        family_reward: string;
+        participant_count: string;
+        helper_count: string;
+        discord_message_id: string | null;
+        discord_channel_id: string | null;
+        discord_synced_at: Date | null;
+      }>(
+        `with completed_quests as (
+           select q.*,
+                  coalesce(r.created_at, q.ends_at, q.updated_at, q.created_at) as completed_at,
+                  coalesce(r.total_reward, q.total_reward, 0) as effective_total_reward,
+                  coalesce(r.member_reward_pool, q.member_reward_pool, 0) as effective_member_reward_pool,
+                  coalesce(r.family_reward, q.family_reward, 0) as effective_family_reward
+           from family_quests q
+           left join family_quest_reports r on r.quest_id = q.id
+           where q.status in ('completed', 'reported', 'sent_to_accounting', 'paid')
+         )
+         select q.id,
+                q.title,
+                q.status,
+                q.completed_at,
+                q.effective_total_reward::text as total_reward,
+                q.effective_member_reward_pool::text as member_reward_pool,
+                q.effective_family_reward::text as family_reward,
+                count(distinct p.id) filter (where p.role = 'participant' and p.left_at is null)::text as participant_count,
+                count(distinct p.id) filter (where p.role = 'helper' and p.left_at is null)::text as helper_count,
+                dm.message_id as discord_message_id,
+                dm.channel_id as discord_channel_id,
+                dm.synced_at as discord_synced_at
+         from completed_quests q
+         left join family_quest_people p on p.quest_id = q.id
+         left join discord_orchestration_messages dm
+           on dm.source_module = 'family_quests'
+          and dm.source_id = q.id::text
+          and dm.message_kind = 'announcement'
+         where q.completed_at >= $1 and q.completed_at < $2
+         group by q.id, q.title, q.status, q.completed_at, q.effective_total_reward, q.effective_member_reward_pool,
+                  q.effective_family_reward, dm.message_id, dm.channel_id, dm.synced_at
+         order by q.completed_at desc`,
+        [startsAt, endsAt],
+      ),
+      this.pool.query<{
+        family_member_id: string | null;
+        display_name: string;
+        completed_quests: string;
+        earned_amount: string;
+      }>(
+        `with completed_quests as (
+           select q.id, coalesce(r.created_at, q.ends_at, q.updated_at, q.created_at) as completed_at
+           from family_quests q
+           left join family_quest_reports r on r.quest_id = q.id
+           where q.status in ('completed', 'reported', 'sent_to_accounting', 'paid')
+         )
+         select p.family_member_id,
+                coalesce(m.nickname, p.display_name) as display_name,
+                count(distinct q.id)::text as completed_quests,
+                coalesce(sum(coalesce(po.amount, p.reward_amount, 0)), 0)::text as earned_amount
+         from completed_quests q
+         join family_quest_people p on p.quest_id = q.id and p.left_at is null
+         left join family_members m on m.id = p.family_member_id
+         left join family_quest_payouts po on po.quest_person_id = p.id
+         where q.completed_at >= $1 and q.completed_at < $2
+         group by p.family_member_id, coalesce(m.nickname, p.display_name)
+         order by count(distinct q.id) desc, coalesce(sum(coalesce(po.amount, p.reward_amount, 0)), 0) desc, display_name asc
+         limit 3`,
+        [startsAt, endsAt],
+      ),
+      this.pool.query<{
+        id: string;
+        transaction_type: 'income' | 'expense' | 'payout' | 'adjustment';
+        amount: string;
+        currency: string;
+        reason: string;
+        created_at: Date;
+        member_name: string | null;
+        quest_title: string | null;
+      }>(
+        `select t.id,
+                t.transaction_type,
+                t.amount::text,
+                t.currency,
+                t.reason,
+                t.created_at,
+                m.nickname as member_name,
+                q.title as quest_title
+         from family_accounting_transactions t
+         left join family_members m on m.id = t.family_member_id
+         left join family_quests q on q.id = t.quest_id
+         where t.created_at >= $1 and t.created_at < $2
+         order by t.created_at desc
+         limit 200`,
+        [startsAt, endsAt],
+      ),
+    ]);
+    const quests = questResult.rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      status: row.status,
+      completedAt: row.completed_at.toISOString(),
+      totalReward: Number(row.total_reward),
+      memberRewardPool: Number(row.member_reward_pool),
+      familyReward: Number(row.family_reward),
+      participantCount: Number(row.participant_count),
+      helperCount: Number(row.helper_count),
+      discordMessageId: row.discord_message_id,
+      discordChannelId: row.discord_channel_id,
+      discordSyncedAt: row.discord_synced_at?.toISOString() ?? null,
+    }));
+    const transactions = transactionResult.rows.map((row) => ({
+      id: row.id,
+      type: row.transaction_type,
+      amount: Number(row.amount),
+      currency: row.currency,
+      reason: row.reason,
+      createdAt: row.created_at.toISOString(),
+      memberName: row.member_name,
+      questTitle: row.quest_title,
+    }));
+    const transactionTotal = (types: Array<MonthlyAccountingSummary['transactions'][number]['type']>) =>
+      transactions.filter((item) => types.includes(item.type)).reduce((total, item) => total + item.amount, 0);
+    const questFamilyIncome = quests.reduce((total, quest) => total + quest.familyReward, 0);
+    const income = transactionTotal(['income']) + questFamilyIncome;
+    const expenses = transactionTotal(['expense', 'payout']);
+    const adjustments = transactionTotal(['adjustment']);
+    return {
+      year: input.year,
+      month: input.month,
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+      currency: transactions[0]?.currency ?? 'USD',
+      totals: {
+        income,
+        expenses,
+        payouts: transactionTotal(['payout']),
+        adjustments,
+        net: income + adjustments - expenses,
+        questFamilyIncome,
+        questMemberRewards: quests.reduce((total, quest) => total + quest.memberRewardPool, 0),
+        questTotalRewards: quests.reduce((total, quest) => total + quest.totalReward, 0),
+      },
+      quests: {
+        completedCount: quests.length,
+        withDiscordProjectionCount: quests.filter((quest) => quest.discordMessageId || quest.discordSyncedAt).length,
+        items: quests,
+        topMembers: topResult.rows.map((row) => ({
+          familyMemberId: row.family_member_id,
+          displayName: row.display_name,
+          completedQuests: Number(row.completed_quests),
+          earnedAmount: Number(row.earned_amount),
+        })),
+      },
+      transactions,
+    };
   }
 
   async recalculateQuestPayouts(questId: string, auth: FamilyAuthContext): Promise<QuestPayoutShare> {
@@ -1997,6 +2219,7 @@ function accrualCategory(accrual: FamilyMemberAccrualRecord): string {
   if (category === 'combat') return 'combatPremium';
   if (category === 'leadership') return 'leadershipPremium';
   if (category === 'top3') return 'top3Premium';
+  if (category === 'special') return 'specialPremium';
   if (category === 'manual' || !category) return 'personalPremium';
   return 'other';
 }
@@ -2142,6 +2365,7 @@ function buildWeeklyEarnings(accruals: FamilyMemberAccrualRecord[]) {
   const combatPremium = by((item) => item.sourceType === 'premium' && item.metadata.category === 'combat');
   const leadershipPremium = by((item) => item.sourceType === 'premium' && item.metadata.category === 'leadership');
   const top3Premium = by((item) => item.sourceType === 'premium' && item.metadata.category === 'top3');
+  const specialPremium = by((item) => item.sourceType === 'premium' && item.metadata.category === 'special');
   const personalPremium = by((item) => item.sourceType === 'premium' && (!item.metadata.category || item.metadata.category === 'manual'));
   const corrections = by((item) => item.sourceType === 'adjustment' || item.sourceType === 'manual_bonus');
   const other = by((item) => !['salary', 'quest', 'quest_reward', 'quest_best_participant', 'reward', 'premium', 'adjustment', 'manual_bonus'].includes(item.sourceType));
@@ -2159,6 +2383,7 @@ function buildWeeklyEarnings(accruals: FamilyMemberAccrualRecord[]) {
       combatPremium,
       leadershipPremium,
       top3Premium,
+      specialPremium,
       personalPremium,
       rewards,
       corrections,

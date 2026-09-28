@@ -268,7 +268,7 @@ function mapBackendPayout(payout: BackendFamilyQuestPayoutDto): FamilyQuestPayou
 function mapRawRewardItem(value: Record<string, unknown>, index: number): FamilyQuestRewardItem {
   return {
     id: typeof value.id === 'string' ? value.id : `backend-payout-item-${index}`,
-    title: typeof value.title === 'string' ? value.title : 'Backend reward item',
+    title: typeof value.title === 'string' ? value.title : 'Нагорода',
     quantity: typeof value.quantity === 'number' ? Math.max(1, value.quantity) : 1,
     status: value.status === 'issued' ? 'issued' : 'prepared',
     issuedAt: typeof value.issuedAt === 'string' ? value.issuedAt : null,

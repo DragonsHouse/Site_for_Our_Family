@@ -88,6 +88,7 @@ function toCreatePayload(input: DragonTowerDefenseCreateInput): CreateBackendTow
     statisticsEligible: input.statisticsEligible,
     notes: input.notes,
     metadata: {
+      ...(input.metadata ?? {}),
       frontendSource: 'dragon-tower-defense',
       frontendEventId: input.eventId ?? null
     }
@@ -115,6 +116,7 @@ function toUpdatePayload(input: Partial<DragonTowerDefenseCreateInput>): UpdateB
   if (input.leaderboardEligible !== undefined) payload.leaderboardEligible = input.leaderboardEligible;
   if (input.statisticsEligible !== undefined) payload.statisticsEligible = input.statisticsEligible;
   if (input.notes !== undefined) payload.notes = input.notes;
+  if (input.metadata !== undefined) payload.metadata = input.metadata;
   if (input.failureReason !== undefined) payload.failureReason = input.failureReason;
   return payload;
 }

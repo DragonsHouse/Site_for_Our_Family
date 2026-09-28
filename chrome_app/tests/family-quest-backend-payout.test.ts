@@ -132,7 +132,7 @@ describe('Family Quest backend payout integration', () => {
   });
 
   it('keeps successful and already-completed same-key backend responses on the success path', () => {
-    assert.match(questUiSource, /result\.alreadyIssued \? 'Backend already completed this payout\.'/u);
+    assert.match(questUiSource, /result\.alreadyIssued \? 'Цю виплату вже проведено\.'/u);
     assert.equal(applyBackendPayoutResultToQuest(quest(), issueResult({ alreadyIssued: true })).payouts[0].status, 'paid');
   });
 
@@ -146,7 +146,7 @@ describe('Family Quest backend payout integration', () => {
   });
 
   it('does not fall back to local payout when backend issuing fails', () => {
-    assert.match(questUiSource, /Backend тимчасово недоступний\. Local fallback для backend payout вимкнено\./u);
+    assert.match(questUiSource, /Сервіс виплат тимчасово недоступний\. Виплату не позначено виконаною\./u);
     assert.match(questUiSource, /catch \(error\) \{[\s\S]*setPayoutFeedback/u);
   });
 
@@ -175,6 +175,6 @@ describe('Family Quest backend payout integration', () => {
 
   it('blocks issue-all local accounting for backend-backed payouts', () => {
     assert.match(questUiSource, /hasBackendPayouts \|\| !plan\.isComplete/u);
-    assert.match(questUiSource, /Backend-backed payouts must be issued one at a time through backend\./u);
+    assert.match(questUiSource, /Ці виплати потрібно видавати по одній через офіційний сервіс\./u);
   });
 });

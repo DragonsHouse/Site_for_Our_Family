@@ -150,6 +150,10 @@ export async function parseBackendQuestDetailResponse(response: Response): Promi
   return assertQuest(await parseBackendJson(response));
 }
 
+export async function parseBackendQuestTemplateResponse(response: Response): Promise<BackendFamilyQuestTemplateDto> {
+  return assertTemplate(await parseBackendJson(response));
+}
+
 async function parseBackendJson(response: Response): Promise<unknown> {
   let body: unknown = null;
   try {

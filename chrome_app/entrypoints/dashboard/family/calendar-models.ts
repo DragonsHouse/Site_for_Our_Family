@@ -69,19 +69,19 @@ export const DRAGON_CALENDAR_CATEGORY_META: Record<
   }
 > = {
   dragon_meeting: {
-    label: 'Dragon Meeting',
+    label: 'Зустріч Dragon House',
     glyph: '🐉',
     tone: 'gold',
     className: 'dh-calendar-category-dragon-meeting'
   },
   birthday: {
-    label: 'Birthday',
+    label: 'День народження',
     glyph: '🎂',
     tone: 'success',
     className: 'dh-calendar-category-birthday'
   },
   celebration: {
-    label: 'Celebration',
+    label: 'Свято',
     glyph: '🎉',
     tone: 'gold',
     className: 'dh-calendar-category-celebration'

@@ -1,6 +1,6 @@
 import { authenticatedFetch } from './family-backend-auth-client.ts';
 
-export type DiscordPublishState = 'unpublished' | 'published' | 'synced' | 'error';
+export type DiscordPublishState = 'not_published' | 'published' | 'synced' | 'pending' | 'sync_error';
 
 export type FamilyDiscordPublishState = {
   sourceModule: 'family_quests' | 'tower_defense' | 'family_events';
@@ -81,7 +81,7 @@ async function parseJson(response: Response): Promise<unknown> {
 function assertPublishState(value: unknown): FamilyDiscordPublishState {
   if (!isRecord(value)) throw malformed();
   const state = value.state;
-  if (state !== 'unpublished' && state !== 'published' && state !== 'synced' && state !== 'error') throw malformed();
+  if (state !== 'not_published' && state !== 'published' && state !== 'synced' && state !== 'pending' && state !== 'sync_error') throw malformed();
   const sourceModule = value.sourceModule;
   if (sourceModule !== 'family_quests' && sourceModule !== 'tower_defense' && sourceModule !== 'family_events') throw malformed();
   if (typeof value.sourceId !== 'string') throw malformed();

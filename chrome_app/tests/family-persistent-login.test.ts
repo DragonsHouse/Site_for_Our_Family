@@ -84,10 +84,17 @@ describe('persistent Family Hub login source contract', () => {
     const dashboard = await readSource('entrypoints/dashboard/family-hub-app.tsx');
     const background = await readSource('entrypoints/background.ts');
 
-    assert.match(dashboard, /loadCurrentBackendFamilyUser/u);
+    assert.match(dashboard, /restoreCurrentBackendFamilyUser/u);
+    assert.match(dashboard, /if \(!user\) \{\s+setCurrentUser\(null\);\s+setAuthState\(\{ status: 'unauthenticated' \}\);\s+return;\s+\}/u);
     assert.match(background, /restoreCurrentAuthSession/u);
     assert.match(background, /restoreAuthSessionOnExtensionStartup/u);
     assert.match(background, /chrome\.runtime\.onStartup\.addListener/u);
     assert.doesNotMatch(dashboard, /window\.localStorage\.getItem\([^)]*currentUser/u);
+  });
+
+  it('returning to login clears stale auth tokens from unavailable restore screens', async () => {
+    const dashboard = await readSource('entrypoints/dashboard/family-hub-app.tsx');
+
+    assert.match(dashboard, /function returnToLogin\(\) \{\s+void clearAuthSession\(\)\.catch\(\(\) => undefined\);/u);
   });
 });

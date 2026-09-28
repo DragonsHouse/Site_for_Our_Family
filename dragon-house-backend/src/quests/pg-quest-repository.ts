@@ -9,7 +9,9 @@ import type {
   FamilyQuestRewardMode,
   FamilyQuestRewardRecord,
   FamilyQuestStatus,
+  FamilyQuestTemplateWriteInput,
   FamilyQuestTemplateRecord,
+  FamilyQuestWriteInput,
 } from './quest-models.js';
 import type { FamilyQuestRepository } from './quest-repository.js';
 import type { UpsertQuestPersonInput } from './quest-repository.js';
@@ -173,6 +175,82 @@ export class PgFamilyQuestRepository implements FamilyQuestRepository {
     return result.rows.map(mapTemplate);
   }
 
+  async createTemplate(input: FamilyQuestTemplateWriteInput, actorFamilyMemberId: string, now: string): Promise<FamilyQuestTemplateRecord> {
+    const result = await this.pool.query<QuestTemplateRow>(
+      `insert into family_quest_templates
+        (template_key, title, category, description, steps, recommended_team_size,
+         total_reward, member_reward_pool, family_reward, reward_mode, required_items,
+         image_asset_id, is_active, cooldown_hours, created_by_family_member_id,
+         updated_by_family_member_id, created_at, updated_at)
+       values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $16)
+       returning *`,
+      [
+        input.templateKey ?? slug(input.title),
+        input.title,
+        input.category,
+        input.description ?? null,
+        JSON.stringify(input.steps ?? []),
+        input.recommendedTeamSize ?? 1,
+        input.totalReward ?? 0,
+        input.memberRewardPool ?? 0,
+        input.familyReward ?? 0,
+        input.rewardMode ?? 'equal',
+        input.requiredItems ?? null,
+        input.imageAssetId ?? null,
+        input.isActive ?? true,
+        input.cooldownHours ?? 24,
+        actorFamilyMemberId,
+        now,
+      ],
+    );
+    return mapTemplate(result.rows[0]);
+  }
+
+  async updateTemplate(id: string, input: Partial<FamilyQuestTemplateWriteInput>, actorFamilyMemberId: string, now: string): Promise<FamilyQuestTemplateRecord | null> {
+    const current = await this.pool.query<QuestTemplateRow>('select * from family_quest_templates where id = $1 limit 1', [id]);
+    if (!current.rows[0]) return null;
+    const row = current.rows[0];
+    const result = await this.pool.query<QuestTemplateRow>(
+      `update family_quest_templates
+       set title = $2,
+           category = $3,
+           description = $4,
+           steps = $5::jsonb,
+           recommended_team_size = $6,
+           total_reward = $7,
+           member_reward_pool = $8,
+           family_reward = $9,
+           reward_mode = $10,
+           required_items = $11,
+           image_asset_id = $12,
+           is_active = $13,
+           cooldown_hours = $14,
+           updated_by_family_member_id = $15,
+           updated_at = $16
+       where id = $1
+       returning *`,
+      [
+        id,
+        input.title ?? row.title,
+        input.category ?? row.category,
+        input.description !== undefined ? input.description : row.description,
+        JSON.stringify(input.steps ?? stringArray(row.steps)),
+        input.recommendedTeamSize ?? row.recommended_team_size,
+        input.totalReward ?? Number(row.total_reward),
+        input.memberRewardPool ?? Number(row.member_reward_pool),
+        input.familyReward ?? Number(row.family_reward),
+        input.rewardMode ?? row.reward_mode,
+        input.requiredItems !== undefined ? input.requiredItems : row.required_items,
+        input.imageAssetId !== undefined ? input.imageAssetId : row.image_asset_id,
+        input.isActive ?? row.is_active,
+        input.cooldownHours ?? row.cooldown_hours,
+        actorFamilyMemberId,
+        now,
+      ],
+    );
+    return mapTemplate(result.rows[0]);
+  }
+
   async listQuests(query: FamilyQuestListQuery = {}): Promise<FamilyQuestRecord[]> {
     const values: unknown[] = [];
     const where: string[] = [];
@@ -196,6 +274,92 @@ export class PgFamilyQuestRepository implements FamilyQuestRepository {
 
   async findQuestById(id: string): Promise<FamilyQuestRecord | null> {
     const result = await this.pool.query<QuestRow>('select * from family_quests where id = $1 limit 1', [id]);
+    const quests = await this.hydrateQuests(result.rows);
+    return quests[0] ?? null;
+  }
+
+  async createQuest(input: FamilyQuestWriteInput, actorFamilyMemberId: string, now: string): Promise<FamilyQuestRecord> {
+    const result = await this.pool.query<QuestRow>(
+      `insert into family_quests
+        (template_id, title, description, category, status, starts_at, scheduled_at,
+         organizer_family_member_id, total_reward, member_reward_pool, family_reward,
+         reward_mode, required_items, metadata, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $15)
+       returning *`,
+      [
+        input.templateId ?? null,
+        input.title,
+        input.description ?? '',
+        input.category,
+        input.status ?? 'recruiting',
+        input.startsAt ?? null,
+        input.scheduledAt ?? input.startsAt ?? null,
+        actorFamilyMemberId,
+        input.totalReward ?? 0,
+        input.memberRewardPool ?? 0,
+        input.familyReward ?? 0,
+        input.rewardMode ?? 'equal',
+        input.requiredItems ?? null,
+        JSON.stringify(input.metadata ?? {}),
+        now,
+      ],
+    );
+    const id = result.rows[0].id;
+    await this.pool.query(
+      `insert into family_quest_audit
+        (quest_id, actor_family_member_id, action, previous_status, new_status, metadata, created_at)
+       values ($1, $2, 'quest_created', null, $3, '{}'::jsonb, $4)`,
+      [id, actorFamilyMemberId, input.status ?? 'recruiting', now],
+    );
+    const quests = await this.hydrateQuests(result.rows);
+    return quests[0];
+  }
+
+  async updateQuest(id: string, input: Partial<FamilyQuestWriteInput>, actorFamilyMemberId: string, now: string): Promise<FamilyQuestRecord | null> {
+    const current = await this.findQuestById(id);
+    if (!current) return null;
+    const result = await this.pool.query<QuestRow>(
+      `update family_quests
+       set template_id = $2,
+           title = $3,
+           description = $4,
+           category = $5,
+           status = $6,
+           starts_at = $7,
+           scheduled_at = $8,
+           total_reward = $9,
+           member_reward_pool = $10,
+           family_reward = $11,
+           reward_mode = $12,
+           required_items = $13,
+           metadata = metadata || $14::jsonb,
+           updated_at = $15
+       where id = $1
+       returning *`,
+      [
+        id,
+        input.templateId !== undefined ? input.templateId : current.templateId,
+        input.title ?? current.title,
+        input.description !== undefined ? input.description ?? '' : current.description,
+        input.category ?? current.category,
+        input.status ?? current.status,
+        input.startsAt !== undefined ? input.startsAt : current.startsAt,
+        input.scheduledAt !== undefined ? input.scheduledAt : current.scheduledAt,
+        input.totalReward ?? current.totalReward,
+        input.memberRewardPool ?? current.memberRewardPool,
+        input.familyReward ?? current.familyReward,
+        input.rewardMode ?? current.rewardMode,
+        input.requiredItems !== undefined ? input.requiredItems : current.requiredItems,
+        JSON.stringify(input.metadata ?? {}),
+        now,
+      ],
+    );
+    await this.pool.query(
+      `insert into family_quest_audit
+        (quest_id, actor_family_member_id, action, previous_status, new_status, metadata, created_at)
+       values ($1, $2, 'quest_updated', $3, $4, '{}'::jsonb, $5)`,
+      [id, actorFamilyMemberId, current.status, input.status ?? current.status, now],
+    );
     const quests = await this.hydrateQuests(result.rows);
     return quests[0] ?? null;
   }
@@ -276,6 +440,163 @@ export class PgFamilyQuestRepository implements FamilyQuestRepository {
     );
     const quests = await this.hydrateQuests(result.rows);
     return quests[0] ?? null;
+  }
+
+  async createQuestReport(
+    id: string,
+    input: { actorFamilyMemberId: string; title: string; comment?: string | null; now: string },
+  ): Promise<FamilyQuestRecord | null> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      const current = await client.query<QuestRow>('select * from family_quests where id = $1 for update', [id]);
+      const quest = current.rows[0];
+      if (!quest) {
+        await client.query('rollback');
+        return null;
+      }
+      const report = await client.query<{ id: string }>(
+        `insert into family_quest_reports
+          (quest_id, title, comment, confirmed_by_family_member_id, total_reward, member_reward_pool, family_reward, metadata, created_at, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, '{}'::jsonb, $8, $8)
+         on conflict (quest_id)
+         do update set
+           title = excluded.title,
+           comment = excluded.comment,
+           confirmed_by_family_member_id = excluded.confirmed_by_family_member_id,
+           total_reward = excluded.total_reward,
+           member_reward_pool = excluded.member_reward_pool,
+           family_reward = excluded.family_reward,
+           updated_at = excluded.updated_at
+         returning id`,
+        [
+          id,
+          input.title,
+          input.comment ?? null,
+          input.actorFamilyMemberId,
+          quest.total_reward,
+          quest.member_reward_pool,
+          quest.family_reward,
+          input.now,
+        ],
+      );
+      const updated = await client.query<QuestRow>(
+        `update family_quests
+         set status = 'reported',
+             report_id = $2,
+             updated_at = $3
+         where id = $1
+         returning *`,
+        [id, report.rows[0].id, input.now],
+      );
+      await client.query(
+        `insert into family_quest_audit
+          (quest_id, actor_family_member_id, action, comment, previous_status, new_status, metadata, created_at)
+         values ($1, $2, 'quest_reported', $3, $4, 'reported', '{}'::jsonb, $5)`,
+        [id, input.actorFamilyMemberId, input.comment ?? null, quest.status, input.now],
+      );
+      await client.query('commit');
+      const quests = await this.hydrateQuests(updated.rows);
+      return quests[0] ?? null;
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async transferQuestReportToAccounting(
+    id: string,
+    input: { actorFamilyMemberId: string; now: string },
+  ): Promise<FamilyQuestRecord | null> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      const current = await client.query<QuestRow>('select * from family_quests where id = $1 for update', [id]);
+      const quest = current.rows[0];
+      if (!quest) {
+        await client.query('rollback');
+        return null;
+      }
+      const report = await client.query<{ id: string }>(
+        `update family_quest_reports
+         set transferred_to_accounting_at = coalesce(transferred_to_accounting_at, $2),
+             updated_at = $2
+         where quest_id = $1
+         returning id`,
+        [id, input.now],
+      );
+      const reportId = report.rows[0]?.id;
+      if (!reportId) {
+        await client.query('rollback');
+        return await this.findQuestById(id);
+      }
+      await client.query(
+        `with payable_people as (
+           select *,
+             count(*) over () as payable_count
+           from family_quest_people
+           where quest_id = $1
+             and role = 'participant'
+             and left_at is null
+             and family_member_id is not null
+         )
+         insert into family_quest_payouts
+           (quest_id, report_id, quest_person_id, family_member_id, display_name, amount,
+            reward_percent, reward_items, bonus_amount, bonus_percent, status, metadata, created_at, updated_at)
+         select
+           $1,
+           $2,
+           person.id,
+           person.family_member_id,
+           person.display_name,
+           case
+             when person.reward_amount > 0 then person.reward_amount
+             when person.payable_count > 0 then round(($3::numeric / person.payable_count)::numeric, 2)
+             else 0
+           end,
+           person.reward_percent,
+           '[]'::jsonb,
+           person.bonus_amount,
+           person.bonus_percent,
+           'pending',
+           jsonb_build_object('source', 'quest_report_handoff'),
+           $4,
+           $4
+         from payable_people person
+         where not exists (
+           select 1 from family_quest_payouts payout
+           where payout.report_id = $2
+             and payout.quest_person_id = person.id
+         )`,
+        [id, reportId, quest.member_reward_pool, input.now],
+      );
+      const updated = await client.query<QuestRow>(
+        `update family_quests
+         set status = 'sent_to_accounting',
+             report_id = coalesce(report_id, $2),
+             report_sent_to_accounting_at = coalesce(report_sent_to_accounting_at, $3),
+             updated_at = $3
+         where id = $1
+         returning *`,
+        [id, reportId, input.now],
+      );
+      await client.query(
+        `insert into family_quest_audit
+          (quest_id, actor_family_member_id, action, previous_status, new_status, metadata, created_at)
+         values ($1, $2, 'quest_sent_to_accounting', $3, 'sent_to_accounting', '{}'::jsonb, $4)`,
+        [id, input.actorFamilyMemberId, quest.status, input.now],
+      );
+      await client.query('commit');
+      const quests = await this.hydrateQuests(updated.rows);
+      return quests[0] ?? null;
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async hydrateQuests(rows: QuestRow[]): Promise<FamilyQuestRecord[]> {
@@ -503,4 +824,9 @@ function stringArray(value: unknown): string[] {
 
 function recordArray(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item)) : [];
+}
+
+function slug(value: string): string {
+  const slugged = value.trim().toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-|-$/gu, '');
+  return slugged || `template-${Date.now()}`;
 }

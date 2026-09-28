@@ -153,10 +153,10 @@ describe('family events backend integration', () => {
     assert.match(calendarState, /sourceModule: 'all'/u);
     assert.match(calendarService, /filters\.sourceModule === 'all'/u);
     assert.match(calendarUi, /SOURCE_OPTIONS/u);
-    assert.match(calendarUi, /Family Events/u);
-    assert.match(calendarUi, /Tower Defense/u);
-    assert.match(calendarUi, /Family Quests/u);
-    assert.match(calendarUi, /Birthdays/u);
+    assert.match(calendarUi, /Сімейні події/u);
+    assert.match(calendarUi, /Оборона вишок/u);
+    assert.match(calendarUi, /Сімейні квести/u);
+    assert.match(calendarUi, /Дні народження/u);
     assert.match(calendarUi, /sourceLabel/u);
     assert.match(eventService, /sourceModule === 'tower_defense'[\s\S]*return 'tower_defense'/u);
     assert.match(eventService, /sourceModule === 'quest_board'[\s\S]*return 'family_quests'/u);

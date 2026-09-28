@@ -5,11 +5,13 @@ import type {
   DiscordMessageRecord,
   SaveDiscordActionInput,
   SaveDiscordMessageInput,
+  UpdateDiscordMessageMetadataInput,
 } from './orchestration-models.js';
 
 export interface DiscordOrchestrationRepository {
   findMessage(identity: DiscordMessageIdentity): Promise<DiscordMessageRecord | null>;
   saveMessage(input: SaveDiscordMessageInput): Promise<DiscordMessageRecord>;
+  updateMessageMetadata(input: UpdateDiscordMessageMetadataInput): Promise<DiscordMessageRecord | null>;
   findActionByIdempotencyKey(idempotencyKey: string): Promise<DiscordActionRecord | null>;
   saveAction(input: SaveDiscordActionInput): Promise<DiscordActionRecord>;
 }
@@ -42,6 +44,19 @@ export class InMemoryDiscordOrchestrationRepository implements DiscordOrchestrat
       metadata: { ...(current?.metadata ?? {}), ...(input.metadata ?? {}) },
       createdAt: current?.createdAt ?? now,
       updatedAt: now,
+    };
+    this.messages.set(key, record);
+    return record;
+  }
+
+  async updateMessageMetadata(input: UpdateDiscordMessageMetadataInput): Promise<DiscordMessageRecord | null> {
+    const key = messageKey(input);
+    const current = this.messages.get(key);
+    if (!current) return null;
+    const record = {
+      ...current,
+      metadata: { ...current.metadata, ...input.metadata },
+      updatedAt: new Date().toISOString(),
     };
     this.messages.set(key, record);
     return record;
@@ -120,6 +135,25 @@ export class PgDiscordOrchestrationRepository implements DiscordOrchestrationRep
       ],
     );
     return mapMessage(result.rows[0]);
+  }
+
+  async updateMessageMetadata(input: UpdateDiscordMessageMetadataInput): Promise<DiscordMessageRecord | null> {
+    const result = await this.pool.query<DiscordMessageRow>(
+      `update discord_orchestration_messages
+       set metadata = metadata || $6::jsonb,
+           updated_at = now()
+       where source_module = $1 and source_id = $2 and message_kind = $3 and guild_id = $4 and channel_id = $5
+       returning *`,
+      [
+        input.sourceModule,
+        input.sourceId,
+        input.messageKind,
+        input.guildId,
+        input.channelId,
+        JSON.stringify(input.metadata),
+      ],
+    );
+    return result.rows[0] ? mapMessage(result.rows[0]) : null;
   }
 
   async findActionByIdempotencyKey(idempotencyKey: string): Promise<DiscordActionRecord | null> {

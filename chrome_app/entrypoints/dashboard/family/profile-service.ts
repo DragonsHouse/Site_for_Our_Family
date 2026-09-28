@@ -73,7 +73,7 @@ export function getDragonProfilePrimaryStats(profile: DragonProfile) {
     achievementsUnlocked: profile.achievements.filter((achievement) => achievement.state === 'unlocked').length,
     legendaryAchievements: profile.achievements.filter((achievement) => achievement.rarity === 'legendary').length,
     grantedPermissions: profile.permissions.filter((permission) => permission.granted).length,
-    activityTotal: profile.activity.reduce((total, day) => total + day.value, 0)
+    activityTotal: profile.statistics.find((statistic) => statistic.backendMetricKey === 'activity_score')?.value ?? '0'
   };
 }
 
@@ -102,8 +102,11 @@ export function getActivityIntensity(day: DragonActivityDay) {
 }
 
 export function formatDragonProfileDate(date?: string | null) {
-  if (!date) return 'Reserved';
-  return new Intl.DateTimeFormat('en', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`));
+  if (!date) return 'Даних поки немає';
+  const normalized = date.includes('T') ? date : `${date}T00:00:00`;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return 'Даних поки немає';
+  return new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Kyiv' }).format(parsed);
 }
 
 function mergeUserStatistics(statistics: DragonProfileStatistic[], user: FamilyUser) {
@@ -111,7 +114,7 @@ function mergeUserStatistics(statistics: DragonProfileStatistic[], user: FamilyU
     const updates: Partial<Record<string, string>> = {
       events_joined: String(user.stats.eventsJoined || statistic.value),
       quests_completed: String(user.stats.questsTotal || statistic.value),
-      activity_score: String(user.stats.contributionPoints || statistic.value),
+      activity_score: String(user.stats.contributionPoints ?? 0),
       promotion_progress: `${clampProgress(user.promotionProgress || 0)}%`
     };
 

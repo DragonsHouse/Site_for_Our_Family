@@ -142,6 +142,7 @@ describe('family member directory route', { timeout: 20_000 }, () => {
     expect(response.status).toBe(200);
     expect(item).toEqual({
       memberId: 'owner-id',
+      staticId: '100',
       displayName: 'Owner Server',
       role: 'owner',
       rank: { level: 10, title: null },
@@ -155,7 +156,6 @@ describe('family member directory route', { timeout: 20_000 }, () => {
       },
       joinedAt: '2026-01-01T00:00:00.000Z',
     });
-    expect(JSON.stringify(item)).not.toContain('staticId');
     expect(JSON.stringify(item)).not.toContain('discordUserId');
     expect(JSON.stringify(item)).not.toContain('permissions');
     expect(JSON.stringify(item)).not.toContain('notes');
@@ -269,6 +269,7 @@ describe('family member directory route', { timeout: 20_000 }, () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({
       memberId: 'owner-id',
+      staticId: '100',
       displayName: 'Owner Server',
       role: 'owner',
       rank: { level: 10, title: null },
@@ -283,7 +284,6 @@ describe('family member directory route', { timeout: 20_000 }, () => {
       },
       profile: { summary: null },
     });
-    expect(JSON.stringify(body)).not.toContain('staticId');
     expect(JSON.stringify(body)).not.toContain('discordUserId');
     expect(JSON.stringify(body)).not.toContain('permissions');
     expect(JSON.stringify(body)).not.toContain('notes');

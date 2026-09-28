@@ -42,15 +42,15 @@ describe('Dragon Profile command chamber source contract', () => {
     ].forEach((name) => assert.match(profileSource, new RegExp(name)));
 
     [
-      'DRAGON IDENTITY',
-      'DRAGON STATISTICS',
-      'ACHIEVEMENTS',
-      'DRAGON TIMELINE',
-      'DRAGON INVENTORY',
-      'PERMISSIONS',
-      'ACTIVITY HEATMAP',
-      'DRAGON RANK PROGRESS',
-      'FUTURE DISCORD'
+      'Особисті дані',
+      'Показники профілю',
+      'Досягнення',
+      'Хроніка профілю',
+      'Особистий інвентар',
+      'Права та доступи',
+      'Карта активності',
+      'Прогрес рангу',
+      'Discord-профіль'
     ].forEach((label) => assert.match(profileSource, new RegExp(label)));
   });
 
@@ -87,16 +87,17 @@ describe('Dragon Profile command chamber source contract', () => {
   });
 
   it('is cinematic Dragon Profile, not a settings or Discord clone page', () => {
-    assert.match(profileSource, /DRAGON COMMAND CHAMBER/);
-    assert.match(profileSource, /Command Seal/);
-    assert.match(profileSource, /data-dragon-profile="command-chamber"/);
+    assert.match(profileSource, /Профіль/u);
+    assert.match(profileSource, /Профіль дракона/u);
+    assert.match(profileSource, /data-dragon-profile="profile-room"/);
     assert.doesNotMatch(profileSource, /settings/i);
     assert.doesNotMatch(profileSource, /ProfileDto/);
   });
 
-  it('routes through the existing profile tab and includes responsive Dragon styling hooks', () => {
+  it('routes through the merged cabinet/profile experience and includes responsive Dragon styling hooks', () => {
     assert.match(wrapperSource, /<DragonProfile user=\{user\} \/>/);
-    assert.match(shellSource, /activeTab === 'profile' \? <FamilyProfile user=\{currentUser\} \/>/);
+    assert.match(shellSource, /activeTab === 'profile' \? 'cabinet' : activeTab/u);
+    assert.match(shellSource, /<PersonalCabinet[\s\S]*onOpenTab=\{onTabChange\}/u);
     [
       'dh-profile-room',
       'dh-profile-hero',

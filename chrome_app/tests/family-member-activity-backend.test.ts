@@ -56,8 +56,8 @@ describe('member activity backend integration', () => {
     assert.match(panel, /getBackendMemberProfileReport\(memberId/u);
     assert.match(panel, /status: 'loading'/u);
     assert.match(panel, /status: 'error'/u);
-    assert.match(panel, /No activity yet/u);
-    assert.match(panel, /Retry/u);
+    assert.match(panel, /Активності поки немає/u);
+    assert.match(panel, /Спробувати ще раз/u);
     assert.doesNotMatch(panel, /mockDragonProfileRepository/u);
     assert.match(details, /<FamilyMemberActivityPanel memberId=\{member\.memberId\}/u);
     assert.match(profile, /<FamilyMemberActivityPanel memberId=\{user\.id\}/u);

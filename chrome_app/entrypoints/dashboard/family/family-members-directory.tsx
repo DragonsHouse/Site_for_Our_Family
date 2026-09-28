@@ -15,26 +15,26 @@ import { FamilyMemberDetails } from './family-member-details';
 
 const PAGE_SIZE = 24;
 const ROLE_OPTIONS: Array<{ value: FamilyMemberDirectoryRoleFilter; label: string }> = [
-  { value: 'all', label: 'All roles' },
-  { value: 'owner', label: 'Owner' },
-  { value: 'deputy', label: 'Deputy' },
-  { value: 'moderator', label: 'Moderator' },
-  { value: 'member', label: 'Member' },
+  { value: 'all', label: 'Усі ролі' },
+  { value: 'owner', label: 'Власниця' },
+  { value: 'deputy', label: 'Заступник' },
+  { value: 'moderator', label: 'Модератор' },
+  { value: 'member', label: 'Учасник' },
 ];
 const STATUS_OPTIONS: Array<{ value: FamilyMemberDirectoryStatusFilter; label: string }> = [
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-  { value: 'all', label: 'All statuses' },
+  { value: 'active', label: 'Активні' },
+  { value: 'inactive', label: 'Неактивні' },
+  { value: 'all', label: 'Усі статуси' },
 ];
 const SORT_OPTIONS: Array<{ value: FamilyMemberDirectorySort; label: string }> = [
-  { value: 'rank', label: 'Rank' },
-  { value: 'displayName', label: 'Display name' },
-  { value: 'role', label: 'Role' },
-  { value: 'joinedAt', label: 'Joined date' },
+  { value: 'rank', label: 'Ранг' },
+  { value: 'displayName', label: 'Імʼя' },
+  { value: 'role', label: 'Роль' },
+  { value: 'joinedAt', label: 'Дата вступу' },
 ];
 const ORDER_OPTIONS: Array<{ value: FamilyMemberDirectoryOrder; label: string }> = [
-  { value: 'desc', label: 'Descending' },
-  { value: 'asc', label: 'Ascending' },
+  { value: 'desc', label: 'За спаданням' },
+  { value: 'asc', label: 'За зростанням' },
 ];
 
 type DirectoryState =
@@ -254,12 +254,12 @@ export function FamilyMembersDirectory({
       .catch((error: unknown) => {
         if (controller.signal.aborted || requestId !== requestSequenceRef.current) return;
         if (error instanceof FamilyMemberDirectoryError && error.status === 403) {
-          setState({ status: 'forbidden', message: 'Additional permissions are required to view inactive members.', data: null });
+          setState({ status: 'forbidden', message: 'Потрібні додаткові права, щоб переглядати неактивних учасників.', data: null });
           return;
         }
         setState({
           status: 'error',
-          message: error instanceof Error ? error.message : 'Unable to load members.',
+          message: error instanceof Error ? error.message : 'Не вдалося завантажити учасників.',
           data: null,
         });
       });
@@ -310,25 +310,25 @@ export function FamilyMembersDirectory({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Dragon House</p>
             <h2 id="family-members-directory-title" className="mt-1 text-2xl font-semibold text-white">
-              Members
+              Учасники
             </h2>
-            <p className="mt-2 text-sm text-slate-400">Read-only family directory.</p>
+            <p className="mt-2 text-sm text-slate-400">Перегляд складу сімʼї, ролей і статусів.</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className="block">
-              <span className="mb-1 block text-xs text-slate-400">Search</span>
+              <span className="mb-1 block text-xs text-slate-400">Пошук</span>
               <input
                 type="search"
                 value={searchDraft}
                 onChange={(event) => setSearchDraft(event.target.value)}
-                placeholder="Search members"
+                placeholder="Пошук учасників"
                 className="w-full rounded-xl border border-white/10 bg-[#151515] px-3 py-2 text-sm text-slate-100 outline-none ring-orange-500/30 placeholder:text-slate-600 focus:ring"
               />
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-xs text-slate-400">Role</span>
+              <span className="mb-1 block text-xs text-slate-400">Роль</span>
               <select
                 value={role}
                 onChange={(event) => {
@@ -344,7 +344,7 @@ export function FamilyMembersDirectory({
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-xs text-slate-400">Status</span>
+              <span className="mb-1 block text-xs text-slate-400">Статус</span>
               <select
                 value={status}
                 onChange={(event) => {
@@ -360,7 +360,7 @@ export function FamilyMembersDirectory({
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-xs text-slate-400">Sort</span>
+              <span className="mb-1 block text-xs text-slate-400">Сортування</span>
               <select
                 value={sort}
                 onChange={(event) => {
@@ -376,7 +376,7 @@ export function FamilyMembersDirectory({
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-xs text-slate-400">Order</span>
+              <span className="mb-1 block text-xs text-slate-400">Порядок</span>
               <select
                 value={order}
                 onChange={(event) => {
@@ -395,60 +395,60 @@ export function FamilyMembersDirectory({
       </div>
 
       <div className="sr-only" aria-live="polite">
-        {state.status === 'loading' ? 'Loading members' : `${members.length} members loaded`}
+        {state.status === 'loading' ? 'Завантаження учасників' : `Завантажено учасників: ${members.length}`}
       </div>
 
       {state.status === 'loading' ? <SkeletonCards /> : null}
 
       {state.status === 'forbidden' ? (
         <div className="dh-panel rounded-2xl border border-amber-500/30 p-5 text-amber-100" role="alert">
-          <h3 className="font-semibold">Additional permissions required</h3>
+          <h3 className="font-semibold">Потрібні додаткові права</h3>
           <p className="mt-2 text-sm text-amber-50">{state.message}</p>
         </div>
       ) : null}
 
       {state.status === 'error' ? (
         <div className="dh-panel rounded-2xl border border-rose-500/30 p-5 text-rose-100" role="alert">
-          <h3 className="font-semibold">Unable to load members</h3>
+          <h3 className="font-semibold">Не вдалося завантажити учасників</h3>
           <p className="mt-2 text-sm text-rose-50">{state.message}</p>
           <button
             type="button"
             onClick={retry}
             className="mt-4 rounded-xl border border-rose-400/40 px-4 py-2 text-sm font-semibold text-rose-50 hover:bg-rose-500/10 focus:outline-none focus:ring focus:ring-rose-400/30"
           >
-            Retry
+            Спробувати ще раз
           </button>
         </div>
       ) : null}
 
       {state.status === 'empty' ? (
-        <div className="dh-panel rounded-2xl p-8 text-center text-slate-400">No dragons found.</div>
+        <div className="dh-panel rounded-2xl p-8 text-center text-slate-400">Даних поки немає.</div>
       ) : null}
 
       {state.status === 'ready' ? <DirectoryGrid members={members} onOpenMember={openMember} /> : null}
 
       {pagination ? (
-        <nav className="dh-panel flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Members pagination">
+        <nav className="dh-panel flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Сторінки учасників">
           <button
             type="button"
             disabled={!pagination.hasPreviousPage || state.status === 'loading'}
             onClick={() => setPage((current) => Math.max(1, current - 1))}
-            aria-label="Previous members page"
+            aria-label="Попередня сторінка учасників"
             className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Previous
+            Попередня
           </button>
           <div className="text-center text-sm text-slate-400">
-            Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+            Сторінка {pagination.page} з {Math.max(1, pagination.totalPages)}
           </div>
           <button
             type="button"
             disabled={!pagination.hasNextPage || state.status === 'loading'}
             onClick={() => setPage((current) => current + 1)}
-            aria-label="Next members page"
+            aria-label="Наступна сторінка учасників"
             className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Next
+            Наступна
           </button>
         </nav>
       ) : null}

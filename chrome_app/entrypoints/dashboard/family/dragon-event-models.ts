@@ -197,32 +197,32 @@ export type DragonEventTimelineEntry = {
 };
 
 export const DRAGON_EVENT_TYPE_LABELS: Record<DragonEventType, string> = {
-  family_meeting: 'Family Meeting',
-  birthday: 'Birthday',
-  quest: 'Quest',
-  tower_defense: 'Tower Defense',
-  celebration: 'Celebration',
-  training: 'Training',
-  resource_run: 'Resource Run',
-  patrol: 'Patrol',
-  war: 'War',
-  announcement: 'Announcement',
-  custom: 'Custom'
+  family_meeting: 'Сімейна зустріч',
+  birthday: 'День народження',
+  quest: 'Квест',
+  tower_defense: 'Оборона вишки',
+  celebration: 'Святкування',
+  training: 'Тренування',
+  resource_run: 'Ресурсний збір',
+  patrol: 'Патруль',
+  war: 'Війна',
+  announcement: 'Оголошення',
+  custom: 'Інше'
 };
 
 export const DRAGON_EVENT_TYPE_META: Record<
   DragonEventType,
   { label: string; glyph: string; tone: 'ember' | 'gold' | 'success' | 'muted' | 'danger'; className: string }
 > = {
-  family_meeting: { label: 'Family Meeting', glyph: 'Council', tone: 'gold', className: 'dh-event-type-family-meeting' },
-  birthday: { label: 'Birthday', glyph: 'Candle', tone: 'success', className: 'dh-event-type-birthday' },
-  quest: { label: 'Quest', glyph: 'Quest', tone: 'ember', className: 'dh-event-type-quest' },
-  tower_defense: { label: 'Tower Defense', glyph: 'Tower', tone: 'danger', className: 'dh-event-type-tower-defense' },
-  celebration: { label: 'Celebration', glyph: 'Flame', tone: 'gold', className: 'dh-event-type-celebration' },
-  training: { label: 'Training', glyph: 'Blade', tone: 'ember', className: 'dh-event-type-training' },
-  resource_run: { label: 'Resource Run', glyph: 'Vault', tone: 'muted', className: 'dh-event-type-resource-run' },
-  patrol: { label: 'Patrol', glyph: 'Watch', tone: 'success', className: 'dh-event-type-patrol' },
-  war: { label: 'War', glyph: 'War', tone: 'danger', className: 'dh-event-type-war' },
-  announcement: { label: 'Announcement', glyph: 'Horn', tone: 'gold', className: 'dh-event-type-announcement' },
-  custom: { label: 'Custom', glyph: 'Rune', tone: 'muted', className: 'dh-event-type-custom' }
+  family_meeting: { label: 'Сімейна зустріч', glyph: 'Council', tone: 'gold', className: 'dh-event-type-family-meeting' },
+  birthday: { label: 'День народження', glyph: 'Candle', tone: 'success', className: 'dh-event-type-birthday' },
+  quest: { label: 'Квест', glyph: 'Quest', tone: 'ember', className: 'dh-event-type-quest' },
+  tower_defense: { label: 'Оборона вишки', glyph: 'Tower', tone: 'danger', className: 'dh-event-type-tower-defense' },
+  celebration: { label: 'Святкування', glyph: 'Flame', tone: 'gold', className: 'dh-event-type-celebration' },
+  training: { label: 'Тренування', glyph: 'Blade', tone: 'ember', className: 'dh-event-type-training' },
+  resource_run: { label: 'Ресурсний збір', glyph: 'Vault', tone: 'muted', className: 'dh-event-type-resource-run' },
+  patrol: { label: 'Патруль', glyph: 'Watch', tone: 'success', className: 'dh-event-type-patrol' },
+  war: { label: 'Війна', glyph: 'War', tone: 'danger', className: 'dh-event-type-war' },
+  announcement: { label: 'Оголошення', glyph: 'Horn', tone: 'gold', className: 'dh-event-type-announcement' },
+  custom: { label: 'Інше', glyph: 'Rune', tone: 'muted', className: 'dh-event-type-custom' }
 };

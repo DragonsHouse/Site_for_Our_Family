@@ -4,8 +4,8 @@ import {
   getBackendWeeklyActivityStatus,
   type BackendAccountingAccrual,
   type BackendMemberAccountingReport,
-  type BackendWeeklyActivityStatus,
-  type BackendPayoutBatchItem
+  type BackendPayoutBatchItem,
+  type BackendWeeklyActivityStatus
 } from '../../../lib/family-accounting-backend-client';
 import { DragonBadge, DragonCard, DragonLoader, DragonPanel, DragonRetry, DragonSection } from '../dragon-ui/dragon-ui';
 
@@ -29,12 +29,13 @@ const earningLabels: Array<[keyof NonNullable<BackendMemberAccountingReport['wee
   ['baseSalary', 'Базова зарплата'],
   ['quests', 'Квести'],
   ['activityPremium', 'Премія за активність'],
-  ['questPremium', 'Квестова премія'],
+  ['questPremium', 'Премія за квести'],
   ['combatPremium', 'Вишки / стаки'],
-  ['leadershipPremium', 'Leadership premium'],
+  ['leadershipPremium', 'Премія від старших'],
   ['top3Premium', 'TOP-3'],
+  ['specialPremium', 'Рекрутери / HR'],
   ['personalPremium', 'Особисті премії'],
-  ['rewards', 'Rewards'],
+  ['rewards', 'Нагороди'],
   ['corrections', 'Корекції'],
   ['other', 'Інше']
 ];
@@ -63,7 +64,12 @@ export function FamilyPersonalAccountingPanel({ memberId }: { memberId: string }
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
-          setState({ loading: false, error: error instanceof Error ? error : new Error('Accounting profile data did not load'), weeklyActivity: null, report: null });
+          setState({
+            loading: false,
+            error: error instanceof Error ? error : new Error('Не вдалося завантажити особисту бухгалтерію.'),
+            weeklyActivity: null,
+            report: null
+          });
         }
       });
     return () => controller.abort();
@@ -79,13 +85,28 @@ export function FamilyPersonalAccountingPanel({ memberId }: { memberId: string }
   }, [state.report, paymentTab]);
 
   return (
-    <DragonSection eyebrow="PERSONAL ACCOUNTING" title="Особистий кабінет">
-      {state.loading ? <DragonLoader label="Завантажуємо особисті фінанси" /> : null}
-      {state.error ? <DragonRetry title="Особисті фінанси не завантажились" description={state.error.message} onRetry={() => setRefreshNonce((value) => value + 1)} /> : null}
-      {state.weeklyActivity ? <WeeklyActivityCard activity={state.weeklyActivity} /> : null}
-      {state.report?.weeklyEarnings ? <WeeklyEarningsCard report={state.report} /> : null}
-      {state.report ? <OutstandingCard items={outstanding} currency={state.report.totals.currency} /> : null}
-      {state.report ? <PaymentHistoryCard items={paidHistory} currency={state.report.totals.currency} tab={paymentTab} onTabChange={setPaymentTab} accruals={state.report.accruals} /> : null}
+    <DragonSection eyebrow="Особиста бухгалтерія" title="Особистий кабінет">
+      <div className="dh-accounting-profile">
+        {state.loading ? <DragonLoader label="Завантажуємо особисті фінанси..." /> : null}
+        {state.error ? (
+          <DragonRetry
+            title="Особисті фінанси не завантажилися"
+            description={state.error.message}
+            onRetry={() => setRefreshNonce((value) => value + 1)}
+          />
+        ) : null}
+        {state.weeklyActivity ? <WeeklyActivityCard activity={state.weeklyActivity} /> : null}
+        {state.report?.weeklyEarnings ? <WeeklyEarningsCard report={state.report} /> : null}
+        {state.report ? <OutstandingCard items={outstanding} /> : null}
+        {state.report ? (
+          <PaymentHistoryCard
+            items={paidHistory}
+            tab={paymentTab}
+            onTabChange={setPaymentTab}
+            accruals={state.report.accruals}
+          />
+        ) : null}
+      </div>
     </DragonSection>
   );
 }
@@ -94,10 +115,10 @@ function WeeklyActivityCard({ activity }: { activity: BackendWeeklyActivityStatu
   const questDone = activity.completedQuests >= activity.questRequirement;
   const towerDone = activity.towerParticipations >= activity.towerRequirement;
   return (
-    <DragonPanel variant="ember" className={`dh-accounting-profile-card ${activity.eligible ? 'is-complete' : 'is-pending'}`}>
+    <DragonPanel variant="raised" className={`dh-accounting-profile-card ${activity.eligible ? 'is-complete' : 'is-pending'}`}>
       <div className="dh-accounting-profile-heading">
         <div>
-          <p className="dh-dragon-eyebrow">{formatDate(activity.startsAt)} - {formatDate(activity.endsAt)}</p>
+          <p className="dh-dragon-eyebrow">{formatWeekRange(activity.startsAt, activity.endsAt)}</p>
           <h3>Тижнева активність</h3>
         </div>
         <DragonBadge tone={activity.eligible ? 'success' : 'warning'}>
@@ -110,15 +131,13 @@ function WeeklyActivityCard({ activity }: { activity: BackendWeeklyActivityStatu
       </div>
       {activity.eligible ? (
         <div className="dh-accounting-profile-message is-success">
-          <strong>✅ Тижнева активність виконана</strong>
-          <p>Дякуємо за активність у житті сім’ї 🐉</p>
-          <p>{qualifyingReasonLabel(activity.qualifyingReason)}</p>
+          <strong>Тижнева активність виконана</strong>
+          <p>Підстава: {qualifyingReasonLabel(activity.qualifyingReason)}</p>
         </div>
       ) : (
         <div className="dh-accounting-profile-message is-warning">
-          <strong>⚠️ Тижнева активність не виконана</strong>
-          <p>Для отримання базової зарплати потрібно виконати хоча б 1 сімейний квест або взяти участь хоча б в 1 вишці/стаку протягом тижня.</p>
-          <p>Якщо ви кудись від’їхали або тимчасово зайняті — напишіть Старшим драконам, щоб вони знали, що з вами все добре ❤️</p>
+          <strong>Тижнева активність не виконана</strong>
+          <p>Для базової зарплати потрібен хоча б 1 сімейний квест або участь хоча б в 1 вишці/стаку протягом тижня.</p>
         </div>
       )}
     </DragonPanel>
@@ -129,7 +148,7 @@ function ProgressRow({ label, value, done }: { label: string; value: number; don
   return (
     <DragonCard className="dh-accounting-profile-progress-row">
       <span>{label}</span>
-      <strong>{done ? '1+ / 1 ✅' : `${value} / 1`}</strong>
+      <strong>{done ? '1+ / 1' : `${value} / 1`}</strong>
     </DragonCard>
   );
 }
@@ -141,7 +160,7 @@ function WeeklyEarningsCard({ report }: { report: BackendMemberAccountingReport 
     <DragonPanel variant="ceremonial" className="dh-accounting-profile-card">
       <div className="dh-accounting-profile-heading">
         <div>
-          <p className="dh-dragon-eyebrow">{formatDate(earnings.startsAt)} - {formatDate(earnings.endsAt)}</p>
+          <p className="dh-dragon-eyebrow">{formatWeekRange(earnings.startsAt, earnings.endsAt)}</p>
           <h3>Заробіток за тиждень</h3>
         </div>
       </div>
@@ -171,23 +190,25 @@ function WeeklyEarningsCard({ report }: { report: BackendMemberAccountingReport 
   );
 }
 
-function OutstandingCard({ items }: { items: BackendAccountingAccrual[]; currency: string }) {
+function OutstandingCard({ items }: { items: BackendAccountingAccrual[] }) {
   return (
-    <DragonPanel variant="ember" className="dh-accounting-profile-card">
+    <DragonPanel variant="raised" className="dh-accounting-profile-card">
       <h3>Очікує виплати</h3>
       {items.length ? (
         <div className="dh-accounting-profile-list">
           {items.slice(0, 8).map((item) => (
-            <DragonCard key={item.id}>
-              <span>{friendlySourceLabel(item)}</span>
+            <DragonCard key={item.id} className="dh-accounting-profile-list-item">
+              <div>
+                <span>{friendlySourceLabel(item)}</span>
+                <p>{item.reason}</p>
+              </div>
               <strong>{formatMoney(item.amount)}</strong>
-              <p>{item.reason}</p>
               <DragonBadge tone="warning">Очікує виплати</DragonBadge>
             </DragonCard>
           ))}
         </div>
       ) : (
-        <p>Наразі немає виплат, що очікують.</p>
+        <p className="dh-accounting-profile-empty">Наразі немає виплат, що очікують.</p>
       )}
     </DragonPanel>
   );
@@ -200,7 +221,6 @@ function PaymentHistoryCard({
   accruals
 }: {
   items: BackendPayoutBatchItem[];
-  currency: string;
   tab: PersonalPaymentTab;
   onTabChange: (tab: PersonalPaymentTab) => void;
   accruals: BackendAccountingAccrual[];
@@ -208,7 +228,7 @@ function PaymentHistoryCard({
   return (
     <DragonPanel variant="ceremonial" className="dh-accounting-profile-card">
       <h3>Історія виплат</h3>
-      <div className="dh-accounting-profile-tabs" role="tablist" aria-label="Personal payment history categories">
+      <div className="dh-accounting-profile-tabs" role="tablist" aria-label="Категорії історії виплат">
         {personalPaymentTabs.map((item) => (
           <button key={item.key} type="button" role="tab" aria-selected={tab === item.key} onClick={() => onTabChange(item.key)} className={tab === item.key ? 'is-active' : ''}>
             {item.label}
@@ -218,18 +238,20 @@ function PaymentHistoryCard({
       {items.length ? (
         <div className="dh-accounting-profile-list">
           {items.map((item) => (
-            <DragonCard key={item.id}>
-              <span>{personalPaymentCategoryLabel(personalPaymentCategory(item, accruals))}</span>
-              <span>✅ Виплачено</span>
+            <DragonCard key={item.id} className="dh-accounting-profile-list-item">
+              <div>
+                <span>{personalPaymentCategoryLabel(personalPaymentCategory(item, accruals))}</span>
+                <p>{item.paidAt ? formatDateTime(item.paidAt) : 'Дата виплати не вказана'}</p>
+                {item.payerNicknameSnapshot ? <p>Виплатив: {item.payerNicknameSnapshot}</p> : null}
+                {item.payerRoleSnapshot ? <p>Роль: {item.payerRoleSnapshot}</p> : null}
+              </div>
               <strong>{formatMoney(item.totalAmount)}</strong>
-              <p>{item.paidAt ? formatDateTime(item.paidAt) : 'Дата виплати не вказана'}</p>
-              {item.payerNicknameSnapshot ? <p>Виплатив: {item.payerNicknameSnapshot}</p> : null}
-              {item.payerRoleSnapshot ? <p>Роль: {item.payerRoleSnapshot}</p> : null}
+              <DragonBadge tone="success">Виплачено</DragonBadge>
             </DragonCard>
           ))}
         </div>
       ) : (
-        <p>Історія виплат поки порожня.</p>
+        <p className="dh-accounting-profile-empty">Історія виплат поки порожня.</p>
       )}
     </DragonPanel>
   );
@@ -260,29 +282,42 @@ function friendlySourceLabel(item: BackendAccountingAccrual): string {
   if (item.sourceType === 'reward') return 'Нагорода';
   if (item.sourceType === 'adjustment' || item.sourceType === 'manual_bonus') return 'Корекція';
   if (item.sourceType === 'premium' && category === 'activity') return 'Премія за активність';
-  if (item.sourceType === 'premium' && category === 'quest_activity') return 'Квестова премія';
+  if (item.sourceType === 'premium' && category === 'quest_activity') return 'Премія за квести';
   if (item.sourceType === 'premium' && category === 'combat') return 'Вишки / стаки';
-  if (item.sourceType === 'premium' && category === 'leadership') return 'Leadership premium';
+  if (item.sourceType === 'premium' && category === 'leadership') return 'Премія від старших';
   if (item.sourceType === 'premium' && category === 'top3') return 'TOP-3';
+  if (item.sourceType === 'premium' && category === 'special') return 'Рекрутери / HR';
   if (item.sourceType === 'premium') return 'Особиста премія';
   return 'Інше';
 }
 
 function qualifyingReasonLabel(reason: BackendWeeklyActivityStatus['qualifyingReason']): string {
-  if (reason === 'quest') return 'Виконано через сімейний квест';
-  if (reason === 'tower') return 'Виконано через участь у вишках / стаках';
-  if (reason === 'both') return 'Виконано обома способами';
-  return 'Ще немає підтвердженої активності';
+  if (reason === 'quest') return 'сімейний квест';
+  if (reason === 'tower') return 'участь у вишках / стаках';
+  if (reason === 'both') return 'квест і вишки / стаки';
+  return 'підтвердженої активності ще немає';
 }
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(value);
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('uk-UA', { day: '2-digit', month: '2-digit' }).format(new Date(value));
+function formatWeekRange(startsAt: string, endsAt: string): string {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'Поточний тиждень';
+  const startText = new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'long', timeZone: 'Europe/Kyiv' }).format(start);
+  const endText = new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'long', timeZone: 'Europe/Kyiv' }).format(end);
+  return `${startText} - ${endText}`;
 }
 
 function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat('uk-UA', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Kyiv'
+  }).format(new Date(value));
 }

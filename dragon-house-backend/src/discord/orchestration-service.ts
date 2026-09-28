@@ -1,4 +1,4 @@
-import type { AppConfig } from '../config/env.js';
+﻿import type { AppConfig } from '../config/env.js';
 import type { FamilyEventService } from '../family-events/family-event-service.js';
 import type { FamilyQuestDto, FamilyQuestService } from '../quests/quest-service.js';
 import type { TowerDefenseResponseStatus } from '../tower-defense/tower-defense-models.js';
@@ -18,6 +18,7 @@ import type {
   DiscordMessageRecord,
   DiscordMessageTransport,
   DiscordOrchestrationSourceModule,
+  DiscordProjectionSyncState,
 } from './orchestration-models.js';
 import type { DiscordOrchestrationRepository } from './orchestration-repository.js';
 
@@ -28,7 +29,7 @@ type ParsedCustomId = {
   value?: string;
 };
 
-export type DiscordPublishState = 'unpublished' | 'published' | 'synced' | 'error';
+export type DiscordPublishState = DiscordProjectionSyncState | 'published';
 
 export type DiscordPublishReadModel = {
   sourceModule: DiscordOrchestrationSourceModule;
@@ -62,7 +63,7 @@ export class DiscordOrchestrationService {
       return {
         ok: true,
         ephemeral: true,
-        content: '🐉 Цю дію вже оброблено в Hub.',
+        content: 'Цю дію вже оброблено в Hub.',
         action: parsed.action,
         sourceModule,
         sourceId: parsed.sourceId,
@@ -86,6 +87,7 @@ export class DiscordOrchestrationService {
       this.assertGuildAndChannel(request.guildId, request.channelId ?? null);
       const identity = await this.identityResolver.resolve(request.discordUserId);
       const response = await this.dispatch(parsed, identity.auth, now, request);
+      const projection = response.ok ? await this.requestProjectionUpdate(sourceModule, parsed.sourceId, identity.auth) : null;
       await this.repository.saveAction({
         interactionId: request.interactionId,
         idempotencyKey,
@@ -98,8 +100,11 @@ export class DiscordOrchestrationService {
         sourceModule,
         sourceId: parsed.sourceId,
         status: 'succeeded',
-        metadata: { customId: request.customId },
+        metadata: { customId: request.customId, projectionState: projection?.state ?? null },
       });
+      if (projection?.state === 'sync_error') {
+        return { ...response, content: `${response.content}\nHub оновлено. Discord-повідомлення потребує повторної синхронізації.` };
+      }
       return response;
     } catch (error) {
       const friendly = friendlyDiscordError(error);
@@ -152,17 +157,21 @@ export class DiscordOrchestrationService {
 
   async publishTowerDefense(defenseId: string, channelId: string, auth: Parameters<TowerDefenseService['getDefense']>[1]): Promise<DiscordPublishReadModel> {
     if (!this.towerDefenseService) throw new Error('Tower Defense service is unavailable.');
-    this.assertConfiguredPublish(channelId, 'вишок / стаків');
+    this.assertConfiguredPublish(channelId, 'Вишки / стаки');
     const defense = await this.towerDefenseService.getDefense(defenseId, auth);
-    return this.syncMessage({
+    const payload = renderTowerDefenseMessage(defense);
+    const published = await this.syncMessage({
       sourceModule: 'tower_defense',
       sourceId: defenseId,
       messageKind: 'announcement',
       guildId: this.config.discord.guildId!,
       channelId,
-    }, renderTowerDefenseMessage(defense), 'Вишки / стаки');
+    }, payload, 'Вишки / стаки');
+    if (published.state === 'published' && this.transport?.sendDirectMessageToGuildMembers) {
+      await this.transport.sendDirectMessageToGuildMembers(this.config.discord.guildId!, payload);
+    }
+    return published;
   }
-
   async publishFamilyEvent(eventId: string, channelId: string, auth: Parameters<FamilyEventService['getEvent']>[1]): Promise<DiscordPublishReadModel> {
     if (!this.familyEventService) throw new Error('Family Event service is unavailable.');
     this.assertConfiguredPublish(channelId, 'подій');
@@ -188,6 +197,43 @@ export class DiscordOrchestrationService {
     return toPublishReadModel(sourceModule, sourceId, record, channelLabel);
   }
 
+  async requestProjectionUpdate(sourceModule: DiscordOrchestrationSourceModule, sourceId: string, auth: FamilyAuthContext): Promise<DiscordPublishReadModel> {
+    const channel = this.channelFor(sourceModule);
+    const channelLabel = labelFor(sourceModule);
+    if (!this.config.discord.orchestration.enabled || !this.config.discord.guildId || !channel) {
+      return emptyPublishState(sourceModule, sourceId, channelLabel);
+    }
+    const identity = {
+      sourceModule,
+      sourceId,
+      messageKind: 'announcement',
+      guildId: this.config.discord.guildId,
+      channelId: channel,
+    };
+    const current = await this.repository.findMessage(identity);
+    if (!current?.messageId) return emptyPublishState(sourceModule, sourceId, channelLabel);
+
+    await this.repository.updateMessageMetadata({
+      ...identity,
+      metadata: { syncStatus: 'pending', syncError: null, lastSyncAttemptAt: new Date().toISOString() },
+    });
+    try {
+      if (sourceModule === 'family_quests') return await this.publishQuest(sourceId, channel, auth);
+      if (sourceModule === 'tower_defense') return await this.publishTowerDefense(sourceId, channel, auth);
+      return await this.publishFamilyEvent(sourceId, channel, auth);
+    } catch {
+      const failed = await this.repository.updateMessageMetadata({
+        ...identity,
+        metadata: {
+          syncStatus: 'sync_error',
+          syncError: { code: 'DISCORD_SYNC_FAILED', message: 'Discord-повідомлення не синхронізувалося. Натисни Повторити в Hub.' },
+          lastSyncAttemptAt: new Date().toISOString(),
+        },
+      });
+      return toPublishReadModel(sourceModule, sourceId, failed ?? current, channelLabel);
+    }
+  }
+
   private async dispatch(
     parsed: ParsedCustomId,
     auth: FamilyAuthContext,
@@ -206,15 +252,15 @@ export class DiscordOrchestrationService {
         role: parsed.action === 'help' ? 'helper' : 'participant',
         metadata: { source: 'discord' },
       }, auth, now);
-      return success('q', parsed, person.role === 'helper' ? '🐉 Ви допомагаєте з квестом.' : '🐉 Ви приєдналися до квесту.');
+      return success('q', parsed, person.role === 'helper' ? 'Ви допомагаєте з квестом.' : 'Ви приєдналися до квесту.');
     }
     if (parsed.action === 'withdraw') {
       await this.questService.withdrawQuest(parsed.sourceId, auth, now);
-      return success('q', parsed, '🐉 Ви вийшли з квесту.');
+      return success('q', parsed, 'Ви вийшли з квесту.');
     }
     if (parsed.action === 'complete') {
       await this.questService.completeQuest(parsed.sourceId, { comment: 'Completed from Discord orchestration.' }, auth, now);
-      return success('q', parsed, '🐉 Квест позначено виконаним у Hub.');
+      return success('q', parsed, 'Квест позначено виконаним у Hub.');
     }
     const quest = await this.questService.getQuest(parsed.sourceId, auth);
     return success('q', parsed, questDetails(quest));
@@ -235,19 +281,19 @@ export class DiscordOrchestrationService {
     }
     if (parsed.action === 'withdraw') {
       await this.towerDefenseService.withdrawResponse(parsed.sourceId, auth, now);
-      return success('t', parsed, '🔥 Відповідь на вишку відкликано.');
+      return success('t', parsed, 'Відповідь на оборону вишки відкликано.');
     }
     if (parsed.action === 'start') {
       await this.towerDefenseService.startDefense(parsed.sourceId, auth, now);
-      return success('t', parsed, '🔥 Захист розпочато у Hub.');
+      return success('t', parsed, 'Оборону вишки розпочато в Hub.');
     }
     if (parsed.action === 'complete') {
       await this.towerDefenseService.completeDefense(parsed.sourceId, { result: parsed.value === 'lost' ? 'lost' : 'defended' }, auth, now);
-      return success('t', parsed, parsed.value === 'lost' ? '🔥 Захист завершено як втрачений.' : '🔥 Захист завершено як успішний.');
+      return success('t', parsed, parsed.value === 'lost' ? 'Оборону завершено як втрачену.' : 'Оборону завершено як успішну.');
     }
     if (parsed.action === 'cancel') {
       await this.towerDefenseService.cancelDefense(parsed.sourceId, { reason: 'Cancelled from Discord orchestration.' }, auth, now);
-      return success('t', parsed, '🔥 Захист скасовано у Hub.');
+      return success('t', parsed, 'Оборону скасовано в Hub.');
     }
     const defense = await this.towerDefenseService.getDefense(parsed.sourceId, auth);
     return success('t', parsed, towerDetails(defense));
@@ -265,28 +311,28 @@ export class DiscordOrchestrationService {
     }
     if (parsed.action === 'withdraw') {
       await this.familyEventService.withdrawResponse(parsed.sourceId, auth, now);
-      return success('e', parsed, '📅 Відповідь на подію відкликано.');
+      return success('e', parsed, 'Відповідь на подію відкликано.');
     }
     if (parsed.action === 'start') {
       await this.familyEventService.startEvent(parsed.sourceId, auth, now);
-      return success('e', parsed, '📅 Подію розпочато у Hub.');
+      return success('e', parsed, 'Подію розпочато в Hub.');
     }
     if (parsed.action === 'complete') {
       await this.familyEventService.completeEvent(parsed.sourceId, auth, now);
-      return success('e', parsed, '📅 Подію завершено у Hub.');
+      return success('e', parsed, 'Подію завершено в Hub.');
     }
     if (parsed.action === 'cancel') {
       await this.familyEventService.cancelEvent(parsed.sourceId, { reason: 'Cancelled from Discord orchestration.' }, auth, now);
-      return success('e', parsed, '📅 Подію скасовано у Hub.');
+      return success('e', parsed, 'Подію скасовано в Hub.');
     }
     const event = await this.familyEventService.getEvent(parsed.sourceId, auth);
-    return success('e', parsed, `📅 ${event.title}\nУчасники: ${event.participantCount}\nStatus: ${event.status}`);
+    return success('e', parsed, `${event.title}\nУчасники: ${event.participantCount}\nСтатус: ${event.status}`);
   }
 
   private async handleMeCommand(discordUserId: string): Promise<DiscordInteractionResponse> {
     const identity = await this.identityResolver.resolve(discordUserId);
     return commandSuccess('me', [
-      '🐉 Discord привʼязано до Dragon House Hub.',
+      'Discord привʼязано до Dragon House Hub.',
       `Нік: ${identity.familyMember.nickname}`,
       `Роль: ${roleLabel(identity.familyMember)}`,
       `Статус: ${identity.familyMember.status === 'active' ? 'активний' : 'неактивний'}`,
@@ -297,11 +343,11 @@ export class DiscordOrchestrationService {
     try {
       const identity = await this.identityResolver.resolve(discordUserId);
       return commandSuccess('status', [
-        '🐉 Dragon House Hub',
+        'Dragon House Hub',
         'Discord: привʼязано',
         `Member: ${identity.familyMember.nickname}`,
         `Роль: ${roleLabel(identity.familyMember)}`,
-        `Orchestration: ${this.config.discord.orchestration.enabled ? 'увімкнено' : 'вимкнено'}`,
+        `Оркестрація: ${this.config.discord.orchestration.enabled ? 'увімкнено' : 'вимкнено'}`,
       ].join('\n'));
     } catch (error) {
       const friendly = friendlyDiscordError(error);
@@ -311,9 +357,9 @@ export class DiscordOrchestrationService {
         action: 'status',
         code: friendly.code,
         content: [
-          '🐉 Dragon House Hub',
+          'Dragon House Hub',
           'Discord: не привʼязано',
-          `Orchestration: ${this.config.discord.orchestration.enabled ? 'увімкнено' : 'вимкнено'}`,
+          `Оркестрація: ${this.config.discord.orchestration.enabled ? 'увімкнено' : 'вимкнено'}`,
           friendly.content,
         ].join('\n'),
       };
@@ -328,14 +374,14 @@ export class DiscordOrchestrationService {
       return commandSuccess('quest', renderQuestList(quests.items));
     }
     const questId = requiredOption(request, 'quest_id');
-    if (action === 'join') return this.handleQuest({ module: 'q', action: 'join', sourceId: questId }, auth, now);
-    if (action === 'help') return this.handleQuest({ module: 'q', action: 'help', sourceId: questId }, auth, now);
-    if (action === 'withdraw') return this.handleQuest({ module: 'q', action: 'withdraw', sourceId: questId }, auth, now);
-    if (action === 'complete') return this.handleQuest({ module: 'q', action: 'complete', sourceId: questId }, auth, now);
+    if (action === 'join') return this.withProjection(await this.handleQuest({ module: 'q', action: 'join', sourceId: questId }, auth, now), 'family_quests', questId, auth);
+    if (action === 'help') return this.withProjection(await this.handleQuest({ module: 'q', action: 'help', sourceId: questId }, auth, now), 'family_quests', questId, auth);
+    if (action === 'withdraw') return this.withProjection(await this.handleQuest({ module: 'q', action: 'withdraw', sourceId: questId }, auth, now), 'family_quests', questId, auth);
+    if (action === 'complete') return this.withProjection(await this.handleQuest({ module: 'q', action: 'complete', sourceId: questId }, auth, now), 'family_quests', questId, auth);
     if (action === 'publish' || action === 'sync') {
       assertCanPublishFromDiscord(auth);
       const result = await this.publishQuest(questId, this.config.discord.channels.questAnnouncements ?? '', auth);
-      return commandSuccess('quest', `🐉 ${result.synced ? 'Discord повідомлення оновлено.' : 'Quest опубліковано в Discord.'}`);
+      return commandSuccess('quest', result.synced ? 'Discord-повідомлення оновлено.' : 'Квест опубліковано в Discord.');
     }
     return this.handleQuest({ module: 'q', action: 'details', sourceId: questId }, auth, now);
   }
@@ -349,17 +395,17 @@ export class DiscordOrchestrationService {
     }
     const defenseId = requiredOption(request, 'defense_id');
     if (action === 'joining' || action === 'confirmed' || action === 'unavailable') {
-      return this.handleTower({ module: 't', action: 'respond', sourceId: defenseId, value: action }, auth, now, requestFromCommand(request));
+      return this.withProjection(await this.handleTower({ module: 't', action: 'respond', sourceId: defenseId, value: action }, auth, now, requestFromCommand(request)), 'tower_defense', defenseId, auth);
     }
-    if (action === 'withdraw') return this.handleTower({ module: 't', action: 'withdraw', sourceId: defenseId }, auth, now, requestFromCommand(request));
-    if (action === 'start') return this.handleTower({ module: 't', action: 'start', sourceId: defenseId }, auth, now, requestFromCommand(request));
-    if (action === 'complete_defended') return this.handleTower({ module: 't', action: 'complete', sourceId: defenseId, value: 'defended' }, auth, now, requestFromCommand(request));
-    if (action === 'complete_lost') return this.handleTower({ module: 't', action: 'complete', sourceId: defenseId, value: 'lost' }, auth, now, requestFromCommand(request));
-    if (action === 'cancel') return this.handleTower({ module: 't', action: 'cancel', sourceId: defenseId }, auth, now, requestFromCommand(request));
+    if (action === 'withdraw') return this.withProjection(await this.handleTower({ module: 't', action: 'withdraw', sourceId: defenseId }, auth, now, requestFromCommand(request)), 'tower_defense', defenseId, auth);
+    if (action === 'start') return this.withProjection(await this.handleTower({ module: 't', action: 'start', sourceId: defenseId }, auth, now, requestFromCommand(request)), 'tower_defense', defenseId, auth);
+    if (action === 'complete_defended') return this.withProjection(await this.handleTower({ module: 't', action: 'complete', sourceId: defenseId, value: 'defended' }, auth, now, requestFromCommand(request)), 'tower_defense', defenseId, auth);
+    if (action === 'complete_lost') return this.withProjection(await this.handleTower({ module: 't', action: 'complete', sourceId: defenseId, value: 'lost' }, auth, now, requestFromCommand(request)), 'tower_defense', defenseId, auth);
+    if (action === 'cancel') return this.withProjection(await this.handleTower({ module: 't', action: 'cancel', sourceId: defenseId }, auth, now, requestFromCommand(request)), 'tower_defense', defenseId, auth);
     if (action === 'publish' || action === 'sync') {
       assertCanPublishFromDiscord(auth);
       const result = await this.publishTowerDefense(defenseId, this.config.discord.channels.towerGuard ?? '', auth);
-      return commandSuccess('tower', `🔥 ${result.synced ? 'Discord повідомлення оновлено.' : 'Захист опубліковано в Discord.'}`);
+      return commandSuccess('tower', result.synced ? 'Discord-повідомлення оновлено.' : 'Оборону вишки опубліковано в Discord.');
     }
     return this.handleTower({ module: 't', action: 'details', sourceId: defenseId }, auth, now, requestFromCommand(request));
   }
@@ -373,16 +419,16 @@ export class DiscordOrchestrationService {
     }
     const eventId = requiredOption(request, 'event_id');
     if (action === 'interested' || action === 'joining' || action === 'confirmed' || action === 'declined') {
-      return this.handleEvent({ module: 'e', action: 'respond', sourceId: eventId, value: action }, auth, now);
+      return this.withProjection(await this.handleEvent({ module: 'e', action: 'respond', sourceId: eventId, value: action }, auth, now), 'family_events', eventId, auth);
     }
-    if (action === 'withdraw') return this.handleEvent({ module: 'e', action: 'withdraw', sourceId: eventId }, auth, now);
-    if (action === 'start') return this.handleEvent({ module: 'e', action: 'start', sourceId: eventId }, auth, now);
-    if (action === 'complete') return this.handleEvent({ module: 'e', action: 'complete', sourceId: eventId }, auth, now);
-    if (action === 'cancel') return this.handleEvent({ module: 'e', action: 'cancel', sourceId: eventId }, auth, now);
+    if (action === 'withdraw') return this.withProjection(await this.handleEvent({ module: 'e', action: 'withdraw', sourceId: eventId }, auth, now), 'family_events', eventId, auth);
+    if (action === 'start') return this.withProjection(await this.handleEvent({ module: 'e', action: 'start', sourceId: eventId }, auth, now), 'family_events', eventId, auth);
+    if (action === 'complete') return this.withProjection(await this.handleEvent({ module: 'e', action: 'complete', sourceId: eventId }, auth, now), 'family_events', eventId, auth);
+    if (action === 'cancel') return this.withProjection(await this.handleEvent({ module: 'e', action: 'cancel', sourceId: eventId }, auth, now), 'family_events', eventId, auth);
     if (action === 'publish' || action === 'sync') {
       assertCanPublishFromDiscord(auth);
       const result = await this.publishFamilyEvent(eventId, this.config.discord.channels.events ?? '', auth);
-      return commandSuccess('event', `📅 ${result.synced ? 'Discord повідомлення оновлено.' : 'Подію опубліковано в Discord.'}`);
+      return commandSuccess('event', result.synced ? 'Discord-повідомлення оновлено.' : 'Подію опубліковано в Discord.');
     }
     return this.handleEvent({ module: 'e', action: 'details', sourceId: eventId }, auth, now);
   }
@@ -412,7 +458,11 @@ export class DiscordOrchestrationService {
       payloadHash: hash,
       syncedAt,
       externalId: `${identity.sourceModule}:${identity.sourceId}:${identity.messageKind}:${identity.guildId}:${identity.channelId}`,
-      metadata: recovered ? { recoveredFromMissingMessage: true, previousMessageId: current?.messageId ?? null } : {},
+      metadata: {
+        syncStatus: 'synced',
+        syncError: null,
+        ...(recovered ? { recoveredFromMissingMessage: true, previousMessageId: current?.messageId ?? null } : {}),
+      },
     });
     return {
       sourceModule: identity.sourceModule,
@@ -438,11 +488,29 @@ export class DiscordOrchestrationService {
 
   private assertConfiguredPublish(channelId: string, channelLabel: string): void {
     if (!this.config.discord.orchestration.enabled) {
-      throw new DiscordOrchestrationError('DISCORD_ORCHESTRATION_DISABLED', 'Discord orchestration вимкнена.', 503);
+      throw new DiscordOrchestrationError('DISCORD_ORCHESTRATION_DISABLED', 'Discord-оркестрація вимкнена.', 503);
     }
-    if (!this.config.discord.guildId) throw new DiscordOrchestrationError('DISCORD_GUILD_NOT_CONFIGURED', 'Discord guild не налаштований.', 400);
-    if (!channelId) throw new DiscordOrchestrationError('DISCORD_CHANNEL_NOT_CONFIGURED', `Канал для ${channelLabel} Discord не налаштований.`, 400);
+    if (!this.config.discord.guildId) throw new DiscordOrchestrationError('DISCORD_GUILD_NOT_CONFIGURED', 'Discord-сервер не налаштований.', 400);
+    if (!channelId) throw new DiscordOrchestrationError('DISCORD_CHANNEL_NOT_CONFIGURED', `Канал Discord для ${channelLabel} не налаштований.`, 400);
     if (!isAllowedChannel(this.config, channelId)) throw new DiscordOrchestrationError('DISCORD_CHANNEL_NOT_ALLOWED', 'Discord channel is not allowed.', 403);
+  }
+
+  private channelFor(sourceModule: DiscordOrchestrationSourceModule): string | null {
+    if (sourceModule === 'family_quests') return this.config.discord.channels.questAnnouncements;
+    if (sourceModule === 'tower_defense') return this.config.discord.channels.towerGuard;
+    return this.config.discord.channels.events;
+  }
+
+  private async withProjection(
+    response: DiscordInteractionResponse,
+    sourceModule: DiscordOrchestrationSourceModule,
+    sourceId: string,
+    auth: FamilyAuthContext,
+  ): Promise<DiscordInteractionResponse> {
+    if (!response.ok) return response;
+    const projection = await this.requestProjectionUpdate(sourceModule, sourceId, auth);
+    if (projection.state !== 'sync_error') return response;
+    return { ...response, content: `${response.content}\nHub оновлено. Discord-повідомлення потребує повторної синхронізації.` };
   }
 }
 
@@ -479,17 +547,17 @@ function assertEventResponse(value: string | undefined) {
 }
 
 function towerResponseMessage(response: TowerDefenseResponseStatus): string {
-  if (response === 'confirmed') return '🔥 Ви підтвердили участь у захисті.';
-  if (response === 'joining') return '🔥 Ви відмітили, що йдете на захист.';
-  if (response === 'unavailable') return '🔥 Ви відмітили, що не можете прийти.';
-  return '🔥 Відповідь на захист оновлено.';
+  if (response === 'confirmed') return 'Ви підтвердили участь в обороні.';
+  if (response === 'joining') return 'Ви відмітили, що йдете на оборону.';
+  if (response === 'unavailable') return 'Ви відмітили, що не можете прийти.';
+  return 'Відповідь на оборону оновлено.';
 }
 
 function eventResponseMessage(response: string): string {
-  if (response === 'confirmed') return '📅 Ви підтвердили участь у події.';
-  if (response === 'joining') return '📅 Ви відмітили, що йдете на подію.';
-  if (response === 'interested') return '📅 Ви відмітили інтерес до події.';
-  return '📅 Ви відмітили, що не можете прийти.';
+  if (response === 'confirmed') return 'Ви підтвердили участь у події.';
+  if (response === 'joining') return 'Ви відмітили, що йдете на подію.';
+  if (response === 'interested') return 'Ви відмітили інтерес до події.';
+  return 'Ви відмітили, що не можете прийти.';
 }
 
 function stringOption(request: DiscordCommandRequest, name: string): string | null {
@@ -524,31 +592,31 @@ function roleLabel(member: FamilyMember): string {
   if (member.role === 'deputy') return 'Зам';
   if (member.rank >= 9) return 'Хранитель полумʼя';
   if (member.rank >= 8) return 'Старші дракони';
-  return `Rank ${member.rank}`;
+  return `Ранг ${member.rank}`;
 }
 
 function renderQuestList(quests: FamilyQuestDto[]): string {
   const visible = quests.slice(0, 5);
-  if (!visible.length) return '🐉 Активних або майбутніх квестів зараз немає.';
-  return ['🐉 Активні Family Quests:', ...visible.map((quest) => `• ${quest.title} — ${quest.status}`)].join('\n');
+  if (!visible.length) return 'Активних або майбутніх квестів зараз немає.';
+  return ['Активні квести:', ...visible.map((quest) => `• ${quest.title} — ${quest.status}`)].join('\n');
 }
 
 function renderTowerList(defenses: TowerDefenseDto[]): string {
   const visible = defenses.filter((defense) => defense.status !== 'completed' && defense.status !== 'cancelled').slice(0, 5);
-  if (!visible.length) return '🔥 Активних або майбутніх захистів зараз немає.';
-  return ['🔥 Tower Defense:', ...visible.map((defense) => `• ${defense.title} — ${defense.status}`)].join('\n');
+  if (!visible.length) return 'Активних або майбутніх оборон зараз немає.';
+  return ['Оборона вишок:', ...visible.map((defense) => `• ${defense.title} — ${defense.status}`)].join('\n');
 }
 
 function renderEventList(events: Array<{ title: string; status: string; startsAt: string }>): string {
   const visible = events.filter((event) => event.status !== 'completed' && event.status !== 'cancelled').slice(0, 5);
-  if (!visible.length) return '📅 Майбутніх Family Events зараз немає.';
-  return ['📅 Family Events:', ...visible.map((event) => `• ${event.title} — ${formatDate(event.startsAt)} — ${event.status}`)].join('\n');
+  if (!visible.length) return 'Майбутніх подій зараз немає.';
+  return ['Сімейні події:', ...visible.map((event) => `• ${event.title} — ${formatDate(event.startsAt)} — ${event.status}`)].join('\n');
 }
 
 function questDetails(quest: FamilyQuestDto): string {
   return [
-    `🐉 ${quest.title}`,
-    `Status: ${quest.status}`,
+    quest.title,
+    `Статус: ${quest.status}`,
     `Учасники: ${quest.participants.filter((item) => !item.leftAt).length}`,
     `Помічники: ${quest.helpers.filter((item) => !item.leftAt).length}`,
   ].join('\n');
@@ -556,9 +624,9 @@ function questDetails(quest: FamilyQuestDto): string {
 
 function towerDetails(defense: TowerDefenseDto): string {
   return [
-    `🔥 ${defense.title}`,
+    defense.title,
     `Вишка: ${defense.tower.name}`,
-    `Status: ${defense.status}`,
+    `Статус: ${defense.status}`,
     `Підтвердили: ${defense.confirmedCount}`,
     `Готовність: ${defense.presentCount}/${defense.minimumGuardCount}`,
   ].join('\n');
@@ -568,7 +636,7 @@ function emptyPublishState(sourceModule: DiscordOrchestrationSourceModule, sourc
   return {
     sourceModule,
     sourceId,
-    state: 'unpublished',
+    state: 'not_published',
     published: false,
     synced: false,
     messageExists: false,
@@ -580,17 +648,38 @@ function emptyPublishState(sourceModule: DiscordOrchestrationSourceModule, sourc
 
 function toPublishReadModel(sourceModule: DiscordOrchestrationSourceModule, sourceId: string, record: DiscordMessageRecord | null, channelLabel: string): DiscordPublishReadModel {
   if (!record) return emptyPublishState(sourceModule, sourceId, channelLabel);
+  const syncStatus = projectionState(record.metadata.syncStatus);
+  const syncError = syncStatus === 'sync_error' ? syncErrorBody(record.metadata.syncError) : null;
   return {
     sourceModule,
     sourceId,
-    state: 'synced',
+    state: syncStatus,
     published: true,
-    synced: true,
+    synced: syncStatus === 'synced',
     messageExists: Boolean(record.messageId),
     lastSyncedAt: record.syncedAt,
     channelLabel,
-    error: null,
+    error: syncError,
   };
+}
+
+function projectionState(value: unknown): DiscordProjectionSyncState {
+  if (value === 'pending' || value === 'sync_error' || value === 'not_published') return value;
+  return 'synced';
+}
+
+function syncErrorBody(value: unknown): { code: string; message: string } {
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if (typeof record.code === 'string' && typeof record.message === 'string') return { code: record.code, message: record.message };
+  }
+  return { code: 'DISCORD_SYNC_FAILED', message: 'Discord-повідомлення не синхронізувалося. Натисни Повторити в Hub.' };
+}
+
+function labelFor(sourceModule: DiscordOrchestrationSourceModule): string {
+  if (sourceModule === 'family_quests') return 'Квести';
+  if (sourceModule === 'tower_defense') return 'Оборона вишок';
+  return 'Події';
 }
 
 function formatDate(value: string): string {

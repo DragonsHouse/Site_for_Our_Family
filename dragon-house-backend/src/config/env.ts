@@ -57,7 +57,13 @@ const EnvSchema = z.object({
   DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(6),
   DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(2),
   DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
+  DISCORD_SYNC_AUTO_ENABLED: EnvBoolean.default(true),
+  DISCORD_SYNC_AUTO_INTERVAL_SECONDS: z.coerce.number().int().min(60).max(86400).default(300),
   DISCORD_ORCHESTRATION_ENABLED: EnvBoolean.default(false),
+  DISCORD_TOWER_SYNC_ENABLED: EnvBoolean.default(false),
+  DISCORD_TOWER_SYNC_INTERVAL_SECONDS: z.coerce.number().int().min(30).max(86400).default(60),
+  DISCORD_TOWER_SYNC_MESSAGE_LIMIT: z.coerce.number().int().min(1).max(500).default(100),
+  DISCORD_TOWER_SYNC_ACTOR_MEMBER_ID: z.string().trim().optional().default(''),
 });
 
 export type AppEnv = z.infer<typeof EnvSchema>;
@@ -118,9 +124,17 @@ export type AppConfig = {
       dryRunRateLimitPerMinute: number;
       applyRateLimitPerHour: number;
       reportRateLimitPerMinute: number;
+      autoEnabled: boolean;
+      autoIntervalSeconds: number;
     };
     orchestration: {
       enabled: boolean;
+    };
+    towerSync: {
+      enabled: boolean;
+      intervalSeconds: number;
+      messageLimit: number;
+      actorMemberId: string | null;
     };
     channels: DiscordChannelConfig;
   };
@@ -188,7 +202,13 @@ export function maskConfigForDiagnostics(env: AppEnv): Record<string, string | n
     DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE: env.DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE,
     DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR: env.DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR,
     DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE: env.DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE,
+    DISCORD_SYNC_AUTO_ENABLED: String(env.DISCORD_SYNC_AUTO_ENABLED),
+    DISCORD_SYNC_AUTO_INTERVAL_SECONDS: env.DISCORD_SYNC_AUTO_INTERVAL_SECONDS,
     DISCORD_ORCHESTRATION_ENABLED: String(env.DISCORD_ORCHESTRATION_ENABLED),
+    DISCORD_TOWER_SYNC_ENABLED: String(env.DISCORD_TOWER_SYNC_ENABLED),
+    DISCORD_TOWER_SYNC_INTERVAL_SECONDS: env.DISCORD_TOWER_SYNC_INTERVAL_SECONDS,
+    DISCORD_TOWER_SYNC_MESSAGE_LIMIT: env.DISCORD_TOWER_SYNC_MESSAGE_LIMIT,
+    DISCORD_TOWER_SYNC_ACTOR_MEMBER_ID: nullable(env.DISCORD_TOWER_SYNC_ACTOR_MEMBER_ID),
   };
 }
 
@@ -246,9 +266,17 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
         dryRunRateLimitPerMinute: env.DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE,
         applyRateLimitPerHour: env.DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR,
         reportRateLimitPerMinute: env.DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE,
+        autoEnabled: env.DISCORD_SYNC_AUTO_ENABLED,
+        autoIntervalSeconds: env.DISCORD_SYNC_AUTO_INTERVAL_SECONDS,
       },
       orchestration: {
         enabled: env.DISCORD_ORCHESTRATION_ENABLED,
+      },
+      towerSync: {
+        enabled: env.DISCORD_TOWER_SYNC_ENABLED,
+        intervalSeconds: env.DISCORD_TOWER_SYNC_INTERVAL_SECONDS,
+        messageLimit: env.DISCORD_TOWER_SYNC_MESSAGE_LIMIT,
+        actorMemberId: nullable(env.DISCORD_TOWER_SYNC_ACTOR_MEMBER_ID),
       },
       channels: {
         welcome: nullable(env.DISCORD_WELCOME_CHANNEL_ID),

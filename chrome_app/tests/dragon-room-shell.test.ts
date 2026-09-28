@@ -163,29 +163,29 @@ describe('Dragon Room Shell and navigation foundation', () => {
       'cabinet',
       'members',
       'profile',
+      'family',
       'calendar',
       'events',
       'tower-defense',
       'achievements',
       'resources',
+      'map',
       'discord-sync',
-      'family',
-      'buyers',
-      'map'
+      'buyers'
     ]);
     assert.equal(DRAGON_ROOM_BACKGROUND_VARIANT.calendar, 'calendar');
     assert.equal(DRAGON_ROOM_BACKGROUND_VARIANT['discord-sync'], 'resources');
   });
 
-  it('keeps permission awareness in navigation without changing existing tab availability', () => {
+  it('keeps permission awareness in navigation without exposing locked rooms as usable actions', () => {
     const discordSync = DRAGON_ROOM_NAVIGATION.find((item) => item.key === 'discord-sync');
     assert.ok(discordSync);
     assert.equal(canAccessDragonRoom(baseUser, discordSync), false);
 
     const visibleItems = getDragonRoomNavigationItems(baseUser);
     assert.equal(visibleItems.some((item) => item.key === 'discord-sync'), true);
-    assert.equal(visibleItems.find((item) => item.key === 'discord-sync')?.locked, false);
-    assert.match(visibleItems.find((item) => item.key === 'discord-sync')?.ariaLabel ?? '', /access limited inside room/);
+    assert.equal(visibleItems.find((item) => item.key === 'discord-sync')?.locked, true);
+    assert.match(visibleItems.find((item) => item.key === 'discord-sync')?.ariaLabel ?? '', /доступ обмежений у кімнаті/);
   });
 
   it('routes FamilyTabs through the canonical Room Rail adapter', () => {
@@ -201,7 +201,7 @@ describe('Dragon Room Shell and navigation foundation', () => {
     assert.match(familyShellSource, /<PersonalCabinet[\s\S]*onOpenTab=\{onTabChange\}/);
     assert.match(familyShellSource, /onAvatarChange=\{onAvatarChange\}/);
     assert.match(familyShellSource, /onAuthenticatedUserRefresh=\{onAuthenticatedUserRefresh\}/);
-    assert.match(familyShellSource, /<FamilyTabs activeTab=\{activeTab\} onChange=\{onTabChange\} currentUser=\{currentUser\}/);
+    assert.match(familyShellSource, /<FamilyTabs activeTab=\{normalizedActiveTab\} onChange=\{onTabChange\} currentUser=\{currentUser\}/);
     assert.doesNotMatch(familyShellSource, /activeTab === 'members' \? \(\s*<DragonRoomShell/);
     assert.doesNotMatch(familyShellSource, /activeTab === 'calendar' \? \(\s*<DragonRoomShell/);
   });

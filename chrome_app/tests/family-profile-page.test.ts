@@ -29,8 +29,8 @@ describe('member profile page route contract', () => {
 
     assert.match(navigation, /key: 'profile'/u);
     assert.match(app, /DRAGON_ROOM_TAB_KEYS/u);
-    assert.match(shell, /activeTab === 'profile'/u);
-    assert.match(shell, /<FamilyProfile user=\{currentUser\}/u);
+    assert.match(shell, /activeTab === 'profile' \? 'cabinet' : activeTab/u);
+    assert.match(shell, /<PersonalCabinet[\s\S]*currentUser=\{currentUser\}/u);
     assert.doesNotMatch(profile, /URLSearchParams/u);
     assert.doesNotMatch(profile, /useParams/u);
     assert.doesNotMatch(profile, /memberId.*fetch/u);

@@ -22,10 +22,10 @@ const TEXT_INPUT_CLASS =
   'mt-1 w-full rounded-xl border border-slate-800 bg-black/35 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-500/60';
 
 const CHAT_IMPORT_MODES: Array<{ value: FamilyChatImportMode; label: string }> = [
-  { value: 'disabled', label: 'Disabled' },
-  { value: 'slash_command', label: 'Slash command' },
-  { value: 'prefix', label: 'Prefix' },
-  { value: 'role_mention', label: 'Role mention' }
+  { value: 'disabled', label: 'Вимкнено' },
+  { value: 'slash_command', label: 'Slash-команда' },
+  { value: 'prefix', label: 'Префікс' },
+  { value: 'role_mention', label: 'Згадка ролі' }
 ];
 
 const GROUPS: DiscordChannelDefinition['group'][] = [
@@ -97,10 +97,6 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
   const [message, setMessage] = useState<string | null>(null);
   const normalizedPreview = useMemo(() => normalizeBeforeSave(settings), [settings]);
   const missingFields = useMemo(() => validateDiscordFamilySettings(normalizedPreview), [normalizedPreview]);
-  const canBeginConnect = Boolean(
-    settings.backend.apiBaseUrl && settings.backend.discordClientId && settings.backend.oauthRedirectUrl
-  );
-
   function updateSettings(nextSettings: DiscordFamilySettings) {
     setSettings(nextSettings);
     setMessage(null);
@@ -164,14 +160,14 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
             Discord-сервер
           </p>
-          <h2 className="mt-1 text-xl font-semibold text-white">Dragon House Hub integration</h2>
+          <h2 className="mt-1 text-xl font-semibold text-white">Інтеграція Dragon House Hub</h2>
           <p className="mt-2 max-w-3xl text-sm text-slate-400">
             Це лише майбутня конфігурація. Family Hub не запускає sync, OAuth або polling, а Discord
             не показується як підключений.
           </p>
         </div>
         <div className="rounded-xl border border-amber-500/30 bg-black/30 px-3 py-2 text-sm text-amber-100">
-          Status: <span className="font-semibold">{settings.family.connectionStatus}</span>
+          Статус: <span className="font-semibold">{settings.family.connectionStatus}</span>
         </div>
       </div>
 
@@ -187,7 +183,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <label className="text-sm text-slate-300">
-          Server invite URL
+          Посилання-запрошення на сервер
           <input
             className={TEXT_INPUT_CLASS}
             value={settings.serverInviteUrl ?? ''}
@@ -198,7 +194,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
           />
         </label>
         <label className="text-sm text-slate-300">
-          Guild ID
+          ID Discord-сервера
           <input
             className={TEXT_INPUT_CLASS}
             value={settings.family.guildId ?? ''}
@@ -215,18 +211,18 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
       <div className="mt-5 rounded-2xl border border-slate-800 bg-black/25 p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h3 className="text-base font-semibold text-white">Family chat filter</h3>
+            <h3 className="text-base font-semibold text-white">Фільтр сімейного чату</h3>
             <p className="mt-1 text-sm text-slate-400">
               У майбутньому backend імпортуватиме тільки повідомлення, що відповідають правилу. @everyone не використовується як основний фільтр.
             </p>
           </div>
           <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400">
-            Default: #hub
+            Типово: #hub
           </span>
         </div>
         <div className="mt-4 grid gap-4 lg:grid-cols-4">
           <label className="text-sm text-slate-300">
-            Import mode
+            Режим імпорту
             <select
               className={TEXT_INPUT_CLASS}
               value={settings.family.familyChatImportMode}
@@ -248,7 +244,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
             </select>
           </label>
           <label className="text-sm text-slate-300">
-            Slash command
+            Slash-команда
             <input
               className={TEXT_INPUT_CLASS}
               value={settings.family.familyChatCommandName}
@@ -261,7 +257,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
             />
           </label>
           <label className="text-sm text-slate-300">
-            Prefix
+            Префікс
             <input
               className={TEXT_INPUT_CLASS}
               value={settings.family.familyChatPrefix}
@@ -274,7 +270,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
             />
           </label>
           <label className="text-sm text-slate-300">
-            Mention role ID
+            ID ролі для згадки
             <input
               className={TEXT_INPUT_CLASS}
               value={settings.family.familyChatMentionRoleId ?? ''}
@@ -306,7 +302,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
                           className={TEXT_INPUT_CLASS}
                           value={settings.family[definition.field] ?? ''}
                           onChange={(event) => updateChannel(definition, event.target.value)}
-                          placeholder="Discord channel ID"
+                          placeholder="ID Discord-каналу"
                         />
                       </label>
                       <label className="mt-1 flex items-center gap-2 rounded-xl border border-slate-800 bg-black/25 px-3 py-2 text-sm text-slate-300 lg:mt-6">
@@ -318,7 +314,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
                             updateSettings(updatePolicy(settings, definition, { importEnabled: event.target.checked }))
                           }
                         />
-                        Import planned
+                        Імпорт дозволено
                       </label>
                       <label className="mt-1 flex items-center gap-2 rounded-xl border border-slate-800 bg-black/25 px-3 py-2 text-sm text-slate-300 lg:mt-6">
                         <input
@@ -329,7 +325,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
                             updateSettings(updatePolicy(settings, definition, { publishEnabled: event.target.checked }))
                           }
                         />
-                        Publish planned
+                        Публікація дозволена
                       </label>
                       <div className="mt-1 rounded-xl border border-red-500/30 bg-red-950/20 px-3 py-2 text-sm text-red-100 lg:mt-6">
                         Не підключено
@@ -337,7 +333,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
                     </div>
                     {definition.requiredPermission || definition.minimumRank ? (
                       <div className="mt-3 text-xs text-amber-200">
-                        Access: owner OR {definition.requiredPermission ?? 'permission'} OR rank &gt;= {definition.minimumRank ?? 1}
+                        Доступ: власниця або {definition.requiredPermission ?? 'дозвіл'} або ранг &gt;= {definition.minimumRank ?? 1}
                       </div>
                     ) : null}
                   </div>
@@ -350,7 +346,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         <label className="text-sm text-slate-300">
-          Backend API URL
+          URL backend API
           <input
             className={TEXT_INPUT_CLASS}
             value={settings.backend.apiBaseUrl ?? ''}
@@ -363,7 +359,7 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
           />
         </label>
         <label className="text-sm text-slate-300">
-          Discord application client ID
+          Client ID Discord-застосунку
           <input
             className={TEXT_INPUT_CLASS}
             value={settings.backend.discordClientId ?? ''}
@@ -392,15 +388,15 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
 
       <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
         <div className="rounded-xl border border-slate-800 bg-black/25 p-3">
-          <div className="text-slate-500">Last successful sync</div>
-          <div className="mt-1 text-slate-100">{settings.family.lastSuccessfulSyncAt ?? 'never'}</div>
+          <div className="text-slate-500">Остання успішна синхронізація</div>
+          <div className="mt-1 text-slate-100">{settings.family.lastSuccessfulSyncAt ?? 'не було'}</div>
         </div>
         <div className="rounded-xl border border-slate-800 bg-black/25 p-3">
-          <div className="text-slate-500">Last error</div>
-          <div className="mt-1 text-slate-100">{settings.family.lastError ?? 'none'}</div>
+          <div className="text-slate-500">Остання помилка</div>
+          <div className="mt-1 text-slate-100">{settings.family.lastError ?? 'немає'}</div>
         </div>
         <div className="rounded-xl border border-slate-800 bg-black/25 p-3">
-          <div className="text-slate-500">Missing fields</div>
+          <div className="text-slate-500">Незаповнені поля</div>
           <div className="mt-1 text-slate-100">{missingFields.length}</div>
         </div>
       </div>
@@ -415,23 +411,11 @@ export function DiscordIntegrationPanel({ currentUser }: { currentUser: FamilyUs
         <button type="button" onClick={resetConfig} className="rounded-xl border border-red-500/40 bg-red-950/30 px-4 py-2 text-sm font-semibold text-red-100 hover:border-red-400">
           Скинути конфігурацію
         </button>
-        <button
-          type="button"
-          disabled
-          title={
-            canBeginConnect
-              ? 'Backend flow ще не реалізований у Family Hub'
-              : 'Потрібні backend URL, public Discord client ID та OAuth redirect URL'
-          }
-          className="cursor-not-allowed rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2 text-sm font-semibold text-slate-500"
-        >
-          Підключити Discord
-        </button>
       </div>
 
       <p className="mt-4 text-xs text-slate-500">
-        Visible to {currentUser.nickname} через permission manage_discord_integration. No background
-        polling, no Discord SDK, no OAuth, no tokens in frontend.
+        Видно для {currentUser.nickname} через дозвіл manage_discord_integration. Цей блок зберігає локальні ID каналів і політики;
+        реальна синхронізація ролей, OAuth і статус бота перевіряються на екрані Discord-синхронізації через backend.
       </p>
       {message ? <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">{message}</div> : null}
     </section>

@@ -16,15 +16,15 @@ type DetailsState =
   | { status: 'not_found'; message: string }
   | { status: 'error'; message: string };
 
-function valueOrEmpty(value: string | null | undefined, fallback = 'Not available') {
+function valueOrEmpty(value: string | null | undefined, fallback = 'Немає даних') {
   return value?.trim() || fallback;
 }
 
 function formatJoinedDate(value: string | null): string {
-  if (!value) return 'Joined date unavailable';
+  if (!value) return 'Дата вступу недоступна';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Joined date unavailable';
-  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
+  if (Number.isNaN(date.getTime())) return 'Дата вступу недоступна';
+  return new Intl.DateTimeFormat('uk-UA', { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
 }
 
 function PublicProfileField({
@@ -105,7 +105,7 @@ function StatusPanel({
           onClick={onBack}
           className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-slate-500 focus:outline-none focus:ring focus:ring-amber-500/30"
         >
-          Back to Members
+          Назад до учасників
         </button>
         {onRetry ? (
           <button
@@ -113,7 +113,7 @@ function StatusPanel({
             onClick={onRetry}
             className="rounded-xl border border-rose-400/40 px-4 py-2 text-sm font-semibold text-rose-50 hover:bg-rose-500/10 focus:outline-none focus:ring focus:ring-rose-400/30"
           >
-            Retry
+            Спробувати ще раз
           </button>
         ) : null}
       </div>
@@ -131,27 +131,27 @@ function MemberHeader({
   onOpenOwnProfile: () => void;
 }) {
   const avatarUrl = member.avatarUrl ?? member.discord.avatarUrl;
-  const statusLabel = member.status === 'inactive' ? 'Inactive' : 'Active';
+  const statusLabel = member.status === 'inactive' ? 'Неактивний' : 'Активний';
   return (
     <section className="dh-panel rounded-2xl p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 gap-4">
           <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-amber-500/30 bg-black/35">
             {avatarUrl ? (
-              <img src={avatarUrl} alt={`${member.displayName} avatar`} className="h-full w-full object-cover" />
+              <img src={avatarUrl} alt={`Аватар ${member.displayName}`} className="h-full w-full object-cover" />
             ) : (
               <DragonHouseCrest slot="dragon_house_logo" size="sm" />
             )}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Public Member Profile</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Публічний профіль учасника</p>
             <h1 className="mt-2 break-words text-2xl font-semibold text-white">{member.displayName}</h1>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-amber-100">
                 {FAMILY_ROLE_LABELS[member.role]}
               </span>
               <span className="rounded-full border border-slate-700 bg-black/25 px-2.5 py-1 text-slate-200">
-                Rank {member.rank.level}
+                Ранг {member.rank.level}
               </span>
               {member.rank.title ? (
                 <span className="rounded-full border border-slate-700 bg-black/25 px-2.5 py-1 text-slate-200">{member.rank.title}</span>
@@ -160,7 +160,7 @@ function MemberHeader({
                 {statusLabel}
               </span>
               <span className={member.discord.linked ? 'rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-200' : 'rounded-full border border-slate-700 bg-black/25 px-2.5 py-1 text-slate-400'}>
-                {member.discord.linked ? 'Discord linked' : 'Discord not linked'}
+                {member.discord.linked ? 'Discord привʼязано' : 'Discord не привʼязано'}
               </span>
             </div>
             <p className="mt-3 text-sm text-slate-400">{formatJoinedDate(member.joinedAt)}</p>
@@ -172,7 +172,7 @@ function MemberHeader({
             onClick={onOpenOwnProfile}
             className="rounded-xl border border-amber-500/40 px-4 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-500/10 focus:outline-none focus:ring focus:ring-amber-500/30"
           >
-            Open my full profile
+            Відкрити мій повний профіль
           </button>
         ) : null}
       </div>
@@ -195,37 +195,37 @@ function LoadedDetails({
       <MemberHeader member={member} isOwnProfile={isOwnProfile} onOpenOwnProfile={onOpenOwnProfile} />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <PublicProfileSection title="General">
-          <PublicProfileField label="Display name" value={member.displayName} />
-          <PublicProfileField label="Member status" value={member.status === 'inactive' ? 'Inactive' : 'Active'} muted={member.status === 'inactive'} />
-          <PublicProfileField label="Joined date" value={formatJoinedDate(member.joinedAt)} muted={!member.joinedAt} />
+        <PublicProfileSection title="Загальне">
+          <PublicProfileField label="Імʼя" value={member.displayName} />
+          <PublicProfileField label="Статус" value={member.status === 'inactive' ? 'Неактивний' : 'Активний'} muted={member.status === 'inactive'} />
+          <PublicProfileField label="У сімʼї з" value={formatJoinedDate(member.joinedAt)} muted={!member.joinedAt} />
         </PublicProfileSection>
 
         <PublicProfileSection title="Discord">
-          <PublicProfileField label="Linked status" value={member.discord.linked ? 'Linked' : 'Not linked'} muted={!member.discord.linked} />
-          <PublicProfileField label="Discord display name" value={valueOrEmpty(member.discord.displayName)} muted={!member.discord.displayName} />
-          <PublicProfileField label="Server nickname" value={valueOrEmpty(member.discord.serverNickname)} muted={!member.discord.serverNickname} />
-          <PublicProfileField label="Discord avatar" value={member.discord.avatarUrl ? 'Available' : 'Not available'} muted={!member.discord.avatarUrl} />
+          <PublicProfileField label="Привʼязка" value={member.discord.linked ? 'Привʼязано' : 'Не привʼязано'} muted={!member.discord.linked} />
+          <PublicProfileField label="Імʼя Discord" value={valueOrEmpty(member.discord.displayName)} muted={!member.discord.displayName} />
+          <PublicProfileField label="Нік на сервері" value={valueOrEmpty(member.discord.serverNickname)} muted={!member.discord.serverNickname} />
+          <PublicProfileField label="Аватар Discord" value={member.discord.avatarUrl ? 'Є' : 'Немає'} muted={!member.discord.avatarUrl} />
         </PublicProfileSection>
 
-        <PublicProfileSection title="Family">
-          <PublicProfileField label="Family role" value={FAMILY_ROLE_LABELS[member.role]} />
-          <PublicProfileField label="Rank level" value={member.rank.level} />
-          <PublicProfileField label="Rank title" value={valueOrEmpty(member.rank.title)} muted={!member.rank.title} />
+        <PublicProfileSection title="Сімʼя">
+          <PublicProfileField label="Роль" value={FAMILY_ROLE_LABELS[member.role]} />
+          <PublicProfileField label="Рівень рангу" value={member.rank.level} />
+          <PublicProfileField label="Назва рангу" value={valueOrEmpty(member.rank.title)} muted={!member.rank.title} />
         </PublicProfileSection>
 
         <section className="dh-panel rounded-2xl p-5">
-          <h2 className="text-lg font-semibold text-white">About</h2>
+          <h2 className="text-lg font-semibold text-white">Про учасника</h2>
           <p className={`mt-4 text-sm leading-6 ${member.profile.summary ? 'text-slate-200' : 'text-slate-500'}`}>
-            {member.profile.summary ?? 'No public summary yet.'}
+            {member.profile.summary ?? 'Публічного опису поки немає.'}
           </p>
         </section>
       </div>
 
       <section className="dh-panel rounded-2xl p-5">
-        <h2 className="text-lg font-semibold text-white">Future profile modules</h2>
+        <h2 className="text-lg font-semibold text-white">Дані профілю</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {['Achievements', 'Statistics', 'Recent Activity'].map((section) => (
+          {['Досягнення', 'Статистика', 'Остання активність'].map((section) => (
             <div key={section} className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-500" aria-disabled="true">
               {section}
             </div>
@@ -272,14 +272,14 @@ export function FamilyMemberDetails({
       .catch((error: unknown) => {
         if (controller.signal.aborted || requestId !== requestSequenceRef.current) return;
         if (error instanceof FamilyMemberDirectoryError && error.status === 403) {
-          setState({ status: 'forbidden', message: 'Additional permissions are required to view this inactive member.' });
+          setState({ status: 'forbidden', message: 'Потрібні додаткові права, щоб переглядати неактивного учасника.' });
           return;
         }
         if (error instanceof FamilyMemberDirectoryError && error.status === 404) {
-          setState({ status: 'not_found', message: 'This public member profile was not found.' });
+          setState({ status: 'not_found', message: 'Публічний профіль цього учасника не знайдено.' });
           return;
         }
-        setState({ status: 'error', message: error instanceof Error ? error.message : 'Unable to load this member profile.' });
+        setState({ status: 'error', message: error instanceof Error ? error.message : 'Не вдалося завантажити профіль учасника.' });
       });
     return () => {
       if (requestAbortRef.current === controller) requestAbortRef.current = null;
@@ -293,7 +293,7 @@ export function FamilyMemberDetails({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Dragon House</p>
           <h2 id="family-member-details-title" className="mt-1 text-xl font-semibold text-white">
-            Member Details
+            Дані учасника
           </h2>
         </div>
         <button
@@ -301,12 +301,12 @@ export function FamilyMemberDetails({
           onClick={onBack}
           className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-slate-500 focus:outline-none focus:ring focus:ring-amber-500/30"
         >
-          Back to Members
+          Назад до учасників
         </button>
       </div>
 
       <div className="sr-only" aria-live="polite">
-        {state.status === 'loading' ? 'Loading member profile' : 'Member profile loaded'}
+        {state.status === 'loading' ? 'Завантаження профілю учасника' : 'Профіль учасника завантажено'}
       </div>
 
       {state.status === 'loading' ? <DetailsSkeleton /> : null}
@@ -314,14 +314,14 @@ export function FamilyMemberDetails({
         <LoadedDetails member={state.member} currentUser={currentUser} onOpenOwnProfile={onOpenOwnProfile} />
       ) : null}
       {state.status === 'forbidden' ? (
-        <StatusPanel title="Additional permissions required" message={state.message} tone="amber" onBack={onBack} />
+        <StatusPanel title="Потрібні додаткові права" message={state.message} tone="amber" onBack={onBack} />
       ) : null}
       {state.status === 'not_found' ? (
-        <StatusPanel title="Member not found" message={state.message} tone="amber" onBack={onBack} />
+        <StatusPanel title="Учасника не знайдено" message={state.message} tone="amber" onBack={onBack} />
       ) : null}
       {state.status === 'error' ? (
         <StatusPanel
-          title="Unable to load member"
+          title="Не вдалося завантажити учасника"
           message={state.message}
           tone="rose"
           onBack={onBack}

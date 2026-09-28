@@ -6,8 +6,10 @@ import { requireFamilyAuthContext } from '../middleware/family-auth-context.js';
 import { ACHIEVEMENT_ERROR_MESSAGES, AchievementError } from '../achievements/achievement-errors.js';
 import type { AchievementService } from '../achievements/achievement-service.js';
 import type { RewardAllocationService } from '../achievements/reward-allocation-service.js';
+import type { DiscordOrchestrationService } from '../discord/orchestration-service.js';
 import { TowerDefenseError, TOWER_DEFENSE_ERROR_MESSAGES } from '../tower-defense/tower-defense-errors.js';
 import type { TowerDefenseService } from '../tower-defense/tower-defense-service.js';
+import type { FamilyAuthContext } from '../types.js';
 
 const uuidSchema = z.string().uuid();
 const statusSchema = z.enum(['draft', 'scheduled', 'gathering', 'active', 'completed', 'cancelled', 'all']);
@@ -106,6 +108,7 @@ export function createFamilyTowerDefenseRouter(
   towerDefenseService: TowerDefenseService | null,
   rewardAllocationService: RewardAllocationService | null = null,
   achievementService: AchievementService | null = null,
+  discordOrchestrationService: DiscordOrchestrationService | null = null,
 ): Router {
   const router = Router();
   const requireAuth = requireFamilyAuthContext(config, authService);
@@ -217,7 +220,9 @@ export function createFamilyTowerDefenseRouter(
     const body = createDefenseSchema.safeParse(request.body);
     if (!body.success) return respondValidation(response, 'Invalid create defense payload.');
     try {
-      response.status(201).json(await towerDefenseService.createDefense(body.data, request.familyAuth));
+      const created = await towerDefenseService.createDefense(body.data, request.familyAuth);
+      await syncTowerDiscordProjection(discordOrchestrationService, created.id, request.familyAuth);
+      response.status(201).json(created);
     } catch (error) {
       respondTowerDefenseError(response, error);
     }
@@ -229,7 +234,9 @@ export function createFamilyTowerDefenseRouter(
     const body = updateDefenseSchema.safeParse(request.body);
     if (!defenseId.success || !body.success) return respondValidation(response, 'Invalid update defense request.');
     try {
-      response.json(await towerDefenseService.updateDefense(defenseId.data, body.data, request.familyAuth));
+      const updated = await towerDefenseService.updateDefense(defenseId.data, body.data, request.familyAuth);
+      await syncTowerDiscordProjection(discordOrchestrationService, defenseId.data, request.familyAuth);
+      response.json(updated);
     } catch (error) {
       respondTowerDefenseError(response, error);
     }
@@ -241,7 +248,9 @@ export function createFamilyTowerDefenseRouter(
     const body = respondSchema.safeParse(request.body);
     if (!defenseId.success || !body.success) return respondValidation(response, 'Invalid response request.');
     try {
-      response.json(await towerDefenseService.respond(defenseId.data, body.data, request.familyAuth));
+      const recorded = await towerDefenseService.respond(defenseId.data, body.data, request.familyAuth);
+      await syncTowerDiscordProjection(discordOrchestrationService, defenseId.data, request.familyAuth);
+      response.json(recorded);
     } catch (error) {
       respondTowerDefenseError(response, error);
     }
@@ -252,7 +261,9 @@ export function createFamilyTowerDefenseRouter(
     const defenseId = uuidSchema.safeParse(request.params.defenseId);
     if (!defenseId.success) return respondValidation(response, 'Invalid defense id.');
     try {
-      response.json(await towerDefenseService.withdrawResponse(defenseId.data, request.familyAuth));
+      const withdrawn = await towerDefenseService.withdrawResponse(defenseId.data, request.familyAuth);
+      await syncTowerDiscordProjection(discordOrchestrationService, defenseId.data, request.familyAuth);
+      response.json(withdrawn);
     } catch (error) {
       respondTowerDefenseError(response, error);
     }
@@ -264,7 +275,9 @@ export function createFamilyTowerDefenseRouter(
     const body = attendanceBodySchema.safeParse(request.body);
     if (!defenseId.success || !body.success) return respondValidation(response, 'Invalid attendance request.');
     try {
-      response.json(await towerDefenseService.confirmAttendance(defenseId.data, body.data, request.familyAuth));
+      const recorded = await towerDefenseService.confirmAttendance(defenseId.data, body.data, request.familyAuth);
+      await syncTowerDiscordProjection(discordOrchestrationService, defenseId.data, request.familyAuth);
+      response.json(recorded);
     } catch (error) {
       respondTowerDefenseError(response, error);
     }
@@ -275,7 +288,9 @@ export function createFamilyTowerDefenseRouter(
     const defenseId = uuidSchema.safeParse(request.params.defenseId);
     if (!defenseId.success) return respondValidation(response, 'Invalid defense id.');
     try {
-      response.json(await towerDefenseService.startDefense(defenseId.data, request.familyAuth));
+      const started = await towerDefenseService.startDefense(defenseId.data, request.familyAuth);
+      await syncTowerDiscordProjection(discordOrchestrationService, defenseId.data, request.familyAuth);
+      response.json(started);
     } catch (error) {
       respondTowerDefenseError(response, error);
     }
@@ -291,6 +306,7 @@ export function createFamilyTowerDefenseRouter(
       const rewardReconciliation = achievementService
         ? await achievementService.reconcileTowerDefenseRewards(defenseId.data, request.familyAuth)
         : null;
+      await syncTowerDiscordProjection(discordOrchestrationService, defenseId.data, request.familyAuth);
       response.json({ ...completed, rewardReconciliation });
     } catch (error) {
       if (error instanceof AchievementError) respondRewardAllocationError(response, error);
@@ -304,13 +320,27 @@ export function createFamilyTowerDefenseRouter(
     const body = cancelSchema.safeParse(request.body);
     if (!defenseId.success || !body.success) return respondValidation(response, 'Invalid cancel defense request.');
     try {
-      response.json(await towerDefenseService.cancelDefense(defenseId.data, body.data, request.familyAuth));
+      const cancelled = await towerDefenseService.cancelDefense(defenseId.data, body.data, request.familyAuth);
+      await syncTowerDiscordProjection(discordOrchestrationService, defenseId.data, request.familyAuth);
+      response.json(cancelled);
     } catch (error) {
       respondTowerDefenseError(response, error);
     }
   });
 
   return router;
+}
+
+async function syncTowerDiscordProjection(
+  orchestration: DiscordOrchestrationService | null,
+  defenseId: string,
+  auth: FamilyAuthContext,
+) {
+  try {
+    await orchestration?.requestProjectionUpdate('tower_defense', defenseId, auth);
+  } catch {
+    // Discord projection failures are recoverable through the orchestration retry/sync state.
+  }
 }
 
 function stringQuery(value: unknown): string | null {

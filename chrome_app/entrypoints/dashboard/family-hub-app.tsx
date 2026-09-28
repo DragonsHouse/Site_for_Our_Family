@@ -31,7 +31,11 @@ import {
   type FamilyMemberCreateInput,
   type FamilyMemberUpdateInput
 } from '../../lib/family-member-data-source';
-import { loadCurrentBackendFamilyUser, resolveBackendFamilyUser } from '../../lib/family-backend-user-session';
+import {
+  loadCurrentBackendFamilyUser,
+  resolveBackendFamilyUser,
+  restoreCurrentBackendFamilyUser
+} from '../../lib/family-backend-user-session';
 import { readFamilyPosts } from '../../lib/family-data';
 import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../lib/family-types';
 import { AuthStartupGate } from './auth/AuthStartupGate';
@@ -85,18 +89,18 @@ function prefersReducedMotion() {
 function validateBirthdayInput(value: string) {
   const result = validateDragonBirthdayValue(value, getTodayDateOnly());
   if (result.valid) return null;
-  if (result.code === 'required') return 'Р’РєР°Р¶Рё РґР°С‚Сѓ РЅР°СЂРѕРґР¶РµРЅРЅСЏ, С‰РѕР± Р·Р°РІРµСЂС€РёС‚Рё РїРѕСЃРІСЏС‚Сѓ.';
-  if (result.code === 'too_early') return 'Р’РєР°Р¶Рё СЂРµР°Р»СЊРЅСѓ РґР°С‚Сѓ РЅР°СЂРѕРґР¶РµРЅРЅСЏ РЅРµ СЂР°РЅС–С€Рµ 1970 СЂРѕРєСѓ.';
-  if (result.code === 'future') return 'Р”Р°С‚Р° РЅР°СЂРѕРґР¶РµРЅРЅСЏ РЅРµ РјРѕР¶Рµ Р±СѓС‚Рё РІ РјР°Р№Р±СѓС‚РЅСЊРѕРјСѓ.';
-  return 'РџРµСЂРµРІС–СЂ РґР°С‚Сѓ вЂ” С‚Р°РєРѕРіРѕ РґРЅСЏ РЅРµ С–СЃРЅСѓС”.';
+  if (result.code === 'required') return 'Вкажи дату народження, щоб завершити посвяту.';
+  if (result.code === 'too_early') return 'Вкажи реальну дату народження не раніше 1970 року.';
+  if (result.code === 'future') return 'Дата народження не може бути в майбутньому.';
+  return 'Перевір дату — такого дня не існує.';
 }
 
 function birthdayErrorMessage(error: string | null) {
   if (!error) return null;
-  if (/required|empty/u.test(error)) return 'Р’РєР°Р¶Рё РґР°С‚Сѓ РЅР°СЂРѕРґР¶РµРЅРЅСЏ, С‰РѕР± Р·Р°РІРµСЂС€РёС‚Рё РїРѕСЃРІСЏС‚Сѓ.';
-  if (/future/u.test(error)) return 'Р”Р°С‚Р° РЅР°СЂРѕРґР¶РµРЅРЅСЏ РЅРµ РјРѕР¶Рµ Р±СѓС‚Рё РІ РјР°Р№Р±СѓС‚РЅСЊРѕРјСѓ.';
-  if (/1970|too_early|early/u.test(error)) return 'Р’РєР°Р¶Рё СЂРµР°Р»СЊРЅСѓ РґР°С‚Сѓ РЅР°СЂРѕРґР¶РµРЅРЅСЏ РЅРµ СЂР°РЅС–С€Рµ 1970 СЂРѕРєСѓ.';
-  if (/invalid/u.test(error)) return 'РџРµСЂРµРІС–СЂ РґР°С‚Сѓ вЂ” С‚Р°РєРѕРіРѕ РґРЅСЏ РЅРµ С–СЃРЅСѓС”.';
+  if (/required|empty/u.test(error)) return 'Вкажи дату народження, щоб завершити посвяту.';
+  if (/future/u.test(error)) return 'Дата народження не може бути в майбутньому.';
+  if (/1970|too_early|early/u.test(error)) return 'Вкажи реальну дату народження не раніше 1970 року.';
+  if (/invalid/u.test(error)) return 'Перевір дату — такого дня не існує.';
   return error;
 }
 
@@ -185,11 +189,11 @@ function ChangePasswordScreen({
     <AuthShell>
       <section className="dh-auth-card w-full max-w-md rounded-3xl p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">
-          РџРµСЂС€РёР№ РІС…С–Рґ
+          Перший вхід
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-white">Р—РјС–РЅР° С‚РёРјС‡Р°СЃРѕРІРѕРіРѕ РїР°СЂРѕР»СЏ</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-white">Зміна тимчасового пароля</h1>
         <p className="mt-2 text-sm text-slate-400">
-          {user.nickname}, static ID РїСЂРёР№РЅСЏС‚Рѕ. РЎС‚РІРѕСЂРё РѕСЃРѕР±РёСЃС‚РёР№ Р»РѕРєР°Р»СЊРЅРёР№ РїР°СЂРѕР»СЊ, С‰РѕР± РїСЂРѕРґРѕРІР¶РёС‚Рё.
+          {user.nickname}, static ID прийнято. Створи особистий локальний пароль, щоб продовжити.
         </p>
 
         <form
@@ -200,7 +204,7 @@ function ChangePasswordScreen({
           }}
         >
           <label className="block">
-            <span className="mb-1 block text-sm text-slate-300">РџРѕС‚РѕС‡РЅРёР№ РїР°СЂРѕР»СЊ / static ID</span>
+            <span className="mb-1 block text-sm text-slate-300">Поточний пароль / static ID</span>
             <input
               className={inputClassName()}
               type="password"
@@ -210,7 +214,7 @@ function ChangePasswordScreen({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm text-slate-300">РќРѕРІРёР№ РїР°СЂРѕР»СЊ</span>
+            <span className="mb-1 block text-sm text-slate-300">Новий пароль</span>
             <input
               className={inputClassName()}
               type="password"
@@ -220,7 +224,7 @@ function ChangePasswordScreen({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm text-slate-300">РџРѕРІС‚РѕСЂРё РїР°СЂРѕР»СЊ</span>
+            <span className="mb-1 block text-sm text-slate-300">Повтори пароль</span>
             <input
               className={inputClassName()}
               type="password"
@@ -241,7 +245,7 @@ function ChangePasswordScreen({
             disabled={loading || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()}
             className="w-full rounded-xl bg-gradient-to-r from-red-700 to-amber-500 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? 'Р—Р±РµСЂС–РіР°СЋ...' : 'Р—Р±РµСЂРµРіС‚Рё РїР°СЂРѕР»СЊ'}
+            {loading ? 'Зберігаю...' : 'Зберегти пароль'}
           </button>
         </form>
       </section>
@@ -271,19 +275,19 @@ function StaticIdOnboardingScreen({
           <DragonHouseCrest slot="dragon_house_logo" size="lg" />
         </div>
         <p className="mt-5 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">DRAGON HOUSE HUB</p>
-        <h1 className="mt-2 text-2xl font-semibold text-white">Welcome to Dragon House Hub</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-white">Ласкаво просимо до Dragon House Hub</h1>
         <p className="mt-3 text-sm leading-6 text-slate-300">
-          {user.displayName}, Р·Р°РІРµСЂС€Рё РєРѕСЂРѕС‚РєСѓ РїРµСЂРµРІС–СЂРєСѓ РїСЂРѕС„С–Р»СЋ, С‰РѕР± РІС–РґРєСЂРёС‚Рё Hub.
+          {user.displayName}, заверши коротку перевірку профілю, щоб відкрити Hub.
         </p>
 
         <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm">
           <div className="flex items-center justify-between gap-3 text-slate-200">
-            <span>Discord linked</span>
-            <span className="font-semibold text-emerald-300">вњ“</span>
+            <span>Discord прив’язано</span>
+            <span className="font-semibold text-emerald-300">Так</span>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3 text-slate-200">
-            <span>Static ID missing</span>
-            <span className="font-semibold text-rose-300">вњ•</span>
+            <span>Static ID не вказано</span>
+            <span className="font-semibold text-rose-300">Потрібно</span>
           </div>
         </div>
 
@@ -317,7 +321,7 @@ function StaticIdOnboardingScreen({
             disabled={loading || !value.trim()}
             className="w-full rounded-xl bg-gradient-to-r from-red-700 to-amber-500 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? 'Saving...' : 'Save Static ID'}
+            {loading ? 'Зберігаю...' : 'Зберегти Static ID'}
           </button>
         </form>
       </section>
@@ -347,7 +351,7 @@ function BirthdayOnboardingScreen({
   const audio = useOnboardingAudio();
   const maxDate = useMemo(getTodayDateOnly, []);
   const inputError = validateBirthdayInput(value);
-  const visibleError = birthdayErrorMessage(error) ?? (value ? inputError : 'Р’РєР°Р¶Рё РґР°С‚Сѓ РЅР°СЂРѕРґР¶РµРЅРЅСЏ, С‰РѕР± Р·Р°РІРµСЂС€РёС‚Рё РїРѕСЃРІСЏС‚Сѓ.');
+  const visibleError = birthdayErrorMessage(error) ?? (value ? inputError : 'Вкажи дату народження, щоб завершити посвяту.');
   const canSubmit = !loading && !inputError;
   const openingSessionKey = `${BIRTHDAY_OPENING_SESSION_PREFIX}${user.id}`;
   const [openingActive, setOpeningActive] = useState(() => {
@@ -392,13 +396,13 @@ function BirthdayOnboardingScreen({
       <div className="dh-initiation-floating-embers" aria-hidden="true" />
 
       {openingActive ? (
-        <section className="dh-opening-ritual" aria-live="polite" aria-label="РџРѕС‡Р°С‚РѕРє РїРѕСЃРІСЏС‚Рё Dragon House">
+        <section className="dh-opening-ritual" aria-live="polite" aria-label="Початок посвяти Dragon House">
           <div className="dh-opening-crest">
             <DragonHouseCrest slot="dragon_house_logo" size="lg" />
           </div>
-          <p>РџРѕР»СѓРјвЂ™СЏ РІРїС–Р·РЅР°Р»Рѕ С‚РµР±Рµ...</p>
+          <p>Полум’я впізнало тебе...</p>
           <button type="button" className="dh-opening-skip" onClick={skipOpening}>
-            РџСЂРѕРїСѓСЃС‚РёС‚Рё
+            Пропустити
           </button>
         </section>
       ) : null}
@@ -413,15 +417,15 @@ function BirthdayOnboardingScreen({
                 <DragonHouseCrest slot="dragon_house_logo" size="lg" />
               </div>
               <div>
-                <p className="dh-initiation-eyebrow">РћРЎРўРђРќРќР†Р™ Р•РўРђРџ РџРћРЎР’РЇРўР</p>
-                <h1 id="birthday-initiation-heading">РџРѕР»СѓРјвЂ™СЏ С‡РµРєР°С” РЅР° РѕСЃС‚Р°РЅРЅСЋ РїРµС‡Р°С‚СЊ</h1>
+                <p className="dh-initiation-eyebrow">ОСТАННІЙ ЕТАП ПОСВЯТИ</p>
+                <h1 id="birthday-initiation-heading">Полум’я чекає на останню печать</h1>
               </div>
             </div>
             <button
               type="button"
               className="dh-initiation-sound"
               aria-pressed={audio.enabled && audio.state === 'playing'}
-              aria-label={audio.enabled && audio.state === 'playing' ? 'Р’РёРјРєРЅСѓС‚Рё Р·РІСѓРє РїРѕСЃРІСЏС‚Рё' : 'РЈРІС–РјРєРЅСѓС‚Рё Р·РІСѓРє РїРѕСЃРІСЏС‚Рё'}
+              aria-label={audio.enabled && audio.state === 'playing' ? 'Вимкнути звук посвяти' : 'Увімкнути звук посвяти'}
               onClick={() => {
                 if (audio.enabled && audio.state === 'playing') {
                   audio.toggle();
@@ -434,20 +438,20 @@ function BirthdayOnboardingScreen({
                 audio.start();
               }}
             >
-              <span aria-hidden="true">{audio.enabled && audio.state === 'playing' ? 'в™Є' : 'Г—'}</span>
-              <span className="dh-sound-label">Р—РІСѓРє РїРѕСЃРІСЏС‚Рё</span>
-              <span>{audio.enabled && audio.state === 'playing' ? 'Р’РёРјРєРЅСѓС‚Рё Р·РІСѓРє' : 'РЈРІС–РјРєРЅСѓС‚Рё Р·РІСѓРє'}</span>
+              <span aria-hidden="true">{audio.enabled && audio.state === 'playing' ? '\u266a' : '\u00d7'}</span>
+              <span className="dh-sound-label">Звук посвяти</span>
+              <span>{audio.enabled && audio.state === 'playing' ? 'Вимкнути звук' : 'Увімкнути звук'}</span>
             </button>
           </div>
 
           <p className="dh-initiation-personal">
-            {user.displayName}, РІРєР°Р¶Рё РґР°С‚Сѓ РЅР°СЂРѕРґР¶РµРЅРЅСЏ, С‰РѕР± С‚РІРѕС” С–РјвЂ™СЏ Р·вЂ™СЏРІРёР»РѕСЃСЏ Сѓ СЃС–РјРµР№РЅРѕРјСѓ РєР°Р»РµРЅРґР°СЂС– Dragon House.
+            {user.displayName}, вкажи дату народження, щоб твоє ім’я з’явилося у сімейному календарі Dragon House.
           </p>
 
-          <div className="dh-initiation-progress" aria-label="РџСЂРѕРіСЂРµСЃ РїРѕСЃРІСЏС‚Рё">
-            <InitiationStep label="Discord" status="complete" detail="Discord РїС–РґС‚РІРµСЂРґР¶РµРЅРѕ" />
-            <InitiationStep label="Static ID" status="complete" detail="Static ID РїСЂРёР№РЅСЏС‚Рѕ" />
-            <InitiationStep label="Р”Р°С‚Р° РЅР°СЂРѕРґР¶РµРЅРЅСЏ" status={value.trim() ? 'ready' : 'current'} detail="Р”Р°С‚Р° РЅР°СЂРѕРґР¶РµРЅРЅСЏ вЂ” РѕСЃС‚Р°РЅРЅСЏ РїРµС‡Р°С‚СЊ" />
+          <div className="dh-initiation-progress" aria-label="Прогрес посвяти">
+            <InitiationStep label="Discord" status="complete" detail="Discord підтверджено" />
+            <InitiationStep label="Static ID" status="complete" detail="Static ID прийнято" />
+            <InitiationStep label="Дата народження" status={value.trim() ? 'ready' : 'current'} detail="Дата народження — остання печать" />
           </div>
 
           <form
@@ -460,9 +464,9 @@ function BirthdayOnboardingScreen({
             }}
           >
             <label className="dh-initiation-date" htmlFor="birthday-date-input">
-              <span className="dh-date-label">Р”Р°С‚Р° РЅР°СЂРѕРґР¶РµРЅРЅСЏ</span>
+              <span className="dh-date-label">Дата народження</span>
               <span className="dh-date-helper">
-                Р”Р°С‚Р° РЅР°СЂРѕРґР¶РµРЅРЅСЏ РїРѕС‚СЂС–Р±РЅР° РґР»СЏ СЃС–РјРµР№РЅРѕРіРѕ РєР°Р»РµРЅРґР°СЂСЏ. Р†РЅС€РёРј СѓС‡Р°СЃРЅРёРєР°Рј Р±СѓРґРµ РІРёРґРЅРѕ Р»РёС€Рµ РґРµРЅСЊ С– РјС–СЃСЏС†СЊ. Р С–Рє РЅР°СЂРѕРґР¶РµРЅРЅСЏ С‚Р° РІС–Рє РЅРµ РїСѓР±Р»С–РєСѓСЋС‚СЊСЃСЏ Р±РµР· РѕРєСЂРµРјРѕРіРѕ РґРѕР·РІРѕР»Сѓ.
+                Дата народження потрібна для сімейного календаря. Іншим учасникам буде видно лише день і місяць. Рік народження та вік не публікуються без окремого дозволу.
               </span>
               <span className="dh-date-input-frame">
                 <span className="dh-date-icon" aria-hidden="true">
@@ -486,26 +490,26 @@ function BirthdayOnboardingScreen({
             </label>
 
             <p id="birthday-date-help" className="dh-date-microcopy">
-              Р¤РѕСЂРјР°С‚ Р·Р±РµСЂС–РіР°С”С‚СЊСЃСЏ СЏРє РєР°Р»РµРЅРґР°СЂРЅР° РґР°С‚Р° Р±РµР· Р·РјС–С‰РµРЅРЅСЏ С‡Р°СЃРѕРІРѕРіРѕ РїРѕСЏСЃСѓ.
+              Формат зберігається як календарна дата без зміщення часового поясу.
             </p>
 
             <div id="birthday-date-error" className={visibleError ? 'dh-initiation-error' : 'dh-initiation-hint'} aria-live="polite">
-              {visibleError ?? 'Р”Р°С‚Р° РіРѕС‚РѕРІР° РґРѕ РїРµС‡Р°С‚С–.'}
+              {visibleError ?? 'Дата готова до печаті.'}
             </div>
 
             <button type="submit" disabled={!canSubmit} className="dh-initiation-primary">
-              {loading ? 'Р—Р°РїР°Р»СЋС”РјРѕ РїРµС‡Р°С‚СЊ...' : 'Р—Р°РІРµСЂС€РёС‚Рё РїРѕСЃРІСЏС‚Сѓ'}
+              {loading ? 'Запалюємо печать...' : 'Завершити посвяту'}
             </button>
             {legacyAccessAllowed ? (
               <button type="button" className="dh-initiation-secondary" onClick={onContinue}>
-                РЈРІС–Р№С‚Рё РґРѕ Hub РїС–Р·РЅС–С€Рµ
+                Увійти до Hub пізніше
               </button>
             ) : null}
           </form>
 
-          <div className="dh-initiation-statusbar" aria-label="РЎС‚Р°РЅ РїРѕСЃРІСЏС‚Рё">
-            <span>Р—РІСѓРє РїРѕСЃРІСЏС‚Рё: {audio.enabled ? 'РґРѕСЃС‚СѓРїРЅРёР№ РїС–СЃР»СЏ РІР·Р°С”РјРѕРґС–С—' : 'РІРёРјРєРЅРµРЅРѕ'}</span>
-            <span>Р—Р°С…РёС‰РµРЅРµ Р·вЂ™С”РґРЅР°РЅРЅСЏ</span>
+          <div className="dh-initiation-statusbar" aria-label="Стан посвяти">
+            <span>Звук посвяти: {audio.enabled ? 'доступний після взаємодії' : 'вимкнено'}</span>
+            <span>Захищене з’єднання</span>
             <span>Dragon House Family</span>
           </div>
         </section>
@@ -518,11 +522,11 @@ function InitiationStep({ label, status, detail }: { label: string; status: 'com
   const isComplete = status === 'complete';
   return (
     <div className={`dh-initiation-step ${status}`}>
-      <span className="dh-initiation-step-icon" aria-hidden="true">{isComplete ? 'вњ“' : 'в—†'}</span>
+      <span className="dh-initiation-step-icon" aria-hidden="true">{isComplete ? '\u2713' : '\u25c6'}</span>
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold text-stone-100">{label}</span>
         <span className="block text-xs uppercase tracking-[0.18em] text-stone-500">
-          {status === 'current' ? 'РѕСЃС‚Р°РЅРЅС–Р№ РєСЂРѕРє' : detail}
+          {status === 'current' ? 'останній крок' : detail}
         </span>
       </span>
     </div>
@@ -552,8 +556,8 @@ function BirthdaySuccessScreen({ user, onComplete }: { user: FamilyUser; onCompl
           <DragonHouseCrest slot="dragon_house_logo" size="lg" />
         </div>
         <p className="dh-initiation-eyebrow">Dragon House Family</p>
-        <h1 id="birthday-success-heading">РџРѕСЃРІСЏС‚Сѓ Р·Р°РІРµСЂС€РµРЅРѕ</h1>
-        <p>{user.displayName}, Dragon House РїСЂРёР№РјР°С” С‚РµР±Рµ РґРѕ СЃРІРѕРіРѕ РїРѕР»СѓРјвЂ™СЏ.</p>
+        <h1 id="birthday-success-heading">Посвяту завершено</h1>
+        <p>{user.displayName}, Dragon House приймає тебе до свого полум’я.</p>
       </section>
     </main>
   );
@@ -696,7 +700,7 @@ export function FamilyHubApp() {
 
     if (completionCode) {
       setAuthState({ status: 'oauth_loading' });
-      void completeDiscordLogin(completionCode)
+      void completeDiscordLogin(completionCode, 'web')
         .then(async (result) => {
           window.history.replaceState(null, document.title, window.location.pathname);
           const user = resolveBackendFamilyUser(result.user);
@@ -739,7 +743,12 @@ export function FamilyHubApp() {
   async function restoreStoredSession() {
     setAuthState({ status: 'checking' });
     try {
-      const user = await loadCurrentBackendFamilyUser();
+      const user = await restoreCurrentBackendFamilyUser();
+      if (!user) {
+        setCurrentUser(null);
+        setAuthState({ status: 'unauthenticated' });
+        return;
+      }
       setCurrentUser(user);
       setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
       void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
@@ -754,11 +763,11 @@ export function FamilyHubApp() {
 
   async function handleLogin() {
     if (!nickname.trim()) {
-      setError('Р’РІРµРґРё РЅС–РєРЅРµР№Рј.');
+      setError('Введи нікнейм.');
       return;
     }
     if (!loginPassword.trim()) {
-      setError('Р’РІРµРґРё РїР°СЂРѕР»СЊ.');
+      setError('Введи пароль.');
       return;
     }
     setLoading(true);
@@ -777,7 +786,7 @@ export function FamilyHubApp() {
       setAuthState(stateForAuthenticatedUser(user, 'login'));
     } catch (err) {
       if (err instanceof AuthOutcomeError && err.failure.outcome.code === 'invalid_credentials') {
-        const message = 'РќРµРІС–СЂРЅРёР№ РЅС–РєРЅРµР№Рј Р°Р±Рѕ РїР°СЂРѕР»СЊ.';
+        const message = 'Невірний нікнейм або пароль.';
         setError(message);
         setAuthState({ status: 'unauthenticated', message });
         return;
@@ -799,7 +808,7 @@ export function FamilyHubApp() {
   async function handleChangePassword() {
     if (!currentUser) return;
     if (newPassword !== confirmPassword) {
-      setError('РџР°СЂРѕР»С– РЅРµ Р·Р±С–РіР°СЋС‚СЊСЃСЏ');
+      setError('Паролі не збігаються');
       return;
     }
 
@@ -1039,6 +1048,7 @@ export function FamilyHubApp() {
   }
 
   function returnToLogin() {
+    void clearAuthSession().catch(() => undefined);
     setCurrentUser(null);
     setError(null);
     setStaticIdDraft('');
@@ -1110,9 +1120,9 @@ export function FamilyHubApp() {
   if (authState.status === 'change_password_required') {
     return (
       <AuthOutcomeScreen
-        title="РџРѕС‚СЂС–Р±РЅРѕ Р·РјС–РЅРёС‚Рё РїР°СЂРѕР»СЊ"
-        message={authState.message ?? 'РЈРІС–Р№РґРё Р·РЅРѕРІСѓ, С‰РѕР± Р±РµР·РїРµС‡РЅРѕ Р·РјС–РЅРёС‚Рё С‚РёРјС‡Р°СЃРѕРІРёР№ РїР°СЂРѕР»СЊ.'}
-        primaryLabel="РџРѕРІРµСЂРЅСѓС‚РёСЃСЏ РґРѕ РІС…РѕРґСѓ"
+        title="Потрібно змінити пароль"
+        message={authState.message ?? 'Увійди знову, щоб безпечно змінити тимчасовий пароль.'}
+        primaryLabel="Повернутися до входу"
         onPrimary={returnToLogin}
       />
     );
@@ -1142,8 +1152,8 @@ export function FamilyHubApp() {
     return (
       <AuthOutcomeScreen
         title="Сесія завершилась"
-        message="Твій попередній вхід більше не активний. Увійди знову, щоб повернутися до Family Hub."
-        primaryLabel="Увійти знову"
+        message="Сесія завершилась. Увійди знову."
+        primaryLabel="Увійти через Discord"
         onPrimary={() => {
           void clearAuthSession().finally(returnToLogin);
         }}
@@ -1154,11 +1164,11 @@ export function FamilyHubApp() {
   if (authState.status === 'discord_link_required') {
     return (
       <AuthOutcomeScreen
-        title="Discord не прив'язаний для входу"
-        message="Цей Discord акаунт не має активної прив'язки для входу у Family Hub. Можеш увійти через nickname або звернутися до адміністратора."
-        primaryLabel="Увійти через nickname"
+        title="Discord не прив'язаний"
+        message="Цей Discord-акаунт ще не прив’язаний до учасника Dragon House."
+        primaryLabel="Повернутися до входу"
         onPrimary={returnToLogin}
-        secondaryLabel="Спробувати Discord ще раз"
+        secondaryLabel="Спробувати ще раз"
         onSecondary={() => void handleDiscordLogin()}
       />
     );
@@ -1200,7 +1210,7 @@ export function FamilyHubApp() {
     return (
       <AuthOutcomeScreen
         title="Доступ вимкнено"
-        message="Цей Family Hub профіль зараз неактивний. Звернися до адміністратора, якщо доступ потрібно відновити."
+        message="Доступ до Dragon House Hub вимкнено. Звернись до керівництва."
         primaryLabel="Повернутися до входу"
         onPrimary={returnToLogin}
       />
@@ -1251,6 +1261,5 @@ export function FamilyHubApp() {
     />
   ) : null;
 }
-
 
 

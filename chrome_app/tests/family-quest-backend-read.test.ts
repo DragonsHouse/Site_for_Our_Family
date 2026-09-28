@@ -270,10 +270,14 @@ describe('Family Quest backend read adapter', () => {
     assert.match(clientSource, /authenticatedFetch\(`\/api\/family\/quests\/\$\{encodeURIComponent\(questId\)\}`/u);
   });
 
-  it('prevents unsupported backend quest local mutations while keeping local mutation functions present', () => {
-    assert.match(questUiSource, /BACKEND_WRITE_PENDING_MESSAGE/u);
-    assert.match(questUiSource, /isBackendQuest\(quest\)[\s\S]*preventBackendWrite\(\)/u);
-    assert.match(questUiSource, /isBackendTemplate\(template\)[\s\S]*preventBackendWrite\(\)/u);
+  it('backs visible quest mutations with backend operations while keeping local dev functions present', () => {
+    assert.match(clientSource, /createBackendFamilyQuest/u);
+    assert.match(clientSource, /updateBackendFamilyQuest/u);
+    assert.match(clientSource, /createBackendFamilyQuestTemplate/u);
+    assert.match(clientSource, /joinBackendFamilyQuest/u);
+    assert.match(questUiSource, /await createBackendFamilyQuest/u);
+    assert.match(questUiSource, /await updateBackendFamilyQuest/u);
+    assert.match(questUiSource, /await joinBackendFamilyQuest/u);
     assert.match(questUiSource, /issueFamilyQuestPayouts\(\{ questId, actorId: currentUser\.id, userIds: \[userId\] \}\)/u);
   });
 
@@ -282,7 +286,9 @@ describe('Family Quest backend read adapter', () => {
     assert.match(questUiSource, /loadFamilyQuestReadState\(controller\.signal\)/u);
     assert.match(questUiSource, /setQuestReadSource\(state\.source\)/u);
     assert.match(questUiSource, /useState<FamilyQuestReadSource>\('backend_loading'\)/u);
-    assert.match(questUiSource, /Backend quests unavailable\. Retry after the backend is reachable\./u);
+    assert.match(questUiSource, /Квести показуються з офіційного сервісу\. Локальні зміни не видаються за справжні дані\./u);
+    assert.match(clientSource, /authenticatedFetch\('\/api\/family\/quests'/u);
+    assert.doesNotMatch(questUiSource, /Створення через Hub ще недоступне/u);
   });
 
   it('keeps this read adapter test in the frontend suite', () => {

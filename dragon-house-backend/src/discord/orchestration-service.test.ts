@@ -89,6 +89,57 @@ describe('DiscordOrchestrationService', () => {
     expect(towerDefenseService.confirmAttendance).not.toHaveBeenCalled();
   });
 
+  it('updates the same canonical Tower message after a Discord response', async () => {
+    const transport = fakeTransport();
+    const { service, towerDefenseService } = await buildService({ transport });
+    const auth = { familyMemberId: memberId, role: 'member' as const, rank: 4, status: 'active' as const, permissions: [] };
+    const defenseId = '00000000-0000-4000-8000-000000000002';
+
+    await service.publishTowerDefense(defenseId, channelId, auth);
+    await service.handleInteraction({
+      interactionId: 'interaction-tower-sync',
+      guildId,
+      channelId,
+      discordUserId,
+      customId: `dh:t:respond:${defenseId}:confirmed`,
+    });
+
+    expect(towerDefenseService.respond).toHaveBeenCalledTimes(1);
+    expect(transport.sent).toHaveLength(1);
+    expect(transport.edited).toHaveLength(1);
+    expect(transport.edited[0]).toMatchObject({ messageId: 'message-1' });
+  });
+
+  it('keeps a successful domain mutation when automatic Discord sync fails and exposes retry state', async () => {
+    const { service, repository, towerDefenseService } = await buildService({ transport: null });
+    const defenseId = '00000000-0000-4000-8000-000000000002';
+    await repository.saveMessage({
+      sourceModule: 'tower_defense',
+      sourceId: defenseId,
+      messageKind: 'announcement',
+      guildId,
+      channelId,
+      messageId: 'message-1',
+      externalId: 'tower:auto-sync-test',
+      metadata: { syncStatus: 'synced' },
+    });
+
+    const response = await service.handleInteraction({
+      interactionId: 'interaction-tower-sync-failure',
+      guildId,
+      channelId,
+      discordUserId,
+      customId: `dh:t:respond:${defenseId}:confirmed`,
+    });
+    const state = await service.getPublishState('tower_defense', defenseId, channelId, 'Tower Defense');
+
+    expect(response.ok).toBe(true);
+    expect(response.content).toContain('потребує повторної синхронізації');
+    expect(towerDefenseService.respond).toHaveBeenCalledTimes(1);
+    expect(state.state).toBe('sync_error');
+    expect(state.error).toMatchObject({ code: 'DISCORD_SYNC_FAILED' });
+  });
+
   it('does not call the domain service twice for a repeated interaction idempotency key', async () => {
     const { service, towerDefenseService } = await buildService();
     const request = {

@@ -111,8 +111,8 @@ describe('auth routes', { timeout: 20_000 }, () => {
     expect(meBody).not.toHaveProperty('member');
   });
 
-  it('nickname login creates a persistent bearer session and me restores it without password requirements', async () => {
-    const { baseUrl, authRepository } = await createServerHarness();
+  it('development-only nickname login creates a persistent bearer session and me restores it without password requirements', async () => {
+    const { baseUrl, authRepository } = await createServerHarness({ nodeEnv: 'development' });
     const existing = await authRepository.findUserByFamilyMemberId(ANASTASIA_MEMBER_ID);
     if (!existing) throw new Error('Missing auth user');
     await authRepository.updatePassword(ANASTASIA_MEMBER_ID, existing.passwordHash, true);
@@ -144,22 +144,23 @@ describe('auth routes', { timeout: 20_000 }, () => {
     });
   });
 
-  it('nickname login rejects unknown nicknames without member enumeration data', async () => {
-    const baseUrl = await createServer();
+  it('blocks nickname login outside explicit development mode without session or enumeration data', async () => {
+    const { baseUrl } = await createServerHarness({ nodeEnv: 'production' });
 
     const login = await fetch(`${baseUrl}/api/auth/nickname-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nickname: 'Unknown_Dragons' }),
+      body: JSON.stringify({ nickname: 'Anastasia_Dragons', rememberMe: true }),
     });
     const loginBody = (await login.json()) as Record<string, unknown>;
 
-    expect(login.status).toBe(401);
+    expect(login.status).toBe(404);
     expect(loginBody).toMatchObject({
-      error: 'invalid_credentials',
-      outcome: { code: 'invalid_credentials' },
+      error: 'auth_unavailable',
+      outcome: { code: 'auth_unavailable' },
     });
-    expect(JSON.stringify(loginBody)).not.toContain('Unknown_Dragons');
+    expect(loginBody).not.toHaveProperty('token');
+    expect(JSON.stringify(loginBody)).not.toContain('Anastasia_Dragons');
     expect(JSON.stringify(loginBody)).not.toContain(ANASTASIA_MEMBER_ID);
   });
 

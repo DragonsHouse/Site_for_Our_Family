@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { FamilyAuthError, authErrorMessage } from '../auth/auth-errors.js';
 import { familyAuthOutcomeCode, sendAuthOutcome } from '../auth/auth-outcomes.js';
 import { BirthdaySelfServiceError, StaticIdSelfServiceError, type FamilyAuthService } from '../auth/auth-service.js';
+import type { AppConfig } from '../config/env.js';
 import { readBearerToken, respondWithAuthError } from '../middleware/family-auth-context.js';
 import type { FamilyPermission } from '../types.js';
 
@@ -40,7 +41,7 @@ const BirthdaySelfServiceSchema = z.object({
   dateOfBirth: z.string(),
 });
 
-export function createAuthRouter(authService: FamilyAuthService | null): Router {
+export function createAuthRouter(config: AppConfig, authService: FamilyAuthService | null): Router {
   const router = Router();
 
   router.use((_request, response, next) => {
@@ -66,6 +67,10 @@ export function createAuthRouter(authService: FamilyAuthService | null): Router 
   });
 
   router.post('/auth/nickname-login', async (request, response) => {
+    if (config.nodeEnv !== 'development') {
+      sendAuthOutcome(response, 404, 'auth_unavailable', 'Authentication is unavailable.', 'auth_unavailable');
+      return;
+    }
     if (!authService) {
       sendFamilyAuthOutcome(response, 503, 'database_unavailable');
       return;

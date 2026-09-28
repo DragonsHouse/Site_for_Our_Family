@@ -12,7 +12,9 @@ import {
   finalizeBackendPayoutBatch,
   finalizeBackendPayrollPeriod,
   getBackendAccountingDashboard,
+  getBackendDiscordAccountingFeed,
   getBackendMemberAccountingReport,
+  getBackendMonthlyAccountingSummary,
   getBackendPayableSummary,
   getBackendWeeklyActivityStatus,
   listBackendPayrollPeriods,
@@ -21,7 +23,9 @@ import {
   setBackendSalaryRuleActive,
   type BackendAccountingAccrual,
   type BackendAccountingDashboard,
+  type BackendDiscordAccountingFeed,
   type BackendMemberAccountingReport,
+  type BackendMonthlyAccountingSummary,
   type BackendPayableMemberSummary,
   type BackendPayableSummary,
   type BackendPayrollPeriod,
@@ -37,13 +41,16 @@ import type { FamilyUser } from '../../../lib/family-types';
 type LoadState =
   | { status: 'loading'; message: string }
   | { status: 'error'; message: string }
-  | { status: 'ready'; dashboard: BackendAccountingDashboard; payableSummary: BackendPayableSummary; periods: BackendPayrollPeriod[]; rules: BackendSalaryRule[]; preview: BackendPayrollPreview | null; ownReport: BackendMemberAccountingReport | null; weeklyActivity: BackendWeeklyActivityStatus | null };
+  | { status: 'ready'; dashboard: BackendAccountingDashboard; payableSummary: BackendPayableSummary; periods: BackendPayrollPeriod[]; rules: BackendSalaryRule[]; preview: BackendPayrollPreview | null; ownReport: BackendMemberAccountingReport | null; weeklyActivity: BackendWeeklyActivityStatus | null; discordFeed: BackendDiscordAccountingFeed | null; monthlySummary: BackendMonthlyAccountingSummary | null };
 
 type PaymentCategoryFilter = 'all' | 'salary' | 'quests' | 'premium' | 'rewards' | 'corrections';
+type ManualPremiumCategory = 'manual' | 'activity' | 'quest_activity' | 'combat' | 'leadership' | 'top3' | 'special';
 type ProofViewerState =
   | { status: 'loading'; proofId: string; title: string; details: string[] }
   | { status: 'error'; proofId: string; title: string; details: string[]; message: string }
   | { status: 'ready'; proofId: string; dataUrl: string; title: string; details: string[] };
+
+const ACCOUNTING_REFRESH_INTERVAL_MS = 30_000;
 
 function money(value: number | null | undefined, currency = 'USD') {
   return value == null ? '-' : `${value.toLocaleString('uk-UA')} ${currency}`;
@@ -53,6 +60,10 @@ function date(value: string | null | undefined) {
   return value ? new Date(value).toLocaleDateString('uk-UA') : '-';
 }
 
+function currentUserAvatarSrc(user: FamilyUser) {
+  return user.avatarDataUrl || user.avatarUrl;
+}
+
 function sourceLabel(accrual: BackendAccountingAccrual | string) {
   const sourceType = typeof accrual === 'string' ? accrual : accrual.sourceType;
   const category = typeof accrual === 'string' ? null : typeof accrual.metadata?.category === 'string' ? accrual.metadata.category : null;
@@ -60,8 +71,9 @@ function sourceLabel(accrual: BackendAccountingAccrual | string) {
   if (sourceType === 'premium' && category === 'activity') return 'Премія за активність';
   if (sourceType === 'premium' && category === 'quest_activity') return 'Квестова премія';
   if (sourceType === 'premium' && category === 'combat') return 'Вишки / стаки';
-  if (sourceType === 'premium' && category === 'leadership') return 'Leadership premium';
+  if (sourceType === 'premium' && category === 'leadership') return 'Премія за лідерство';
   if (sourceType === 'premium' && category === 'top3') return 'TOP-3';
+  if (sourceType === 'premium' && category === 'special') return 'Рекрутери / HR';
   if (sourceType === 'premium') return 'Особиста премія';
   if (sourceType === 'reward') return 'Нагорода';
   if (sourceType === 'quest' || sourceType === 'quest_reward' || sourceType === 'quest_best_participant') return 'Квести';
@@ -75,8 +87,9 @@ const payableBreakdownLabels: Record<string, string> = {
   activityPremium: 'Премія за активність',
   questPremium: 'Квестова премія',
   combatPremium: 'Вишки / стаки',
-  leadershipPremium: 'Leadership premium',
+  leadershipPremium: 'Премія за лідерство',
   top3Premium: 'TOP-3',
+  specialPremium: 'Рекрутери / HR',
   personalPremium: 'Особиста премія',
   rewards: 'Нагорода',
   corrections: 'Корекція',
@@ -88,8 +101,53 @@ const managerHistoryTabs: Array<{ key: PaymentCategoryFilter; label: string }> =
   { key: 'salary', label: 'Зарплата' },
   { key: 'quests', label: 'Квести' },
   { key: 'premium', label: 'Премії' },
-  { key: 'rewards', label: 'Rewards' },
+  { key: 'rewards', label: 'Нагороди' },
   { key: 'corrections', label: 'Корекції' }
+];
+
+const manualPremiumCategories: Array<{ key: ManualPremiumCategory; label: string; hint: string; defaultReason: string }> = [
+  {
+    key: 'manual',
+    label: 'Особиста премія',
+    hint: 'Разова премія за рішенням керівництва.',
+    defaultReason: 'Особиста премія за рішенням старших'
+  },
+  {
+    key: 'activity',
+    label: 'Активність',
+    hint: 'За стабільну присутність і допомогу сім’ї.',
+    defaultReason: 'Премія за активність у сімейних справах'
+  },
+  {
+    key: 'quest_activity',
+    label: 'Квести',
+    hint: 'За організацію або сильну участь у квестах.',
+    defaultReason: 'Квестова премія'
+  },
+  {
+    key: 'combat',
+    label: 'Каптери / фармери',
+    hint: 'Для каптерів, фармерів, вишок, стаків і бойових активностей.',
+    defaultReason: 'Премія каптеру/фармеру за сімейну активність'
+  },
+  {
+    key: 'leadership',
+    label: 'Від старших',
+    hint: 'Виписувальна премія від старших за корисну дію або приведення людей.',
+    defaultReason: 'Виписувальна премія від старших за приведення людей'
+  },
+  {
+    key: 'top3',
+    label: 'TOP-3',
+    hint: 'Для лідерів таблиць, тижня або події.',
+    defaultReason: 'Премія TOP-3'
+  },
+  {
+    key: 'special',
+    label: 'Рекрутери / HR',
+    hint: 'За рекрутинг, адаптацію, перевірку кандидатів і супровід новачків.',
+    defaultReason: 'Премія рекрутеру/HR за приведення та адаптацію людей'
+  }
 ];
 
 function memberLabel(users: FamilyUser[], memberId: string) {
@@ -111,6 +169,18 @@ function paymentCategoryForItem(item: BackendPayoutBatchItem, accruals: BackendA
 function paymentCategoryLabel(category: PaymentCategoryFilter): string {
   if (category === 'all') return 'Інше';
   return managerHistoryTabs.find((tab) => tab.key === category)?.label ?? 'Інше';
+}
+
+function discordFeedStatusLabel(feed: BackendDiscordAccountingFeed | null): string {
+  if (!feed) return 'Discord-стрічка недоступна';
+  if (feed.status === 'synced') return `Синхронізовано ${new Date(feed.lastSyncedAt).toLocaleTimeString('uk-UA')}`;
+  if (feed.status === 'not_configured') return 'DISCORD_ACCOUNTING_CHANNEL_ID не налаштовано';
+  if (feed.status === 'unavailable') return 'Discord-сервіс недоступний';
+  return feed.error ?? 'Помилка Discord-стрічки';
+}
+
+function isImageAttachment(attachment: { contentType: string | null; filename: string }) {
+  return attachment.contentType?.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/iu.test(attachment.filename);
 }
 
 function filterPaymentHistory(
@@ -140,16 +210,17 @@ function filterPaymentHistory(
 export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUser; users: FamilyUser[] }) {
   const canView = canViewAccounting(currentUser);
   const canManage = canManageAccounting(currentUser);
-  const [state, setState] = useState<LoadState>({ status: 'loading', message: 'Loading accounting from backend...' });
+  const [state, setState] = useState<LoadState>({ status: 'loading', message: 'Завантаження...' });
   const [selectedAccrualIds, setSelectedAccrualIds] = useState<string[]>([]);
   const [mutatingKey, setMutatingKey] = useState<string | null>(null);
-  const [periodTitle, setPeriodTitle] = useState('Weekly payroll');
-  const [ruleName, setRuleName] = useState('Base salary rule');
+  const [periodTitle, setPeriodTitle] = useState('Тижнева зарплата');
+  const [ruleName, setRuleName] = useState('Правило базової зарплати');
   const [ruleAmount, setRuleAmount] = useState('');
   const [ruleMinRank, setRuleMinRank] = useState('');
   const [ruleMaxRank, setRuleMaxRank] = useState('');
   const [premiumMemberId, setPremiumMemberId] = useState(users[0]?.id ?? '');
   const [premiumAmount, setPremiumAmount] = useState('');
+  const [premiumCategory, setPremiumCategory] = useState<ManualPremiumCategory>('manual');
   const [adjustmentAmount, setAdjustmentAmount] = useState('');
   const [reason, setReason] = useState('');
   const [proofByItem, setProofByItem] = useState<Record<string, { originalFilename: string; contentType: 'image/png' | 'image/jpeg' | 'image/webp'; dataBase64: string }>>({});
@@ -160,6 +231,8 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
   const [historyPayerFilter, setHistoryPayerFilter] = useState('');
   const [historyDateFrom, setHistoryDateFrom] = useState('');
   const [historyDateTo, setHistoryDateTo] = useState('');
+  const [summaryYear, setSummaryYear] = useState(() => new Date().getFullYear());
+  const [summaryMonth, setSummaryMonth] = useState(() => new Date().getMonth() + 1);
 
   const pendingAccruals = state.status === 'ready' ? state.dashboard.pendingAccruals : [];
   const latestPeriod = state.status === 'ready' ? state.periods[0] ?? null : null;
@@ -167,6 +240,7 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
     () => pendingAccruals.filter((item) => selectedAccrualIds.includes(item.id)).reduce((total, item) => total + item.amount, 0),
     [pendingAccruals, selectedAccrualIds]
   );
+  const ownAccruals = state.status === 'ready' ? state.ownReport?.accruals ?? [] : [];
   const filteredPaymentHistory = useMemo(() => {
     if (state.status !== 'ready') return [];
     return filterPaymentHistory(
@@ -187,26 +261,36 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
     if (!canView) return;
     const controller = new AbortController();
     void load(controller.signal);
-    return () => controller.abort();
-  }, [canView, currentUser.id]);
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      void load(controller.signal, { silent: true });
+    }, ACCOUNTING_REFRESH_INTERVAL_MS);
+    return () => {
+      window.clearInterval(intervalId);
+      controller.abort();
+    };
+  }, [canManage, canView, currentUser.id, summaryMonth, summaryYear]);
 
-  async function load(signal?: AbortSignal) {
-    setState({ status: 'loading', message: 'Loading accounting from backend...' });
+  async function load(signal?: AbortSignal, options: { silent?: boolean } = {}) {
+    if (!options.silent) setState({ status: 'loading', message: 'Завантаження...' });
     try {
-      const [dashboard, payableSummary, periods, rules, ownReport, weeklyActivity] = await Promise.all([
+      const [dashboard, payableSummary, periods, rules, ownReport, weeklyActivity, discordFeed, monthlySummary] = await Promise.all([
         getBackendAccountingDashboard(signal),
         canManage ? getBackendPayableSummary(signal) : Promise.resolve({ items: [] }),
         listBackendPayrollPeriods(signal),
         listBackendSalaryRules(signal),
         getBackendMemberAccountingReport(currentUser.id, signal).catch(() => null),
-        getBackendWeeklyActivityStatus(currentUser.id, signal).catch(() => null)
+        getBackendWeeklyActivityStatus(currentUser.id, signal).catch(() => null),
+        canManage ? getBackendDiscordAccountingFeed(signal).catch(() => null) : Promise.resolve(null),
+        canManage ? getBackendMonthlyAccountingSummary(summaryYear, summaryMonth, signal).catch(() => null) : Promise.resolve(null)
       ]);
       const latest = periods.items[0] ?? null;
       const preview = latest ? await previewBackendPayrollPeriod(latest.id, signal).catch(() => null) : null;
-      setState({ status: 'ready', dashboard, payableSummary, periods: periods.items, rules: rules.items, preview, ownReport, weeklyActivity });
-      setSelectedAccrualIds([]);
+      setState({ status: 'ready', dashboard, payableSummary, periods: periods.items, rules: rules.items, preview, ownReport, weeklyActivity, discordFeed, monthlySummary });
+      if (!options.silent) setSelectedAccrualIds([]);
     } catch (error) {
       if (signal?.aborted) return;
+      if (options.silent) return;
       setState({ status: 'error', message: accountingErrorMessage(error) });
     }
   }
@@ -236,12 +320,21 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
   return (
     <section className="dh-panel rounded-3xl p-5" data-accounting-source="backend">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Бухгалтерія Dragon House</h2>
-          <p className="mt-1 text-sm text-slate-400">Accruals, payroll periods, premiums and payout batches are loaded from backend.</p>
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-amber-500/30 bg-black/35 text-sm font-bold text-amber-100">
+            {currentUserAvatarSrc(currentUser) ? (
+              <img src={currentUserAvatarSrc(currentUser) ?? undefined} alt={currentUser.displayName ?? currentUser.nickname} className="h-full w-full object-cover" />
+            ) : (
+              <span>{currentUser.nickname.slice(0, 2).toUpperCase()}</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-white">Бухгалтерія Dragon House</h2>
+            <p className="mt-1 text-sm text-slate-400">Нарахування, періоди зарплати, премії та виплатні пакети завантажуються з офіційного сервісу.</p>
+          </div>
         </div>
         <button type="button" onClick={() => void load()} disabled={state.status === 'loading'} className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-slate-200 disabled:opacity-50">
-          Retry
+          Повторити
         </button>
       </div>
 
@@ -249,18 +342,20 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
       {state.status === 'error' ? (
         <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
           {state.message}
-          <button type="button" onClick={() => void load()} className="ml-3 rounded-lg border border-red-300/30 px-3 py-1 text-xs">Retry</button>
+          <button type="button" onClick={() => void load()} className="ml-3 rounded-lg border border-red-300/30 px-3 py-1 text-xs">Повторити</button>
         </div>
       ) : null}
 
       {state.status === 'ready' ? (
         <div className="mt-5 space-y-5">
           <div className="grid gap-3 md:grid-cols-4">
-            <SummaryCard label="Payable" value={money(state.ownReport?.totals.payable ?? 0, state.ownReport?.totals.currency)} />
-            <SummaryCard label="Paid" value={money(state.ownReport?.totals.paid ?? 0, state.ownReport?.totals.currency)} />
-            <SummaryCard label="Salary" value={money(state.ownReport?.bySource.salary ?? 0, state.ownReport?.totals.currency)} />
-            <SummaryCard label="Premiums" value={money(state.ownReport?.bySource.premium ?? 0, state.ownReport?.totals.currency)} />
+            <SummaryCard label="До виплати" value={money(state.ownReport?.totals.payable ?? 0, state.ownReport?.totals.currency)} />
+            <SummaryCard label="Виплачено" value={money(state.ownReport?.totals.paid ?? 0, state.ownReport?.totals.currency)} />
+            <SummaryCard label="Зарплата" value={money(state.ownReport?.bySource.salary ?? 0, state.ownReport?.totals.currency)} />
+            <SummaryCard label="Премії" value={money(state.ownReport?.bySource.premium ?? 0, state.ownReport?.totals.currency)} />
           </div>
+
+          {canManage ? <DiscordAccountingFeedPanel feed={state.discordFeed} /> : null}
 
           {state.weeklyActivity ? (
             <section className={`rounded-2xl border p-4 ${state.weeklyActivity.eligible ? 'border-emerald-400/25 bg-emerald-500/10' : 'border-amber-400/25 bg-amber-500/10'}`}>
@@ -275,7 +370,7 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                 <div className="mt-3 space-y-2 text-sm text-amber-100">
                   <p>⚠️ Тижнева активність не виконана</p>
                   <p>Для отримання базової зарплати потрібно виконати хоча б 1 сімейний квест або взяти участь хоча б в 1 вишці/стаку протягом тижня.</p>
-                  <p>Якщо ви кудись від’їхали або тимчасово зайняті — напишіть Старшим драконам, щоб вони знали, що з вами все добре ❤️</p>
+                  <p>Якщо ви кудись від’їхали або тимчасово зайняті, напишіть Старшим драконам, щоб вони знали, що з вами все добре.</p>
                 </div>
               )}
             </section>
@@ -289,9 +384,10 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                 <SummaryCard label="Квести" value={money(state.ownReport.weeklyEarnings.categories.quests, state.ownReport.weeklyEarnings.currency)} />
                 <SummaryCard label="Активність" value={money(state.ownReport.weeklyEarnings.categories.activityPremium, state.ownReport.weeklyEarnings.currency)} />
                 <SummaryCard label="Квестова премія" value={money(state.ownReport.weeklyEarnings.categories.questPremium, state.ownReport.weeklyEarnings.currency)} />
-                <SummaryCard label="Вишки / Стаки" value={money(state.ownReport.weeklyEarnings.categories.combatPremium, state.ownReport.weeklyEarnings.currency)} />
-                <SummaryCard label="Leadership premium" value={money(state.ownReport.weeklyEarnings.categories.leadershipPremium, state.ownReport.weeklyEarnings.currency)} />
+                <SummaryCard label="Вишки / стаки" value={money(state.ownReport.weeklyEarnings.categories.combatPremium, state.ownReport.weeklyEarnings.currency)} />
+                <SummaryCard label="Премія за лідерство" value={money(state.ownReport.weeklyEarnings.categories.leadershipPremium, state.ownReport.weeklyEarnings.currency)} />
                 <SummaryCard label="TOP-3" value={money(state.ownReport.weeklyEarnings.categories.top3Premium, state.ownReport.weeklyEarnings.currency)} />
+                <SummaryCard label="Рекрутери / HR" value={money(state.ownReport.weeklyEarnings.categories.specialPremium, state.ownReport.weeklyEarnings.currency)} />
                 <SummaryCard label="Особисті премії" value={money(state.ownReport.weeklyEarnings.categories.personalPremium, state.ownReport.weeklyEarnings.currency)} />
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -303,14 +399,25 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
           ) : null}
 
           {canManage ? (
+            <MonthlyAccountingSummaryPanel
+              summary={state.monthlySummary}
+              month={summaryMonth}
+              year={summaryYear}
+              onMonthChange={setSummaryMonth}
+              onYearChange={setSummaryYear}
+              onReload={() => void load()}
+            />
+          ) : null}
+
+          {canManage ? (
             <div className="grid gap-4 xl:grid-cols-2">
               <section className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 xl:col-span-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="font-semibold text-white">Потрібно виплатити</h3>
-                    <p className="mt-1 text-xs text-amber-100/80">Backend grouped payable summary. No frontend recalculation.</p>
+                    <p className="mt-1 text-xs text-amber-100/80">Зведення до виплати завантажується з офіційного сервісу без перерахунку на клієнті.</p>
                   </div>
-                  <span className="rounded-full border border-amber-300/30 px-3 py-1 text-xs text-amber-100">{state.payableSummary.items.length} members</span>
+                  <span className="rounded-full border border-amber-300/30 px-3 py-1 text-xs text-amber-100">{state.payableSummary.items.length} учасників</span>
                 </div>
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                   {state.payableSummary.items.map((item) => (
@@ -330,7 +437,7 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
               </section>
 
               <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                <h3 className="font-semibold text-white">Payroll foundation</h3>
+                <h3 className="font-semibold text-white">Періоди зарплати</h3>
                 <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
                   <input value={periodTitle} onChange={(event) => setPeriodTitle(event.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
                   <button
@@ -340,18 +447,18 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                       periodType: 'weekly',
                       startsAt: startOfCurrentWeek(),
                       endsAt: endOfCurrentWeek(),
-                      title: periodTitle.trim() || 'Weekly payroll'
+                      title: periodTitle.trim() || 'Тижнева зарплата'
                     }))}
                     className="rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-sm font-semibold text-amber-100 disabled:opacity-50"
                   >
-                    Create period
+                    Створити період
                   </button>
                 </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <input value={ruleName} onChange={(event) => setRuleName(event.target.value)} placeholder="Rule name" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
-                  <input value={ruleAmount} onChange={(event) => setRuleAmount(event.target.value.replace(/[^\d.]/g, ''))} placeholder="Amount" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
-                  <input value={ruleMinRank} onChange={(event) => setRuleMinRank(event.target.value.replace(/\D/g, ''))} placeholder="Min rank" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
-                  <input value={ruleMaxRank} onChange={(event) => setRuleMaxRank(event.target.value.replace(/\D/g, ''))} placeholder="Max rank" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
+                  <input value={ruleName} onChange={(event) => setRuleName(event.target.value)} placeholder="Назва правила" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
+                  <input value={ruleAmount} onChange={(event) => setRuleAmount(event.target.value.replace(/[^\d.]/g, ''))} placeholder="Сума" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
+                  <input value={ruleMinRank} onChange={(event) => setRuleMinRank(event.target.value.replace(/\D/g, ''))} placeholder="Мін. ранг" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
+                  <input value={ruleMaxRank} onChange={(event) => setRuleMaxRank(event.target.value.replace(/\D/g, ''))} placeholder="Макс. ранг" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
@@ -359,7 +466,7 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                     disabled={!Number(ruleAmount) || (!ruleMinRank && !ruleMaxRank) || Boolean(mutatingKey)}
                     onClick={() => void mutate('salary-rule', () => createBackendSalaryRule({
                       ruleKey: `base-rank-${ruleMinRank || 'any'}-${ruleMaxRank || 'any'}-${Date.now()}`,
-                      name: ruleName.trim() || 'Base salary rule',
+                      name: ruleName.trim() || 'Правило базової зарплати',
                       ruleType: 'base_salary',
                       basis: 'rank',
                       amount: Number(ruleAmount),
@@ -370,13 +477,13 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                     }))}
                     className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:opacity-50"
                   >
-                    Add base rule
+                    Додати базове правило
                   </button>
-                  <button type="button" disabled={!latestPeriod || Boolean(mutatingKey)} onClick={() => latestPeriod && void mutate('calculate', () => calculateBackendPayrollPeriod(latestPeriod.id))} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:opacity-50">Calculate</button>
-                  <button type="button" disabled={!latestPeriod || Boolean(mutatingKey)} onClick={() => latestPeriod && void mutate('finalize', () => finalizeBackendPayrollPeriod(latestPeriod.id))} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:opacity-50">Finalize</button>
+                  <button type="button" disabled={!latestPeriod || Boolean(mutatingKey)} onClick={() => latestPeriod && void mutate('calculate', () => calculateBackendPayrollPeriod(latestPeriod.id))} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:opacity-50">Розрахувати</button>
+                  <button type="button" disabled={!latestPeriod || Boolean(mutatingKey)} onClick={() => latestPeriod && void mutate('finalize', () => finalizeBackendPayrollPeriod(latestPeriod.id))} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:opacity-50">Зафіксувати</button>
                 </div>
                 <div className="mt-4 grid gap-2">
-                  <h4 className="text-sm font-semibold text-slate-200">Salary Rules</h4>
+                  <h4 className="text-sm font-semibold text-slate-200">Правила зарплати</h4>
                   {state.rules.map((rule) => (
                     <div key={rule.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 p-3 text-sm">
                       <span>
@@ -384,28 +491,46 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                         <span className="block text-slate-400">{rule.ruleType} - {rule.basis} - v{rule.version} - {money(rule.amount, rule.currency)}</span>
                       </span>
                       <button type="button" disabled={Boolean(mutatingKey)} onClick={() => void mutate(`rule-${rule.id}`, () => setBackendSalaryRuleActive(rule.id, !rule.active))} className="rounded-lg border border-white/10 px-3 py-1 text-xs text-slate-200 disabled:opacity-50">
-                        {rule.active ? 'Disable' : 'Enable'}
+                        {rule.active ? 'Вимкнути' : 'Увімкнути'}
                       </button>
                     </div>
                   ))}
-                  {!state.rules.length ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-500">No salary rules configured.</div> : null}
+                  {!state.rules.length ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-500">Даних поки немає</div> : null}
                 </div>
               </section>
 
               <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                <h3 className="font-semibold text-white">Premium / adjustment</h3>
+                <h3 className="font-semibold text-white">Премія / корекція</h3>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <select value={premiumMemberId} onChange={(event) => setPremiumMemberId(event.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100">
                     {users.map((user) => <option key={user.id} value={user.id}>{memberLabel(users, user.id)}</option>)}
                   </select>
+                  <select
+                    value={premiumCategory}
+                    onChange={(event) => {
+                      const nextCategory = event.target.value as ManualPremiumCategory;
+                      setPremiumCategory(nextCategory);
+                      if (!reason.trim()) {
+                        setReason(manualPremiumCategories.find((category) => category.key === nextCategory)?.defaultReason ?? '');
+                      }
+                    }}
+                    className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100"
+                    aria-label="Категорія премії"
+                  >
+                    {manualPremiumCategories.map((category) => (
+                      <option key={category.key} value={category.key}>{category.label}</option>
+                    ))}
+                  </select>
                   <input value={premiumAmount} onChange={(event) => setPremiumAmount(event.target.value.replace(/[^\d.-]/g, ''))} placeholder="50,000 - 500,000" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
-                  <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Reason" className="sm:col-span-2 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
+                  <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Причина" className="sm:col-span-2 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
                 </div>
-                <p className="mt-2 text-xs text-slate-500">Manual premium range: 50,000 - 500,000. It becomes payable, not paid.</p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {manualPremiumCategories.find((category) => category.key === premiumCategory)?.hint} Ручна особиста премія має бути 50 000 - 500 000. Інші категорії фіксуються як окреме нарахування до виплати.
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" disabled={!premiumMemberId || !manualPremiumAmountValid(premiumAmount) || !reason.trim() || Boolean(mutatingKey)} onClick={() => void mutate('premium', () => createBackendPremium({ familyMemberId: premiumMemberId, payrollPeriodId: latestPeriod?.id ?? null, amount: Math.abs(Number(premiumAmount)), reason: reason.trim(), sourceKey: `manual-premium:${premiumMemberId}:${Date.now()}`, category: 'manual', stackingPolicy: 'not_applicable' }))} className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50">Add premium</button>
-                  <button type="button" disabled={!premiumMemberId || !Number(adjustmentAmount || premiumAmount) || !reason.trim() || Boolean(mutatingKey)} onClick={() => void mutate('adjustment', () => createBackendAdjustment({ familyMemberId: premiumMemberId, amount: Number(adjustmentAmount || premiumAmount), reason: reason.trim(), sourceKey: `manual-adjustment:${premiumMemberId}:${Date.now()}` }))} className="rounded-xl border border-red-400/40 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-100 disabled:opacity-50">Add adjustment</button>
-                  <input value={adjustmentAmount} onChange={(event) => setAdjustmentAmount(event.target.value.replace(/[^\d.-]/g, ''))} placeholder="Adjustment override" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
+                  <button type="button" disabled={!premiumMemberId || !premiumAmountValid(premiumAmount, premiumCategory) || !reason.trim() || Boolean(mutatingKey)} onClick={() => void mutate('premium', () => createBackendPremium({ familyMemberId: premiumMemberId, payrollPeriodId: latestPeriod?.id ?? null, amount: Math.abs(Number(premiumAmount)), reason: reason.trim(), sourceKey: `${premiumCategory}-premium:${premiumMemberId}:${Date.now()}`, category: premiumCategory, stackingPolicy: premiumCategory === 'manual' ? 'not_applicable' : 'category_specific' }))} className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50">Додати премію</button>
+                  <button type="button" disabled={!premiumMemberId || !Number(adjustmentAmount || premiumAmount) || !reason.trim() || Boolean(mutatingKey)} onClick={() => void mutate('adjustment', () => createBackendAdjustment({ familyMemberId: premiumMemberId, amount: Number(adjustmentAmount || premiumAmount), reason: reason.trim(), sourceKey: `manual-adjustment:${premiumMemberId}:${Date.now()}` }))} className="rounded-xl border border-red-400/40 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-100 disabled:opacity-50">Додати корекцію</button>
+                  <input value={adjustmentAmount} onChange={(event) => setAdjustmentAmount(event.target.value.replace(/[^\d.-]/g, ''))} placeholder="Окрема сума корекції" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
                 </div>
               </section>
             </div>
@@ -415,11 +540,11 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
             <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="font-semibold text-white">Payroll Preview</h3>
-                  <p className="mt-1 text-xs text-slate-500">Preview is dry-run only. It does not create accruals.</p>
+                  <h3 className="font-semibold text-white">Попередній розрахунок зарплати</h3>
+                  <p className="mt-1 text-xs text-slate-500">Це лише перевірка. Вона не створює нарахування.</p>
                 </div>
                 <span className={`rounded-full border px-3 py-1 text-xs ${state.preview.configurationComplete ? 'border-emerald-400/30 text-emerald-100' : 'border-amber-400/30 text-amber-100'}`}>
-                  {state.preview.configurationComplete ? 'Configuration ready' : 'Configuration warnings'}
+                  {state.preview.configurationComplete ? 'Налаштування готові' : 'Є попередження в налаштуваннях'}
                 </span>
               </div>
               {state.preview.warnings.length ? (
@@ -432,14 +557,14 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                   <div key={item.familyMemberId} className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-3 text-sm md:grid-cols-[1fr_auto_auto_auto]">
                     <span>
                       <span className="block font-medium text-white">{item.displayName}</span>
-                      <span className="block text-slate-400">{item.eligible ? item.status : 'ineligible'}{item.warnings.length ? ` - ${item.warnings.join(', ')}` : ''}</span>
+                      <span className="block text-slate-400">{item.eligible ? item.status : 'не відповідає умовам'}{item.warnings.length ? ` - ${item.warnings.join(', ')}` : ''}</span>
                     </span>
-                    <span className="text-slate-300">Base {money(item.baseAmount, item.currency)}</span>
-                    <span className="text-slate-300">Modifiers {money(item.modifiersTotal, item.currency)}</span>
-                    <span className="font-semibold text-amber-100">Salary {money(item.finalSalary, item.currency)} · Premium preview {money(item.premiumPreviewTotal, item.currency)}</span>
+                    <span className="text-slate-300">База {money(item.baseAmount, item.currency)}</span>
+                    <span className="text-slate-300">Модифікатори {money(item.modifiersTotal, item.currency)}</span>
+                    <span className="font-semibold text-amber-100">Зарплата {money(item.finalSalary, item.currency)} · Попередні премії {money(item.premiumPreviewTotal, item.currency)}</span>
                   </div>
                 ))}
-                {!state.preview.items.length ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-500">No eligible active members in preview.</div> : null}
+                {!state.preview.items.length ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-500">Даних поки немає.</div> : null}
               </div>
             </section>
           ) : null}
@@ -447,12 +572,12 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
           <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="font-semibold text-white">Pending / payable accruals</h3>
-                <p className="mt-1 text-xs text-slate-500">Backend [] means there are no payable accruals.</p>
+                <h3 className="font-semibold text-white">Очікують виплати</h3>
+                <p className="mt-1 text-xs text-slate-500">Якщо список порожній, зараз немає нарахувань до виплати.</p>
               </div>
               {canManage ? (
                 <button type="button" disabled={!selectedAccrualIds.length || Boolean(mutatingKey)} onClick={() => void mutate('batch', () => createBackendPayoutBatch({ payrollPeriodId: latestPeriod?.id ?? null, title: `Payout ${new Date().toLocaleDateString('uk-UA')}`, accrualIds: selectedAccrualIds }))} className="rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-sm font-semibold text-amber-100 disabled:opacity-50">
-                  Create batch: {money(selectedTotal)}
+                  Створити пакет: {money(selectedTotal)}
                 </button>
               ) : null}
             </div>
@@ -467,17 +592,17 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                   onToggle={() => setSelectedAccrualIds((current) => current.includes(accrual.id) ? current.filter((id) => id !== accrual.id) : [...current, accrual.id])}
                 />
               ))}
-              {!pendingAccruals.length ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-500">No pending accruals.</div> : null}
+              {!pendingAccruals.length ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-500">Даних поки немає.</div> : null}
             </div>
           </section>
 
           <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
-            <h3 className="font-semibold text-white">Payout batches</h3>
+            <h3 className="font-semibold text-white">Пакети виплат</h3>
             <div className="mt-3 grid gap-2">
               {state.dashboard.payoutBatches.map((batch) => (
                 <BatchRow key={batch.id} batch={batch} canManage={canManage} mutating={Boolean(mutatingKey)} onFinalize={() => void mutate(`finalize-${batch.id}`, () => finalizeBackendPayoutBatch(batch.id))} />
               ))}
-              {!state.dashboard.payoutBatches.length ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-500">No payout batches.</div> : null}
+              {!state.dashboard.payoutBatches.length ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-500">Даних поки немає.</div> : null}
             </div>
           </section>
 
@@ -502,60 +627,16 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
               setProofByItem={setProofByItem}
               setProofPreviewByItem={setProofPreviewByItem}
               onConfirm={(item) => void mutate(`paid-${item.id}`, () => confirmBackendPayoutItemPaid(item.payoutBatchId, item.id, { proof: proofByItem[item.id], idempotencyKey: `proof:${item.id}` }))}
-              onOpenProof={(item) => void openProofViewer(item, memberLabel(users, item.familyMemberId), paymentCategoryLabel(paymentCategoryForItem(item, state.ownReport.accruals)), setProofViewer)}
+              onOpenProof={(item) => void openProofViewer(item, memberLabel(users, item.familyMemberId), paymentCategoryLabel(paymentCategoryForItem(item, ownAccruals)), setProofViewer)}
             />
           ) : null}
 
-          {false && canManage && state.ownReport?.payoutHistory.length ? (
-            <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
-              <h3 className="font-semibold text-white">Payment history / proof</h3>
-              <div className="mt-3 grid gap-2">
-                {state.ownReport.payoutHistory.map((item) => (
-                  <div key={item.id} className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <span>
-                        <span className="block font-medium text-white">{item.status === 'paid' ? '✅ Виплачено' : 'Очікує виплати'} - {money(item.totalAmount, item.currency)}</span>
-                        <span className="block text-slate-400">{item.payerNicknameSnapshot ? `Виплатив: ${item.payerNicknameSnapshot}; Роль: ${item.payerRoleSnapshot ?? '-'}` : 'Proof required before paid confirmation'}</span>
-                      </span>
-                      {item.status !== 'paid' ? (
-                        <span className="flex flex-wrap items-center gap-2">
-                          <ProofInput
-                            itemId={item.id}
-                            preview={proofPreviewByItem[item.id] ?? null}
-                            onReady={(proof, preview) => {
-                              setProofByItem((current) => ({ ...current, [item.id]: proof }));
-                              setProofPreviewByItem((current) => ({ ...current, [item.id]: preview }));
-                            }}
-                            onRemove={() => {
-                              setProofByItem((current) => {
-                                const next = { ...current };
-                                delete next[item.id];
-                                return next;
-                              });
-                              setProofPreviewByItem((current) => {
-                                const next = { ...current };
-                                delete next[item.id];
-                                return next;
-                              });
-                            }}
-                          />
-                          <button type="button" disabled={!proofByItem[item.id] || Boolean(mutatingKey)} onClick={() => void mutate(`paid-${item.id}`, () => confirmBackendPayoutItemPaid(item.payoutBatchId, item.id, { proof: proofByItem[item.id], idempotencyKey: `proof:${item.id}` }))} className="rounded-lg border border-emerald-400/30 px-3 py-1 text-xs text-emerald-100 disabled:opacity-50">Підтвердити виплату</button>
-                        </span>
-                      ) : item.paymentProofId ? (
-                        <button type="button" disabled={Boolean(mutatingKey)} onClick={() => void openProofViewer(item, setProofViewer, setMutatingKey)} className="rounded-lg border border-white/10 px-3 py-1 text-xs text-slate-200 disabled:opacity-50">Переглянути підтвердження</button>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
           {proofViewer ? (
             <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" onClick={() => setProofViewer(null)}>
               <div className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-2xl border border-amber-300/20 bg-slate-950 p-4 shadow-2xl shadow-amber-950/40" onClick={(event) => event.stopPropagation()}>
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="font-semibold text-white">{proofViewer.title}</h3>
-                  <button type="button" aria-label="Close proof viewer" onClick={() => setProofViewer(null)} className="rounded-lg border border-white/10 px-3 py-1 text-sm text-slate-200">Close</button>
+                  <button type="button" aria-label="Закрити перегляд підтвердження" onClick={() => setProofViewer(null)} className="rounded-lg border border-white/10 px-3 py-1 text-sm text-slate-200">Закрити</button>
                 </div>
                 <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
                   <div className="grid min-h-64 place-items-center rounded-xl border border-white/10 bg-black/30 p-2">
@@ -563,7 +644,7 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                     {proofViewer.status === 'error' ? (
                       <div className="space-y-3 text-center text-sm text-red-100">
                         <p>{proofViewer.message}</p>
-                        <button type="button" onClick={() => void retryProofViewer(proofViewer, setProofViewer)} className="rounded-lg border border-red-300/30 px-3 py-1 text-xs">Retry</button>
+                        <button type="button" onClick={() => void retryProofViewer(proofViewer, setProofViewer)} className="rounded-lg border border-red-300/30 px-3 py-1 text-xs">Повторити</button>
                       </div>
                     ) : null}
                     {proofViewer.status === 'ready' ? <img src={proofViewer.dataUrl} alt={proofViewer.title} className="max-h-[72vh] w-full rounded-xl object-contain" /> : null}
@@ -577,6 +658,190 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
           ) : null}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function MonthlyAccountingSummaryPanel({
+  summary,
+  month,
+  year,
+  onMonthChange,
+  onYearChange,
+  onReload
+}: {
+  summary: BackendMonthlyAccountingSummary | null;
+  month: number;
+  year: number;
+  onMonthChange: Dispatch<SetStateAction<number>>;
+  onYearChange: Dispatch<SetStateAction<number>>;
+  onReload: () => void;
+}) {
+  const years = Array.from({ length: 7 }, (_, index) => new Date().getFullYear() - 3 + index);
+  const months = [
+    'Січень',
+    'Лютий',
+    'Березень',
+    'Квітень',
+    'Травень',
+    'Червень',
+    'Липень',
+    'Серпень',
+    'Вересень',
+    'Жовтень',
+    'Листопад',
+    'Грудень'
+  ];
+  const discordGap = summary ? summary.quests.completedCount - summary.quests.withDiscordProjectionCount : 0;
+
+  return (
+    <section className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h3 className="font-semibold text-white">Бухгалтерія за місяць</h3>
+          <p className="mt-1 text-xs text-sky-100/80">
+            Місячний зріз бере гроші, завершені квести й Discord projection з офіційної бази. Discord-стрічка нижче лишається доказовим шаром, а не джерелом paid/approved.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select value={month} onChange={(event) => onMonthChange(Number(event.target.value))} className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" aria-label="Місяць бухгалтерії">
+            {months.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}
+          </select>
+          <select value={year} onChange={(event) => onYearChange(Number(event.target.value))} className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" aria-label="Рік бухгалтерії">
+            {years.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <button type="button" onClick={onReload} className="rounded-xl border border-sky-300/30 px-3 py-2 text-sm text-sky-100">Оновити</button>
+        </div>
+      </div>
+
+      {!summary ? (
+        <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-300">
+          Не вдалося завантажити місячну бухгалтерію. Перевір backend і права доступу.
+        </div>
+      ) : (
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-2 md:grid-cols-4">
+            <SummaryCard label="Прибуток" value={money(summary.totals.income, summary.currency)} />
+            <SummaryCard label="Витрати" value={money(summary.totals.expenses, summary.currency)} />
+            <SummaryCard label="Чистий баланс" value={money(summary.totals.net, summary.currency)} />
+            <SummaryCard label="Завершено квестів" value={String(summary.quests.completedCount)} />
+          </div>
+          <div className="grid gap-2 md:grid-cols-4">
+            <SummaryCard label="Прибуток сім’ї з квестів" value={money(summary.totals.questFamilyIncome, summary.currency)} />
+            <SummaryCard label="Нагороди учасникам" value={money(summary.totals.questMemberRewards, summary.currency)} />
+            <SummaryCard label="Усього по квестах" value={money(summary.totals.questTotalRewards, summary.currency)} />
+            <SummaryCard label="Discord projection" value={`${summary.quests.withDiscordProjectionCount}/${summary.quests.completedCount}`} />
+          </div>
+          {discordGap > 0 ? (
+            <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+              Є reconciliation gap: {discordGap} завершених квестів за цей місяць не мають збереженої Discord projection у базі.
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 xl:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <h4 className="text-sm font-semibold text-white">TOP-3 по квестах</h4>
+              <div className="mt-2 grid gap-2">
+                {summary.quests.topMembers.map((member, index) => (
+                  <div key={`${member.familyMemberId ?? member.displayName}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm">
+                    <span className="min-w-0 truncate text-slate-100">{index + 1}. {member.displayName}</span>
+                    <span className="shrink-0 text-amber-100">{member.completedQuests} квестів · {money(member.earnedAmount, summary.currency)}</span>
+                  </div>
+                ))}
+                {!summary.quests.topMembers.length ? <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-sm text-slate-400">За цей місяць немає учасників у завершених квестах.</div> : null}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <h4 className="text-sm font-semibold text-white">Останні рухи грошей</h4>
+              <div className="mt-2 grid max-h-72 gap-2 overflow-y-auto pr-1">
+                {summary.transactions.slice(0, 12).map((transaction) => (
+                  <div key={transaction.id} className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-slate-100">{transaction.reason}</span>
+                      <span className={transaction.type === 'income' ? 'text-emerald-100' : 'text-amber-100'}>{money(transaction.amount, transaction.currency)}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {date(transaction.createdAt)} · {transaction.type} {transaction.memberName ? `· ${transaction.memberName}` : ''} {transaction.questTitle ? `· ${transaction.questTitle}` : ''}
+                    </div>
+                  </div>
+                ))}
+                {!summary.transactions.length ? <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-sm text-slate-400">За цей місяць рухів грошей ще немає.</div> : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <h4 className="text-sm font-semibold text-white">Квести за місяць</h4>
+            <div className="mt-2 grid max-h-80 gap-2 overflow-y-auto pr-1">
+              {summary.quests.items.map((quest) => (
+                <div key={quest.id} className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <span className="font-medium text-white">{quest.title}</span>
+                    <span className="text-amber-100">{money(quest.totalReward, summary.currency)}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-400">
+                    {date(quest.completedAt)} · учасники {quest.participantCount} · помічники {quest.helperCount} · сім’ї {money(quest.familyReward, summary.currency)} · людям {money(quest.memberRewardPool, summary.currency)}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {quest.discordMessageId ? 'Discord projection є' : 'Discord projection не знайдено'}
+                  </div>
+                </div>
+              ))}
+              {!summary.quests.items.length ? <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-sm text-slate-400">За цей місяць завершених квестів ще немає.</div> : null}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DiscordAccountingFeedPanel({ feed }: { feed: BackendDiscordAccountingFeed | null }) {
+  const imageCount = feed?.items.reduce((total, item) => total + item.attachments.filter(isImageAttachment).length, 0) ?? 0;
+  return (
+    <section className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="font-semibold text-white">Discord accounting feed</h3>
+          <p className="mt-1 text-xs text-sky-100/80">{discordFeedStatusLabel(feed)}</p>
+        </div>
+        <span className="rounded-full border border-sky-300/30 px-3 py-1 text-xs text-sky-100">
+          {feed?.items.length ?? 0} messages / {imageCount} photos
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {feed?.items.slice(0, 5).map((item) => (
+          <article key={item.externalId} className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <span>
+                <span className="block font-medium text-white">{item.authorName}</span>
+                <span className="block text-xs text-slate-500">{new Date(item.createdAt).toLocaleString('uk-UA')}</span>
+              </span>
+              <span className="text-xs text-sky-100">{item.attachmentCount} files</span>
+            </div>
+            {item.content ? <p className="mt-2 whitespace-pre-wrap text-slate-300">{item.content}</p> : null}
+            {item.attachments.length ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {item.attachments.map((attachment) => (
+                  isImageAttachment(attachment) ? (
+                    <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-white/10 bg-black/30">
+                      <img src={attachment.proxyUrl ?? attachment.url} alt={attachment.filename} className="h-32 w-full object-cover" />
+                      <span className="block truncate px-2 py-1 text-xs text-slate-300">{attachment.filename}</span>
+                    </a>
+                  ) : (
+                    <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-xs text-slate-300">
+                      {attachment.filename}
+                    </a>
+                  )
+                ))}
+              </div>
+            ) : null}
+          </article>
+        ))}
+        {feed && feed.items.length === 0 ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-400">No Discord accounting messages yet.</div> : null}
+        {!feed ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-400">Discord accounting feed did not load.</div> : null}
+      </div>
     </section>
   );
 }
@@ -709,7 +974,7 @@ function PaymentHistoryManager({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-semibold text-white">Історія виплат</h3>
-          <p className="mt-1 text-xs text-slate-500">Payment history tabs and filters are presentation-only.</p>
+          <p className="mt-1 text-xs text-slate-500">Фільтри працюють по категорії, учаснику, виплатнику та датах.</p>
         </div>
         <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">{items.length} records</span>
       </div>
@@ -721,8 +986,8 @@ function PaymentHistoryManager({
         ))}
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-4">
-        <input value={memberFilter} onChange={(event) => onMemberFilterChange(event.target.value)} placeholder="Member" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" aria-label="Payment history member filter" />
-        <input value={payerFilter} onChange={(event) => onPayerFilterChange(event.target.value)} placeholder="Payer" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" aria-label="Payment history payer filter" />
+        <input value={memberFilter} onChange={(event) => onMemberFilterChange(event.target.value)} placeholder="Учасник" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" aria-label="Фільтр історії виплат за учасником" />
+        <input value={payerFilter} onChange={(event) => onPayerFilterChange(event.target.value)} placeholder="Хто виплатив" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" aria-label="Фільтр історії виплат за виплатником" />
         <input type="date" value={dateFrom} onChange={(event) => onDateFromChange(event.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
         <input type="date" value={dateTo} onChange={(event) => onDateToChange(event.target.value)} className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100" />
       </div>
@@ -792,7 +1057,7 @@ function PaymentHistoryRow({
           <span className="block text-xs text-amber-100">{paymentCategoryLabel(category)}</span>
           <span className="block font-medium text-white">{item.status === 'paid' ? '✅ Виплачено' : '⏳ Очікує виплати'} - {money(item.totalAmount, item.currency)}</span>
           <span className="block text-slate-400">Кому: {memberName} · {item.paidAt ? date(item.paidAt) : '-'}</span>
-          <span className="block text-slate-400">{item.payerNicknameSnapshot ? `Виплатив: ${item.payerNicknameSnapshot}; Роль: ${item.payerRoleSnapshot ?? '-'}` : 'Proof required before paid confirmation'}</span>
+          <span className="block text-slate-400">{item.payerNicknameSnapshot ? `Виплатив: ${item.payerNicknameSnapshot}; Роль: ${item.payerRoleSnapshot ?? '-'}` : 'Потрібне підтвердження перед позначкою виплати'}</span>
         </span>
         {item.status !== 'paid' ? (
           <span className="flex flex-wrap items-center gap-2">
@@ -802,7 +1067,7 @@ function PaymentHistoryRow({
         ) : item.paymentProofId ? (
           <button type="button" disabled={mutating} onClick={onOpenProof} className="rounded-lg border border-white/10 px-3 py-1 text-xs text-slate-200 disabled:opacity-50">Переглянути підтвердження</button>
         ) : (
-          <span className="text-xs text-slate-500">No proof attached</span>
+          <span className="text-xs text-slate-500">Підтвердження не прикріплено</span>
         )}
       </div>
     </div>
@@ -928,6 +1193,12 @@ function manualPremiumAmountValid(value: string) {
   return Number.isFinite(amount) && amount >= 50000 && amount <= 500000;
 }
 
+function premiumAmountValid(value: string, category: ManualPremiumCategory) {
+  const amount = Math.abs(Number(value));
+  if (!Number.isFinite(amount) || amount <= 0) return false;
+  return category === 'manual' ? manualPremiumAmountValid(value) : true;
+}
+
 async function readProofFile(file: File | null): Promise<{
   proof: { originalFilename: string; contentType: 'image/png' | 'image/jpeg' | 'image/webp'; dataBase64: string };
   preview: { filename: string; size: number; dataUrl: string };
@@ -956,9 +1227,9 @@ async function readProofFile(file: File | null): Promise<{
 
 function accountingErrorMessage(error: unknown) {
   if (error instanceof FamilyAccountingApiError) {
-    if (error.code === 'BACKEND_UNAVAILABLE') return 'Accounting backend is unavailable. No local fallback is used.';
-    if (error.code === 'ACCOUNTING_PERMISSION_DENIED') return 'No permission for accounting action.';
+    if (error.code === 'BACKEND_UNAVAILABLE') return 'Не вдалося завантажити дані обліку. Локальна підміна не використовується.';
+    if (error.code === 'ACCOUNTING_PERMISSION_DENIED') return 'Немає прав для дії в обліку.';
     return error.message;
   }
-  return error instanceof Error ? error.message : 'Accounting request failed.';
+  return error instanceof Error ? error.message : 'Не вдалося виконати дію в обліку.';
 }

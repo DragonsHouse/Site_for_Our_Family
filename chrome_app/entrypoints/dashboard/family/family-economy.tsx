@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { canManageFamilyEconomy } from '../../../lib/family-permissions';
 import {
-  readFamilyEconomyEntries,
-  saveFamilyEconomyEntries
-} from '../../../lib/family-repositories';
+  archiveFamilyTreasuryEntry,
+  createFamilyTreasuryEntry,
+  listFamilyTreasuryEntries,
+  updateFamilyTreasuryEntry
+} from '../../../lib/family-treasury-backend-client';
 import type { FamilyEconomyCategory, FamilyEconomyEntry, FamilyUser } from '../../../lib/family-types';
 
 const CATEGORY_LABELS: Record<FamilyEconomyCategory | 'all', string> = {
@@ -16,14 +18,34 @@ const CATEGORY_LABELS: Record<FamilyEconomyCategory | 'all', string> = {
 };
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as Array<FamilyEconomyCategory | 'all'>;
+const SAVE_ERROR = 'Не вдалося зберегти дані.';
 
 export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
-  const [entries, setEntries] = useState<FamilyEconomyEntry[]>(() => readFamilyEconomyEntries());
+  const [entries, setEntries] = useState<FamilyEconomyEntry[]>([]);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<FamilyEconomyCategory | 'all'>('all');
   const [draftTitle, setDraftTitle] = useState('');
   const [draftCategory, setDraftCategory] = useState<FamilyEconomyCategory>('shops');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const canManage = canManageFamilyEconomy(currentUser);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsLoading(true);
+    setError(null);
+    listFamilyTreasuryEntries(controller.signal)
+      .then((result) => setEntries(result.items))
+      .catch((loadError) => {
+        if (controller.signal.aborted) return;
+        setError(loadError instanceof Error ? loadError.message : 'Не вдалося завантажити дані.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   const filteredEntries = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -37,41 +59,70 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
     });
   }, [category, entries, query]);
 
-  function persist(nextEntries: FamilyEconomyEntry[]) {
-    saveFamilyEconomyEntries(nextEntries);
-    setEntries(nextEntries);
+  async function reload() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await listFamilyTreasuryEntries();
+      setEntries(result.items);
+    } catch (reloadError) {
+      setError(reloadError instanceof Error ? reloadError.message : 'Не вдалося завантажити дані.');
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  function addEntry() {
+  async function addEntry() {
     const title = draftTitle.trim();
-    if (!title) return;
-    const now = new Date().toISOString();
-    const nextEntry: FamilyEconomyEntry = {
-      id: `economy-${Date.now()}`,
-      category: draftCategory,
-      title,
-      locationNumber: null,
-      locationReference: null,
-      description: 'Локальний запис Dragon House. Опис можна деталізувати на наступному етапі.',
-      price: null,
-      note: null,
-      createdBy: currentUser.nickname,
-      createdAt: now,
-      updatedAt: now,
-      isActive: true
-    };
-    persist([nextEntry, ...entries]);
-    setDraftTitle('');
+    if (!title || isSaving) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      const created = await createFamilyTreasuryEntry({
+        category: draftCategory,
+        title,
+        description: 'Новий запис Скарбниці Dragon House.',
+      });
+      setEntries((current) => [created, ...current]);
+      setDraftTitle('');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : SAVE_ERROR);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function deactivateEntry(entryId: string) {
-    persist(
-      entries.map((entry) =>
-        entry.id === entryId
-          ? { ...entry, isActive: false, updatedAt: new Date().toISOString() }
-          : entry
-      )
+  async function deactivateEntry(entryId: string) {
+    if (isSaving) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      const archived = await archiveFamilyTreasuryEntry(entryId);
+      setEntries((current) => current.map((entry) => (entry.id === entryId ? archived : entry)));
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : SAVE_ERROR);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function updateEntry(
+    entryId: string,
+    updates: Partial<Pick<FamilyEconomyEntry, 'category' | 'title' | 'locationNumber' | 'locationReference' | 'description' | 'price' | 'note'>>
+  ) {
+    const previous = entries;
+    const optimistic = entries.map((entry) =>
+      entry.id === entryId ? { ...entry, ...updates, updatedAt: new Date().toISOString() } : entry
     );
+    setEntries(optimistic);
+    setError(null);
+    try {
+      const updated = await updateFamilyTreasuryEntry(entryId, updates);
+      setEntries((current) => current.map((entry) => (entry.id === entryId ? updated : entry)));
+    } catch (saveError) {
+      setEntries(previous);
+      setError(saveError instanceof Error ? saveError.message : SAVE_ERROR);
+    }
   }
 
   return (
@@ -80,15 +131,24 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
         <div>
           <h2 className="text-lg font-semibold text-white">Скарбниця Dragon House</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Це не бухгалтерія. Це сімейна база економії: місця, де можна витратити менше і отримати більше.
+            Це сімейна база ресурсів: паливо, одяг, зброя, магазини та інші корисні точки.
           </p>
         </div>
         {canManage ? (
           <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-            Доступно: додати запис, деактивувати. Повне редагування полів підготовлено для наступного етапу.
+            Доступно: додати, редагувати або архівувати запис.
           </div>
         ) : null}
       </div>
+
+      {error ? (
+        <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+          {error}
+          <button type="button" onClick={() => void reload()} className="ml-3 underline">
+            Спробувати ще раз
+          </button>
+        </div>
+      ) : null}
 
       {canManage ? (
         <div className="mt-4 grid gap-3 md:grid-cols-[220px_1fr_auto]">
@@ -107,12 +167,12 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
             value={draftTitle}
             onChange={(event) => setDraftTitle(event.target.value)}
             className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-            placeholder="Новий запис, наприклад: Магазин #30"
+            placeholder="Новий запис, наприклад: Магазин №30"
           />
           <button
             type="button"
-            onClick={addEntry}
-            disabled={!draftTitle.trim()}
+            onClick={() => void addEntry()}
+            disabled={!draftTitle.trim() || isSaving}
             className="rounded-xl border border-amber-500/60 px-3 py-2 text-sm text-amber-100 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Додати
@@ -140,21 +200,84 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
         </select>
       </div>
 
+      {isLoading ? <div className="mt-4 text-sm text-slate-300">Завантаження...</div> : null}
+      {!isLoading && filteredEntries.length === 0 ? <div className="mt-4 text-sm text-slate-300">Даних поки немає.</div> : null}
+
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredEntries.map((entry) => (
           <article key={entry.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs uppercase tracking-[0.2em] text-amber-300">
-                  {CATEGORY_LABELS[entry.category]}
-                </div>
-                <h3 className="mt-1 text-base font-semibold text-white">{entry.title}</h3>
+              <div className="min-w-0 flex-1 space-y-2">
+                {canManage ? (
+                  <>
+                    <select
+                      value={entry.category}
+                      onChange={(event) => void updateEntry(entry.id, { category: event.target.value as FamilyEconomyCategory })}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs uppercase tracking-[0.14em] text-amber-200"
+                      aria-label="Категорія запису"
+                    >
+                      {CATEGORIES.filter((item) => item !== 'all').map((item) => (
+                        <option key={item} value={item}>
+                          {CATEGORY_LABELS[item]}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={entry.title}
+                      onChange={(event) => void updateEntry(entry.id, { title: event.target.value })}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-base font-semibold text-white"
+                      aria-label="Назва запису"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <div className="text-xs uppercase tracking-[0.2em] text-amber-300">
+                      {CATEGORY_LABELS[entry.category]}
+                    </div>
+                    <h3 className="mt-1 text-base font-semibold text-white">{entry.title}</h3>
+                  </>
+                )}
               </div>
               <span className="rounded-full border border-slate-700 px-2 py-1 text-xs text-slate-300">
                 {entry.locationNumber ?? entry.locationReference ?? 'без номера'}
               </span>
             </div>
-            <p className="mt-3 text-sm text-slate-300">{entry.description}</p>
+            {canManage ? (
+              <div className="mt-3 grid gap-2">
+                <input
+                  value={entry.locationNumber ?? ''}
+                  onChange={(event) => void updateEntry(entry.id, { locationNumber: event.target.value.trim() || null })}
+                  className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                  placeholder="Номер або коротка локація"
+                  aria-label="Номер або локація"
+                />
+                <textarea
+                  value={entry.description}
+                  onChange={(event) => void updateEntry(entry.id, { description: event.target.value })}
+                  rows={3}
+                  className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                  aria-label="Опис запису"
+                />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <input
+                    value={entry.price ?? ''}
+                    onChange={(event) => void updateEntry(entry.id, { price: event.target.value.trim() || null })}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                    placeholder="Ціна / умови"
+                    aria-label="Ціна або умови"
+                  />
+                  <input
+                    value={entry.note ?? ''}
+                    onChange={(event) => void updateEntry(entry.id, { note: event.target.value.trim() || null })}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                    placeholder="Примітка"
+                    aria-label="Примітка"
+                  />
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-slate-300">{entry.description}</p>
+            )}
             {entry.note || entry.price ? (
               <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
                 {entry.note ?? entry.price}
@@ -163,10 +286,11 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
             {canManage ? (
               <button
                 type="button"
-                onClick={() => deactivateEntry(entry.id)}
-                className="mt-3 rounded-lg border border-red-500/50 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/10"
+                onClick={() => void deactivateEntry(entry.id)}
+                disabled={isSaving}
+                className="mt-3 rounded-lg border border-red-500/50 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Деактивувати
+                Архівувати
               </button>
             ) : null}
           </article>

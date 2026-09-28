@@ -37,8 +37,8 @@ function member(input: Partial<FamilyMember> & Pick<FamilyMember, 'id' | 'nickna
     permissionsDiscord: input.permissionsDiscord ?? [],
     permissionsDenied: input.permissionsDenied ?? [],
     onboardingMetadata: {},
-    profileMetadata: {},
-    deletedAt: null,
+    profileMetadata: input.profileMetadata ?? {},
+    deletedAt: input.deletedAt ?? null,
     version: input.version ?? 1,
     createdByFamilyMemberId: null,
     updatedByFamilyMemberId: null,
@@ -120,6 +120,33 @@ describe('FamilyMemberService', () => {
     const restored = await service.restore('restored-id', 2, ownerAuth);
     expect(restored.status).toBe('active');
     expect(restored.deletedAt).toBeNull();
+  });
+
+  it('treats restore as manual approval after Discord archive', async () => {
+    const repository = new MemoryFamilyMemberRepository([
+      member({ id: 'owner-id', nickname: 'Owner', staticId: '1', role: 'owner', rank: 10 }),
+      member({
+        id: 'archived-id',
+        nickname: 'Archived',
+        staticId: '2',
+        status: 'inactive',
+        version: 2,
+        deletedAt: '2026-07-17T01:00:00.000Z',
+        profileMetadata: {
+          discordAccessArchive: {
+            requiresReapproval: true,
+          },
+        },
+      }),
+    ]);
+    const service = new FamilyMemberService(repository, null);
+
+    const restored = await service.restore('archived-id', 2, ownerAuth);
+
+    expect(restored.profileMetadata.discordAccessArchive).toMatchObject({
+      requiresReapproval: false,
+      approvedByFamilyMemberId: 'owner-id',
+    });
   });
 
   it('returns version conflict on stale update', async () => {

@@ -12,7 +12,7 @@ export function createBackendDragonMembersRepository(client = new FamilyMemberDi
         page: query?.pagination?.page ?? 1,
         pageSize: query?.pagination?.pageSize ?? 50,
         search: filters?.search || undefined,
-        status: filters?.status === 'all' ? 'active' : undefined,
+        status: filters?.status === 'all' ? undefined : mapDirectoryStatusFilter(filters?.status),
         sort: filters?.sort === 'nickname' ? 'displayName' : filters?.sort === 'status' ? 'displayName' : filters?.sort,
         order: filters?.direction,
       });
@@ -40,4 +40,9 @@ export function createBackendDragonMembersRepository(client = new FamilyMemberDi
       throw new Error('Member directory is read-only in module selectors.');
     },
   };
+}
+
+function mapDirectoryStatusFilter(status: DragonMembersFilters['status'] | undefined) {
+  if (status === 'active' || status === 'inactive') return status;
+  return undefined;
 }

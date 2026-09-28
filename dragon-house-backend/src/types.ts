@@ -229,10 +229,72 @@ export type ExternalFamilyNews = {
 
 export type ExternalFamilyQuest = {
   externalId: string;
+  channelId?: string;
+  authorId?: string;
+  authorName?: string;
+  messageCreatedAt?: string;
+  messageEditedAt?: string | null;
   title: string;
   status: string;
   participants: string[];
   helpers: string[];
+  participantDetails?: Array<{
+    displayName: string;
+    discordUserId: string | null;
+    rewardAmount: number | null;
+    rewardPercent: number | null;
+    payoutStatus: 'paid' | 'pending' | 'unpaid' | null;
+  }>;
+  helperDetails?: Array<{
+    displayName: string;
+    discordUserId: string | null;
+  }>;
+  totalReward?: number | null;
+  paidReward?: number | null;
+  remainingReward?: number | null;
+  rewardLines?: Array<{
+    displayName: string;
+    discordUserId: string | null;
+    amount: number;
+    rewardPercent: number | null;
+    status: 'paid' | 'pending' | 'unpaid';
+  }>;
+  startsAt?: string | null;
+  completedAt?: string | null;
+  organizer?: {
+    displayName: string;
+    discordUserId: string | null;
+  } | null;
+  source?: 'discord_embed' | 'discord_audit_log';
+  sourceQuestId?: string;
+  templateKey?: string | null;
+  sourceMessageIds?: string[];
+  warnings?: string[];
+  raw?: Record<string, unknown>;
+};
+
+export type ExternalAccountingMessageAttachment = {
+  id: string;
+  filename: string;
+  contentType: string | null;
+  url: string;
+  proxyUrl: string | null;
+  size: number;
+  width: number | null;
+  height: number | null;
+};
+
+export type ExternalAccountingMessage = {
+  externalId: string;
+  channelId: string;
+  authorId: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  content: string;
+  createdAt: string;
+  editedAt: string | null;
+  attachmentCount: number;
+  attachments: ExternalAccountingMessageAttachment[];
 };
 
 export type ExternalSyncResult = {

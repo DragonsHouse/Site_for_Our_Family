@@ -9,6 +9,7 @@ export type FamilyMemberDirectoryOrder = 'asc' | 'desc';
 
 export type FamilyMemberDirectoryItem = {
   memberId: string;
+  staticId?: string | null;
   displayName: string;
   role: FamilyRole;
   rank: {

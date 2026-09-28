@@ -31,8 +31,8 @@ export function DragonAchievementCard({ achievement }: { achievement: DragonProf
       </div>
       <div className="dh-achievement-head">
         <div>
-          <h3>{isSecret ? 'Secret Achievement' : achievement.title}</h3>
-          <p>{isSecret ? 'Hidden until the chamber reveals this seal.' : achievement.description}</p>
+          <h3>{isSecret ? 'Таємна відзнака' : achievement.title}</h3>
+          <p>{isSecret ? 'Приховано до відкриття цієї печатки.' : achievement.description}</p>
         </div>
         <DragonBadge tone={rarityMeta.tone}>{rarityMeta.label}</DragonBadge>
       </div>

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 import { InMemoryFamilyAuthRepository } from '../auth/auth-repository.js';
 import { hashPassword } from '../auth/password.js';
+import type { DiscordOrchestrationService } from '../discord/orchestration-service.js';
 import { MemoryFamilyEventRepository } from '../family-events/family-event-repository.js';
 import { MemoryFamilyMemberRepository } from '../members/member-repository.js';
 import { createTestConfig } from '../test/test-config.js';
@@ -80,9 +81,55 @@ describe('family event routes', { timeout: 20_000 }, () => {
     expect(calendar.status).toBe(200);
     expect(await calendar.json()).toMatchObject({ items: [expect.objectContaining({ sourceModule: 'family_events', sourceId: event.id })] });
   });
+
+  it('requests Discord projection sync after attendance without blocking the domain mutation', async () => {
+    const projectionUpdates: Array<{ sourceModule: string; sourceId: string; actorId: string }> = [];
+    const orchestration = {
+      requestProjectionUpdate: async (sourceModule: string, sourceId: string, auth: { familyMemberId: string }) => {
+        projectionUpdates.push({ sourceModule, sourceId, actorId: auth.familyMemberId });
+        throw new Error('Discord temporarily unavailable');
+      },
+    } as unknown as DiscordOrchestrationService;
+    const { baseUrl } = await createHarness(orchestration);
+    const ownerHeaders = await authHeaders(baseUrl, 'Owner_Dragons', '100');
+
+    const created = await fetch(`${baseUrl}/api/family/events`, {
+      method: 'POST',
+      headers: ownerHeaders,
+      body: JSON.stringify({
+        title: 'Attendance Sync',
+        eventType: 'family_meeting',
+        category: 'meeting',
+        status: 'scheduled',
+        startsAt: '2026-08-20T18:00:00.000Z',
+      }),
+    });
+    const event = await created.json() as { id: string };
+
+    const memberHeaders = await authHeaders(baseUrl, 'Member_Dragons', '101');
+    const responseOne = await fetch(`${baseUrl}/api/family/events/${event.id}/respond`, {
+      method: 'POST',
+      headers: memberHeaders,
+      body: JSON.stringify({ response: 'joining' }),
+    });
+    expect(responseOne.status).toBe(200);
+    projectionUpdates.length = 0;
+
+    const attendance = await fetch(`${baseUrl}/api/family/events/${event.id}/attendance`, {
+      method: 'POST',
+      headers: ownerHeaders,
+      body: JSON.stringify({ familyMemberId: 'member-id', status: 'present' }),
+    });
+
+    expect(attendance.status).toBe(200);
+    expect(await attendance.json()).toMatchObject({ eventId: event.id, familyMemberId: 'member-id', status: 'present' });
+    expect(projectionUpdates).toEqual([
+      { sourceModule: 'family_events', sourceId: event.id, actorId: 'owner-id' },
+    ]);
+  });
 });
 
-async function createHarness() {
+async function createHarness(discordOrchestrationService: DiscordOrchestrationService | null = null) {
   const config = createTestConfig({ bcryptCost: 10 });
   const authRepository = new InMemoryFamilyAuthRepository();
   const members = [
@@ -104,7 +151,7 @@ async function createHarness() {
     });
   }
   const familyEventRepository = new MemoryFamilyEventRepository([], members.map((item) => item.id));
-  const { app } = createApp(config, { authRepository, memberRepository, familyEventRepository, questRepository: null as never, towerDefenseRepository: null as never });
+  const { app } = createApp(config, { authRepository, memberRepository, familyEventRepository, questRepository: null as never, towerDefenseRepository: null as never, discordOrchestrationService });
   const server = app.listen(0);
   servers.push(server);
   const address = server.address() as AddressInfo;

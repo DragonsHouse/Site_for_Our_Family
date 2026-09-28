@@ -242,8 +242,8 @@ export class FamilyMemberService {
   }
 
   private toSafeDto(member: FamilyMember, auth: FamilyAuthContext): FamilyMember {
+    if (this.hasPermission(auth, 'view_member_private_fields')) return member;
     const publicMember = stripPrivateBirthdayFields(member);
-    if (this.hasPermission(auth, 'view_member_private_fields')) return publicMember;
     return { ...publicMember, notes: auth.familyMemberId === member.id ? member.notes : null };
   }
 }

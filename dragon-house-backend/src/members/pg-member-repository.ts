@@ -230,6 +230,19 @@ export class PgFamilyMemberRepository implements FamilyMemberRepository {
       `update family_members
        set status = 'active',
            deleted_at = null,
+           profile_metadata = coalesce(profile_metadata, '{}'::jsonb) ||
+             case
+               when profile_metadata ? 'discordAccessArchive' then jsonb_build_object(
+                 'discordAccessArchive',
+                 coalesce(profile_metadata->'discordAccessArchive', '{}'::jsonb) ||
+                 jsonb_build_object(
+                   'requiresReapproval', false,
+                   'approvedByFamilyMemberId', $3,
+                   'approvedAt', now()
+                 )
+               )
+               else '{}'::jsonb
+             end,
            updated_by_family_member_id = $3,
            updated_at = now(),
            version = version + 1

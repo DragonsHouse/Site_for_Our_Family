@@ -55,6 +55,10 @@ import { createFamilyQuestsRouter } from './routes/family-quests.js';
 import { PgFamilyQuestRepository } from './quests/pg-quest-repository.js';
 import { MemoryFamilyQuestRepository, type FamilyQuestRepository } from './quests/quest-repository.js';
 import { FamilyQuestService } from './quests/quest-service.js';
+import { createFamilyTreasuryRouter } from './routes/family-treasury.js';
+import { PgFamilyTreasuryRepository } from './treasury/pg-treasury-repository.js';
+import { MemoryFamilyTreasuryRepository, type FamilyTreasuryRepository } from './treasury/treasury-repository.js';
+import { FamilyTreasuryService } from './treasury/treasury-service.js';
 import { FamilyAccountingReadService } from './accounting/accounting-read-service.js';
 import { FamilyAccountingService } from './accounting/accounting-service.js';
 import { FamilyQuestPayoutService } from './accounting/quest-payout-service.js';
@@ -108,6 +112,8 @@ export type AppDependencies = {
   memberService?: FamilyMemberService | null;
   questRepository?: FamilyQuestRepository;
   questService?: FamilyQuestService | null;
+  treasuryRepository?: FamilyTreasuryRepository;
+  treasuryService?: FamilyTreasuryService | null;
   questPayoutService?: FamilyQuestPayoutService | null;
   accountingReadService?: FamilyAccountingReadService | null;
   accountingService?: FamilyAccountingService | null;
@@ -167,6 +173,15 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
       ? dependencies.questService
       : questRepository
         ? new FamilyQuestService(questRepository, memberRepository)
+        : null;
+  const treasuryRepository =
+    dependencies.treasuryRepository ??
+    (pgPool ? new PgFamilyTreasuryRepository(pgPool) : config.nodeEnv === 'test' ? new MemoryFamilyTreasuryRepository() : null);
+  const treasuryService =
+    dependencies.treasuryService !== undefined
+      ? dependencies.treasuryService
+      : treasuryRepository
+        ? new FamilyTreasuryService(treasuryRepository)
         : null;
   const questPayoutService =
     dependencies.questPayoutService !== undefined
@@ -305,16 +320,17 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   const healthRouter = createHealthRouter(discordService, pgPool);
   app.use('/api', healthRouter);
   app.use('/', healthRouter);
-  app.use('/api', createAuthRouter(authService));
+  app.use('/api', createAuthRouter(config, authService));
   app.use('/api', createDiscordAuthRouter(config, oauthLoginService));
   app.use('/api', createFamilyMembersRouter(config, authService, memberService));
-  app.use('/api', createFamilyAccountingRouter(config, authService, accountingReadService, accountingService));
+  app.use('/api', createFamilyAccountingRouter(config, authService, accountingReadService, accountingService, discordService));
   app.use('/api', createFamilyMemberActivityRouter(config, authService, memberActivityService));
   app.use('/api', createFamilyAchievementsRouter(config, authService, achievementService));
-  app.use('/api', createFamilyEventsRouter(config, authService, familyEventService, rewardAllocationService, achievementService));
+  app.use('/api', createFamilyEventsRouter(config, authService, familyEventService, rewardAllocationService, achievementService, discordOrchestrationService));
   app.use('/api', createFamilyCalendarRouter(config, authService, familyCalendarService));
-  app.use('/api', createFamilyQuestsRouter(config, authService, questService, questPayoutService));
-  app.use('/api', createFamilyTowerDefenseRouter(config, authService, towerDefenseService, rewardAllocationService, achievementService));
+  app.use('/api', createFamilyQuestsRouter(config, authService, questService, questPayoutService, discordService));
+  app.use('/api', createFamilyTreasuryRouter(config, authService, treasuryService));
+  app.use('/api', createFamilyTowerDefenseRouter(config, authService, towerDefenseService, rewardAllocationService, achievementService, discordOrchestrationService));
   app.use('/api', createDiscordRouter(discordService));
   app.use('/api', createDiscordOrchestrationRouter(config, authService, discordOrchestrationService));
   app.use('/api', createDiscordAccountLinkRouter(config, accountLinks, accountLinkOAuthService, authService));
@@ -346,6 +362,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     memberService,
     questRepository,
     questService,
+    treasuryRepository,
+    treasuryService,
     questPayoutService,
     accountingReadService,
     accountingService,

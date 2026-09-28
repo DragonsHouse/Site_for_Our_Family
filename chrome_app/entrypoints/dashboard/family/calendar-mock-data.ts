@@ -16,12 +16,12 @@ export const DRAGON_CALENDAR_MOCK_EVENTS: DragonCalendarEvent[] = [
     ],
     createdBy: 'Anastasia_Dragons',
     hall: 'War Council',
-    attachments: [{ id: 'agenda', title: 'Agenda placeholder', kind: 'document' }],
+    attachments: [{ id: 'agenda', title: 'План зустрічі', kind: 'document' }],
     activity: 'Agenda updated'
   },
   {
     id: 'weekly-quests',
-    title: 'Weekly Family Quests',
+    title: 'Щотижневі сімейні квести',
     description: 'Prepare tasks, reports and rewards for Dragon House members.',
     date: '2026-08-01',
     startTime: '19:00',
@@ -58,7 +58,7 @@ export const DRAGON_CALENDAR_MOCK_EVENTS: DragonCalendarEvent[] = [
     participants: [{ id: 'treasury', name: 'Treasury Keepers' }],
     createdBy: 'Treasury',
     hall: 'Treasury',
-    attachments: [{ id: 'inventory', title: 'Inventory placeholder', kind: 'document' }],
+    attachments: [{ id: 'inventory', title: 'Список ресурсів', kind: 'document' }],
     activity: 'Resource audit created'
   },
   {

@@ -27,7 +27,7 @@ export function DiscordPublishPanel({ target, sourceId }: { target: DiscordPubli
     try {
       setState(await getState(target, sourceId, signal));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Discord state request failed.');
+      setError(loadError instanceof Error ? loadError.message : 'Не вдалося завантажити стан Discord.');
     } finally {
       setLoading(false);
     }
@@ -47,7 +47,7 @@ export function DiscordPublishPanel({ target, sourceId }: { target: DiscordPubli
       const next = state?.published ? await syncTarget(target, sourceId) : await publishTarget(target, sourceId);
       setState(next);
     } catch (mutationError) {
-      setError(mutationError instanceof Error ? mutationError.message : 'Discord publish request failed.');
+      setError(mutationError instanceof Error ? mutationError.message : 'Не вдалося оновити Discord.');
     } finally {
       setMutating(false);
     }
@@ -68,18 +68,19 @@ export function DiscordPublishPanel({ target, sourceId }: { target: DiscordPubli
         <div>
           <span className="dh-dragon-eyebrow">Discord</span>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <DragonBadge tone={badgeTone(state?.state ?? 'unpublished')}>{discordStateLabel(state?.state ?? 'unpublished')}</DragonBadge>
+            <DragonBadge tone={badgeTone(state?.state ?? 'not_published')}>{discordStateLabel(state?.state ?? 'not_published')}</DragonBadge>
             {state?.channelLabel ? <span className="text-sm text-slate-400">{state.channelLabel}</span> : null}
           </div>
         </div>
         <DragonButton type="button" variant={state?.published ? 'secondary' : undefined} disabled={mutating} onClick={() => void runPublishSync()}>
-          {mutating ? 'Синхронізуємо...' : state?.published ? 'Оновити в Discord' : 'Опублікувати в Discord'}
+          {mutating ? 'Синхронізуємо...' : state?.published ? (state.state === 'sync_error' ? 'Повторити' : 'Оновити в Discord') : 'Опублікувати в Discord'}
         </DragonButton>
       </div>
       {state?.lastSyncedAt ? <p className="text-sm text-slate-400">Остання синхронізація: {formatDate(state.lastSyncedAt)}</p> : <p className="text-sm text-slate-400">Повідомлення Discord ще не створювалось.</p>}
+      {state?.error ? <p className="text-sm text-rose-200">{state.error.message}</p> : null}
       {error ? (
         <DragonRetry
-          title="Discord sync не виконано"
+          title="Помилка синхронізації Discord"
           description={error}
           onRetry={() => void (state?.published ? runPublishSync() : load())}
         />
@@ -109,13 +110,15 @@ function syncTarget(target: DiscordPublishTarget, sourceId: string) {
 function discordStateLabel(state: FamilyDiscordPublishState['state']): string {
   if (state === 'published') return 'Опубліковано';
   if (state === 'synced') return 'Синхронізовано';
-  if (state === 'error') return 'Помилка синхронізації';
+  if (state === 'pending') return 'Очікує синхронізації';
+  if (state === 'sync_error') return 'Помилка синхронізації';
   return 'Не опубліковано';
 }
 
 function badgeTone(state: FamilyDiscordPublishState['state']) {
   if (state === 'published' || state === 'synced') return 'success';
-  if (state === 'error') return 'danger';
+  if (state === 'sync_error') return 'danger';
+  if (state === 'pending') return 'warning';
   return 'muted';
 }
 

@@ -52,7 +52,19 @@ export function getDragonMemberInitials(member: DragonMember) {
 }
 
 export function formatDragonMemberDate(date: string) {
-  return new Intl.DateTimeFormat('en', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`));
+  const parsed = new Date(date.includes('T') ? date : `${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return 'Даних поки немає';
+  return new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Kyiv' }).format(parsed);
+}
+
+export function formatDragonMemberDiscordSyncState(state: DragonMemberDiscordSyncState) {
+  return {
+    'not-linked': 'Discord не прив’язано',
+    linked: 'Discord прив’язано',
+    synchronized: 'Синхронізовано',
+    'guild-inactive': 'Не знайдено на сервері',
+    conflict: 'Потрібна перевірка'
+  }[state];
 }
 
 export function formatDragonMemberBirthday(date?: string) {
@@ -157,6 +169,8 @@ function createStatusCounts(): Record<DragonMemberStatus, number> {
 
 function getStatusOrder(status: DragonMemberStatus) {
   return {
+    active: 3,
+    inactive: 0,
     online: 5,
     in_voice: 4,
     recently_active: 3,

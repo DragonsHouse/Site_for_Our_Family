@@ -104,6 +104,90 @@ export type BackendAccountingDashboard = {
   payoutBatches: BackendPayoutBatch[];
 };
 
+export type BackendDiscordAccountingAttachment = {
+  id: string;
+  filename: string;
+  contentType: string | null;
+  url: string;
+  proxyUrl: string | null;
+  size: number;
+  width: number | null;
+  height: number | null;
+};
+
+export type BackendDiscordAccountingMessage = {
+  externalId: string;
+  channelId: string;
+  authorId: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  content: string;
+  createdAt: string;
+  editedAt: string | null;
+  attachmentCount: number;
+  attachments: BackendDiscordAccountingAttachment[];
+};
+
+export type BackendDiscordAccountingFeed = {
+  status: 'synced' | 'not_configured' | 'unavailable' | 'error';
+  channelId: string | null;
+  lastSyncedAt: string;
+  items: BackendDiscordAccountingMessage[];
+  error: string | null;
+};
+
+export type BackendMonthlyAccountingSummary = {
+  year: number;
+  month: number;
+  startsAt: string;
+  endsAt: string;
+  currency: string;
+  totals: {
+    income: number;
+    expenses: number;
+    payouts: number;
+    adjustments: number;
+    net: number;
+    questFamilyIncome: number;
+    questMemberRewards: number;
+    questTotalRewards: number;
+  };
+  quests: {
+    completedCount: number;
+    withDiscordProjectionCount: number;
+    items: Array<{
+      id: string;
+      title: string;
+      status: string;
+      completedAt: string;
+      totalReward: number;
+      memberRewardPool: number;
+      familyReward: number;
+      participantCount: number;
+      helperCount: number;
+      discordMessageId: string | null;
+      discordChannelId: string | null;
+      discordSyncedAt: string | null;
+    }>;
+    topMembers: Array<{
+      familyMemberId: string | null;
+      displayName: string;
+      completedQuests: number;
+      earnedAmount: number;
+    }>;
+  };
+  transactions: Array<{
+    id: string;
+    type: 'income' | 'expense' | 'payout' | 'adjustment';
+    amount: number;
+    currency: string;
+    reason: string;
+    createdAt: string;
+    memberName: string | null;
+    questTitle: string | null;
+  }>;
+};
+
 export type BackendPayableMemberSummary = {
   memberId: string;
   nickname: string;
@@ -151,6 +235,7 @@ export type BackendMemberAccountingReport = {
       combatPremium: number;
       leadershipPremium: number;
       top3Premium: number;
+      specialPremium: number;
       personalPremium: number;
       rewards: number;
       corrections: number;
@@ -186,6 +271,14 @@ export async function getBackendPayableSummary(signal?: AbortSignal): Promise<Ba
   const value = await requestJson('/api/family/accounting/payable-summary', { method: 'GET', signal });
   if (!isRecord(value) || !Array.isArray(value.items)) throw malformed();
   return { items: value.items.map(assertPayableMemberSummary) };
+}
+
+export async function getBackendDiscordAccountingFeed(signal?: AbortSignal): Promise<BackendDiscordAccountingFeed> {
+  return assertDiscordAccountingFeed(await requestJson('/api/family/accounting/discord-feed', { method: 'GET', signal }));
+}
+
+export async function getBackendMonthlyAccountingSummary(year: number, month: number, signal?: AbortSignal): Promise<BackendMonthlyAccountingSummary> {
+  return assertMonthlySummary(await requestJson(`/api/family/accounting/monthly-summary?year=${encodeURIComponent(String(year))}&month=${encodeURIComponent(String(month))}`, { method: 'GET', signal }));
 }
 
 export async function listBackendPayrollPeriods(signal?: AbortSignal): Promise<{ items: BackendPayrollPeriod[] }> {
@@ -341,6 +434,121 @@ function assertDashboard(value: unknown): BackendAccountingDashboard {
   return { pendingAccruals: value.pendingAccruals.map(assertAccrual), payoutBatches: value.payoutBatches.map(assertBatch) };
 }
 
+function assertDiscordAccountingFeed(value: unknown): BackendDiscordAccountingFeed {
+  if (!isRecord(value) || !Array.isArray(value.items)) throw malformed();
+  const status = stringField(value, 'status');
+  if (!['synced', 'not_configured', 'unavailable', 'error'].includes(status)) throw malformed();
+  return {
+    status: status as BackendDiscordAccountingFeed['status'],
+    channelId: nullableStringField(value, 'channelId'),
+    lastSyncedAt: stringField(value, 'lastSyncedAt'),
+    items: value.items.map(assertDiscordAccountingMessage),
+    error: nullableStringField(value, 'error'),
+  };
+}
+
+function assertDiscordAccountingMessage(value: unknown): BackendDiscordAccountingMessage {
+  if (!isRecord(value) || !Array.isArray(value.attachments)) throw malformed();
+  return {
+    externalId: stringField(value, 'externalId'),
+    channelId: stringField(value, 'channelId'),
+    authorId: stringField(value, 'authorId'),
+    authorName: stringField(value, 'authorName'),
+    authorAvatarUrl: nullableStringField(value, 'authorAvatarUrl'),
+    content: stringField(value, 'content'),
+    createdAt: stringField(value, 'createdAt'),
+    editedAt: nullableStringField(value, 'editedAt'),
+    attachmentCount: numberField(value, 'attachmentCount'),
+    attachments: value.attachments.map(assertDiscordAccountingAttachment),
+  };
+}
+
+function assertDiscordAccountingAttachment(value: unknown): BackendDiscordAccountingAttachment {
+  if (!isRecord(value)) throw malformed();
+  return {
+    id: stringField(value, 'id'),
+    filename: stringField(value, 'filename'),
+    contentType: nullableStringField(value, 'contentType'),
+    url: stringField(value, 'url'),
+    proxyUrl: nullableStringField(value, 'proxyUrl'),
+    size: numberField(value, 'size'),
+    width: nullableNumberField(value, 'width'),
+    height: nullableNumberField(value, 'height'),
+  };
+}
+
+function assertMonthlySummary(value: unknown): BackendMonthlyAccountingSummary {
+  if (!isRecord(value) || !isRecord(value.totals) || !isRecord(value.quests) || !Array.isArray(value.quests.items) || !Array.isArray(value.quests.topMembers) || !Array.isArray(value.transactions)) throw malformed();
+  return {
+    year: numberField(value, 'year'),
+    month: numberField(value, 'month'),
+    startsAt: stringField(value, 'startsAt'),
+    endsAt: stringField(value, 'endsAt'),
+    currency: stringField(value, 'currency'),
+    totals: {
+      income: numberField(value.totals, 'income'),
+      expenses: numberField(value.totals, 'expenses'),
+      payouts: numberField(value.totals, 'payouts'),
+      adjustments: numberField(value.totals, 'adjustments'),
+      net: numberField(value.totals, 'net'),
+      questFamilyIncome: numberField(value.totals, 'questFamilyIncome'),
+      questMemberRewards: numberField(value.totals, 'questMemberRewards'),
+      questTotalRewards: numberField(value.totals, 'questTotalRewards'),
+    },
+    quests: {
+      completedCount: numberField(value.quests, 'completedCount'),
+      withDiscordProjectionCount: numberField(value.quests, 'withDiscordProjectionCount'),
+      items: value.quests.items.map(assertMonthlyQuest),
+      topMembers: value.quests.topMembers.map(assertMonthlyTopMember),
+    },
+    transactions: value.transactions.map(assertMonthlyTransaction),
+  };
+}
+
+function assertMonthlyQuest(value: unknown): BackendMonthlyAccountingSummary['quests']['items'][number] {
+  if (!isRecord(value)) throw malformed();
+  return {
+    id: stringField(value, 'id'),
+    title: stringField(value, 'title'),
+    status: stringField(value, 'status'),
+    completedAt: stringField(value, 'completedAt'),
+    totalReward: numberField(value, 'totalReward'),
+    memberRewardPool: numberField(value, 'memberRewardPool'),
+    familyReward: numberField(value, 'familyReward'),
+    participantCount: numberField(value, 'participantCount'),
+    helperCount: numberField(value, 'helperCount'),
+    discordMessageId: nullableStringField(value, 'discordMessageId'),
+    discordChannelId: nullableStringField(value, 'discordChannelId'),
+    discordSyncedAt: nullableStringField(value, 'discordSyncedAt'),
+  };
+}
+
+function assertMonthlyTopMember(value: unknown): BackendMonthlyAccountingSummary['quests']['topMembers'][number] {
+  if (!isRecord(value)) throw malformed();
+  return {
+    familyMemberId: nullableStringField(value, 'familyMemberId'),
+    displayName: stringField(value, 'displayName'),
+    completedQuests: numberField(value, 'completedQuests'),
+    earnedAmount: numberField(value, 'earnedAmount'),
+  };
+}
+
+function assertMonthlyTransaction(value: unknown): BackendMonthlyAccountingSummary['transactions'][number] {
+  if (!isRecord(value)) throw malformed();
+  const type = stringField(value, 'type');
+  if (!['income', 'expense', 'payout', 'adjustment'].includes(type)) throw malformed();
+  return {
+    id: stringField(value, 'id'),
+    type: type as BackendMonthlyAccountingSummary['transactions'][number]['type'],
+    amount: numberField(value, 'amount'),
+    currency: stringField(value, 'currency'),
+    reason: stringField(value, 'reason'),
+    createdAt: stringField(value, 'createdAt'),
+    memberName: nullableStringField(value, 'memberName'),
+    questTitle: nullableStringField(value, 'questTitle'),
+  };
+}
+
 function assertAccrual(value: unknown): BackendAccountingAccrual {
   if (!isRecord(value)) throw malformed();
   return {
@@ -443,6 +651,7 @@ function assertWeeklyEarnings(value: Record<string, unknown>): NonNullable<Backe
       combatPremium: numberField(value.categories, 'combatPremium'),
       leadershipPremium: numberField(value.categories, 'leadershipPremium'),
       top3Premium: numberField(value.categories, 'top3Premium'),
+      specialPremium: numberField(value.categories, 'specialPremium'),
       personalPremium: numberField(value.categories, 'personalPremium'),
       rewards: numberField(value.categories, 'rewards'),
       corrections: numberField(value.categories, 'corrections'),
@@ -534,6 +743,11 @@ function nullableStringField(value: Record<string, unknown>, field: string): str
 function numberField(value: Record<string, unknown>, field: string): number {
   if (typeof value[field] !== 'number' || !Number.isFinite(value[field])) throw malformed();
   return value[field];
+}
+
+function nullableNumberField(value: Record<string, unknown>, field: string): number | null {
+  if (value[field] === null || value[field] === undefined) return null;
+  return numberField(value, field);
 }
 
 function malformed(): FamilyAccountingApiError {

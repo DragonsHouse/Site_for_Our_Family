@@ -67,6 +67,62 @@ const STANDALONE_EVENT_CATEGORIES = ['meeting', 'training', 'celebration', 'anno
 const RESPONSE_CHOICES: FamilyEventResponseChoice[] = ['interested', 'joining', 'confirmed', 'declined'];
 const ATTENDANCE_CHOICES: FamilyEventAttendanceChoice[] = ['present', 'late', 'absent', 'excused'];
 
+const EVENT_STATUS_LABELS: Record<DragonEventStatus, string> = {
+  draft: 'Чернетка',
+  scheduled: 'Заплановано',
+  active: 'Активна',
+  completed: 'Завершена',
+  cancelled: 'Скасована'
+};
+
+const EVENT_PRIORITY_LABELS: Record<DragonEventPriority, string> = {
+  low: 'Низький',
+  normal: 'Звичайний',
+  high: 'Високий',
+  critical: 'Критичний'
+};
+
+const EVENT_VISIBILITY_LABELS: Record<DragonEventVisibility, string> = {
+  public: 'Публічна',
+  members: 'Для учасників',
+  leadership: 'Для старших',
+  private: 'Приватна',
+  hidden: 'Прихована'
+};
+
+const EVENT_SORT_LABELS: Record<DragonEventSortMode, string> = {
+  today: 'Сьогодні',
+  upcoming: 'Найближчі',
+  active: 'Активні',
+  completed: 'Завершені',
+  priority: 'За пріоритетом',
+  newest: 'Новіші',
+  oldest: 'Старіші',
+  alphabetical: 'За назвою'
+};
+
+const STANDALONE_EVENT_CATEGORY_LABELS: Record<typeof STANDALONE_EVENT_CATEGORIES[number], string> = {
+  meeting: 'Зустріч',
+  training: 'Тренування',
+  celebration: 'Святкування',
+  announcement: 'Оголошення',
+  custom: 'Інше'
+};
+
+const RESPONSE_CHOICE_LABELS: Record<FamilyEventResponseChoice, string> = {
+  interested: 'Цікавить',
+  joining: 'Буду',
+  confirmed: 'Підтверджено',
+  declined: 'Не буду'
+};
+
+const ATTENDANCE_CHOICE_LABELS: Record<FamilyEventAttendanceChoice, string> = {
+  present: 'Був/була',
+  late: 'Запізнився/лась',
+  absent: 'Не був/була',
+  excused: 'Поважна причина'
+};
+
 export function DragonEventEngineScreen({ currentUser, dependencies }: { currentUser?: FamilyUser; dependencies?: DragonEventStateDependencies }) {
   const engine = useDragonEventState(dependencies);
   const [detailsEvent, setDetailsEvent] = useState<DragonEvent | null>(null);
@@ -88,7 +144,7 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
       if (updated && editEvent?.id === updated.id) setEditEvent(null);
       if (key === 'create') setCreateOpen(false);
     } catch (error) {
-      setMutationError(error instanceof Error ? error.message : 'Family Events backend request failed.');
+      setMutationError(error instanceof Error ? error.message : 'Не вдалося виконати дію з подією.');
     } finally {
       setMutatingKey(null);
     }
@@ -98,15 +154,15 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
     <div className="dh-event-engine" data-dragon-event-engine="frontend">
       <DragonPanel variant="ceremonial" className="dh-event-engine-hero">
         <div>
-          <p className="dh-dragon-eyebrow">DRAGON EVENT ENGINE</p>
-          <h1>Every family action becomes a chronicle.</h1>
-          <p>Backend-ready activity architecture for meetings, birthdays, quests, celebrations, future Tower Defense and Discord sync.</p>
+          <p className="dh-dragon-eyebrow">Події</p>
+          <h1>Хроніка сімейних подій</h1>
+          <p>Зустрічі, дні народження, квести, святкування, вишки та синхронізація з Discord.</p>
         </div>
         <div className="flex flex-col gap-2">
           <DragonEventStatistics statistics={engine.statistics} />
           {canCreate ? (
             <DragonButton type="button" onClick={() => setCreateOpen(true)}>
-              Create Event
+              Створити подію
             </DragonButton>
           ) : null}
         </div>
@@ -124,13 +180,13 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
 
       <DragonEventGallery events={engine.visibleEvents} onSelect={setDetailsEvent} />
 
-      <DragonSection eyebrow="EVENT TIMELINE" title="Living activity chronicle">
+      <DragonSection eyebrow="Хроніка" title="Історія активності">
         <DragonEventTimeline events={engine.visibleEvents} onSelect={setDetailsEvent} />
       </DragonSection>
 
       {createOpen && currentUser ? (
         <DragonEventFormDialog
-          title="Create Family Event"
+          title="Створити сімейну подію"
           currentUser={currentUser}
           mutating={mutatingKey === 'create'}
           error={mutationError}
@@ -141,7 +197,7 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
 
       {editEvent && currentUser ? (
         <DragonEventFormDialog
-          title="Edit Family Event"
+          title="Редагувати сімейну подію"
           currentUser={currentUser}
           event={editEvent}
           mutating={mutatingKey === `edit:${editEvent.id}`}
@@ -191,7 +247,7 @@ export function DragonEventCard({ event, onSelect }: { event: DragonEvent; onSel
 
   return (
     <DragonCard interactive className={`dh-event-card ${meta.className} is-${event.status}`}>
-      <button type="button" className="dh-event-card-open" onClick={() => onSelect?.(event)} aria-label={`Open event ${event.title}`}>
+      <button type="button" className="dh-event-card-open" onClick={() => onSelect?.(event)} aria-label={`Відкрити подію ${event.title}`}>
         <span className="dh-event-card-glyph" aria-hidden="true">
           {meta.glyph}
         </span>
@@ -202,16 +258,16 @@ export function DragonEventCard({ event, onSelect }: { event: DragonEvent; onSel
       </button>
       <div className="dh-event-card-meta">
         <DragonBadge tone={meta.tone}>{meta.label}</DragonBadge>
-        <DragonBadge tone={event.priority === 'critical' ? 'danger' : event.priority === 'high' ? 'ember' : 'muted'}>{event.priority}</DragonBadge>
-        <DragonBadge tone={event.status === 'completed' ? 'success' : event.status === 'active' ? 'gold' : 'muted'}>{event.status}</DragonBadge>
+        <DragonBadge tone={event.priority === 'critical' ? 'danger' : event.priority === 'high' ? 'ember' : 'muted'}>{EVENT_PRIORITY_LABELS[event.priority]}</DragonBadge>
+        <DragonBadge tone={event.status === 'completed' ? 'success' : event.status === 'active' ? 'gold' : 'muted'}>{EVENT_STATUS_LABELS[event.status]}</DragonBadge>
       </div>
       <dl>
         <div>
-          <dt>Date</dt>
+          <dt>Дата</dt>
           <dd>{getDragonEventDateKey(event)}</dd>
         </div>
         <div>
-          <dt>Hall</dt>
+          <dt>Локація</dt>
           <dd>{event.location.label}</dd>
         </div>
         <div>
@@ -219,7 +275,7 @@ export function DragonEventCard({ event, onSelect }: { event: DragonEvent; onSel
           <dd>{event.xp}</dd>
         </div>
       </dl>
-      <DragonProgress value={capacity} label={`${event.title} participation`} />
+      <DragonProgress value={capacity} label={`Участь у події ${event.title}`} />
     </DragonCard>
   );
 }
@@ -272,26 +328,26 @@ export function DragonEventDetails({
           <p>{event.description}</p>
           <dl>
             <div>
-              <dt>Starts</dt>
+              <dt>Початок</dt>
               <dd>{event.startsAt}</dd>
             </div>
             <div>
-              <dt>Ends</dt>
-              <dd>{event.endsAt ?? 'Open ended'}</dd>
+              <dt>Завершення</dt>
+              <dd>{event.endsAt ?? 'Без кінцевого часу'}</dd>
             </div>
             <div>
-              <dt>Owner</dt>
+              <dt>Організатор</dt>
               <dd>{event.owner.name}</dd>
             </div>
             <div>
-              <dt>Participants</dt>
+              <dt>Учасники</dt>
               <dd>{event.participants.map((participant) => participant.name).join(', ')}</dd>
             </div>
           </dl>
         </div>
         {isStandalone ? (
           <DragonCard className="dh-event-details-actions">
-            <span className="dh-dragon-eyebrow">Actions</span>
+            <span className="dh-dragon-eyebrow">Дії</span>
             {error ? <p role="alert">{error}</p> : null}
             {currentUser ? (
               <div className="flex flex-wrap gap-2">
@@ -303,11 +359,11 @@ export function DragonEventDetails({
                     disabled={Boolean(mutatingKey) || closed}
                     onClick={() => onRespond?.(choice)}
                   >
-                    {choice}
+                    {RESPONSE_CHOICE_LABELS[choice]}
                   </DragonButton>
                 ))}
                 <DragonButton type="button" variant="ghost" disabled={Boolean(mutatingKey) || closed || !currentResponse} onClick={onWithdraw}>
-                  Withdraw
+                  Скасувати участь
                 </DragonButton>
               </div>
             ) : null}
@@ -316,28 +372,28 @@ export function DragonEventDetails({
                 <div className="flex flex-wrap gap-2">
                   {!closed ? (
                     <DragonButton type="button" variant="secondary" disabled={Boolean(mutatingKey)} onClick={() => onEdit?.(event)}>
-                      Edit
+                      Редагувати
                     </DragonButton>
                   ) : null}
                   {event.status === 'scheduled' ? (
                     <DragonButton type="button" disabled={Boolean(mutatingKey)} onClick={onStart}>
-                      Start
+                      Почати
                     </DragonButton>
                   ) : null}
                   {event.status === 'active' ? (
                     <DragonButton type="button" disabled={Boolean(mutatingKey)} onClick={() => setConfirmingComplete(true)}>
-                      Complete
+                      Завершити
                     </DragonButton>
                   ) : null}
                   {!closed ? (
                     <DragonButton type="button" variant="danger" disabled={Boolean(mutatingKey)} onClick={() => onCancel?.(cancelReason || null)}>
-                      Cancel
+                      Скасувати
                     </DragonButton>
                   ) : null}
                 </div>
                 {confirmingComplete && event.backendEventId ? (
                   <div className="space-y-3" data-event-completion-reward-summary="backend">
-                    <span className="dh-dragon-eyebrow">Completion reward summary</span>
+                    <span className="dh-dragon-eyebrow">Підсумок винагород</span>
                     <FamilyRewardAllocationPanel
                       sourceModule="events"
                       sourceId={event.backendEventId}
@@ -347,15 +403,15 @@ export function DragonEventDetails({
                     />
                     <div className="mt-3 flex flex-wrap gap-2">
                       <DragonButton type="button" variant="ghost" disabled={Boolean(mutatingKey)} onClick={() => setConfirmingComplete(false)}>
-                        Keep editing
+                        Продовжити редагування
                       </DragonButton>
                       <DragonButton type="button" disabled={Boolean(mutatingKey)} onClick={onComplete}>
-                        Confirm complete
+                        Підтвердити завершення
                       </DragonButton>
                     </div>
                   </div>
                 ) : null}
-                {!closed ? <DragonInput value={cancelReason} onChange={(input) => setCancelReason(input.currentTarget.value)} placeholder="Cancel reason" aria-label="Cancel reason" /> : null}
+                {!closed ? <DragonInput value={cancelReason} onChange={(input) => setCancelReason(input.currentTarget.value)} placeholder="Причина скасування" aria-label="Причина скасування" /> : null}
                 <div className="dh-event-attendance-grid">
                   {event.participants.length ? event.participants.map((participant) => (
                     <div key={participant.backendMemberId ?? participant.id}>
@@ -369,12 +425,12 @@ export function DragonEventDetails({
                             disabled={Boolean(mutatingKey) || closed}
                             onClick={() => onAttendance?.(participant.backendMemberId ?? participant.id, choice)}
                           >
-                            {choice}
+                            {ATTENDANCE_CHOICE_LABELS[choice]}
                           </DragonButton>
                         ))}
                       </div>
                     </div>
-                  )) : <p>No responders yet.</p>}
+                  )) : <p>Відповідей поки немає.</p>}
                 </div>
               </div>
             ) : null}
@@ -391,24 +447,24 @@ export function DragonEventDetails({
             />
           ) : null}
           <DragonCard>
-            <span className="dh-dragon-eyebrow">Achievements</span>
+            <span className="dh-dragon-eyebrow">Досягнення</span>
             <strong>{event.achievementIds.length}</strong>
-            <p>{event.achievementIds.join(', ') || 'Reserved integration point'}</p>
+            <p>{event.achievementIds.join(', ') || 'Досягнення для цієї події не привʼязані.'}</p>
           </DragonCard>
           <DragonCard>
-            <span className="dh-dragon-eyebrow">Rewards</span>
+            <span className="dh-dragon-eyebrow">Винагороди</span>
             <strong>{event.rewards.length}</strong>
-            <p>{event.rewards.map((reward) => reward.label).join(', ') || 'Reward logic not executed here'}</p>
+            <p>{event.rewards.map((reward) => reward.label).join(', ') || 'Винагороди для цієї події не налаштовані.'}</p>
           </DragonCard>
           <DragonCard>
-            <span className="dh-dragon-eyebrow">Tower Defense</span>
-            <strong>{event.towerDefense?.result ?? 'extension ready'}</strong>
-            <p>{event.towerDefense?.defenseId ?? 'Defense metadata slot is available without hardcoded logic.'}</p>
+            <span className="dh-dragon-eyebrow">Оборона вишок</span>
+            <strong>{event.towerDefense?.result ?? 'Готово до звʼязку'}</strong>
+            <p>{event.towerDefense?.defenseId ?? 'Дані оборони для цієї події не привʼязані.'}</p>
           </DragonCard>
           <DragonCard>
             <span className="dh-dragon-eyebrow">Discord</span>
-            <strong>{event.discord?.channelId ?? 'not synced'}</strong>
-            <p>{event.discord?.guildId ?? 'Discord metadata placeholder'}</p>
+            <strong>{event.discord?.channelId ?? 'Не синхронізовано'}</strong>
+            <p>{event.discord?.guildId ?? 'Discord-метадані для цієї події не привʼязані.'}</p>
           </DragonCard>
         </div>
       </div>
@@ -435,48 +491,48 @@ export function DragonEventFilters({
         type="search"
         value={filters.search}
         onChange={(event) => update({ search: event.currentTarget.value })}
-        placeholder="Search events"
-        aria-label="Search Dragon Events"
+        placeholder="Пошук подій"
+        aria-label="Пошук подій Dragon House"
       />
-      <DragonSelect value={filters.type} onChange={(event) => update({ type: event.currentTarget.value as DragonEventFilters['type'] })} aria-label="Filter events by type">
+      <DragonSelect value={filters.type} onChange={(event) => update({ type: event.currentTarget.value as DragonEventFilters['type'] })} aria-label="Фільтр подій за типом">
         {EVENT_TYPES.map((type) => (
           <option key={type} value={type}>
-            {type === 'all' ? 'All types' : DRAGON_EVENT_TYPE_META[type].label}
+            {type === 'all' ? 'Усі типи' : DRAGON_EVENT_TYPE_META[type].label}
           </option>
         ))}
       </DragonSelect>
-      <DragonSelect value={filters.status} onChange={(event) => update({ status: event.currentTarget.value as DragonEventFilters['status'] })} aria-label="Filter events by status">
+      <DragonSelect value={filters.status} onChange={(event) => update({ status: event.currentTarget.value as DragonEventFilters['status'] })} aria-label="Фільтр подій за статусом">
         {EVENT_STATUSES.map((status) => (
           <option key={status} value={status}>
-            {status === 'all' ? 'All statuses' : status}
+            {status === 'all' ? 'Усі статуси' : EVENT_STATUS_LABELS[status]}
           </option>
         ))}
       </DragonSelect>
-      <DragonSelect value={filters.priority} onChange={(event) => update({ priority: event.currentTarget.value as DragonEventFilters['priority'] })} aria-label="Filter events by priority">
+      <DragonSelect value={filters.priority} onChange={(event) => update({ priority: event.currentTarget.value as DragonEventFilters['priority'] })} aria-label="Фільтр подій за пріоритетом">
         {EVENT_PRIORITIES.map((priority) => (
           <option key={priority} value={priority}>
-            {priority === 'all' ? 'All priorities' : priority}
+            {priority === 'all' ? 'Усі пріоритети' : EVENT_PRIORITY_LABELS[priority]}
           </option>
         ))}
       </DragonSelect>
-      <DragonSelect value={filters.visibility} onChange={(event) => update({ visibility: event.currentTarget.value as DragonEventFilters['visibility'] })} aria-label="Filter events by visibility">
+      <DragonSelect value={filters.visibility} onChange={(event) => update({ visibility: event.currentTarget.value as DragonEventFilters['visibility'] })} aria-label="Фільтр подій за видимістю">
         {EVENT_VISIBILITIES.map((visibility) => (
           <option key={visibility} value={visibility}>
-            {visibility === 'all' ? 'All visibility' : visibility}
+            {visibility === 'all' ? 'Уся видимість' : EVENT_VISIBILITY_LABELS[visibility]}
           </option>
         ))}
       </DragonSelect>
-      <DragonInput type="date" value={filters.dateFrom} onChange={(event) => update({ dateFrom: event.currentTarget.value })} aria-label="Dragon Event date from" />
-      <DragonInput type="date" value={filters.dateTo} onChange={(event) => update({ dateTo: event.currentTarget.value })} aria-label="Dragon Event date to" />
-      <DragonSelect value={sortMode} onChange={(event) => onSortChange(event.currentTarget.value as DragonEventSortMode)} aria-label="Sort Dragon Events">
+      <DragonInput type="date" value={filters.dateFrom} onChange={(event) => update({ dateFrom: event.currentTarget.value })} aria-label="Дата подій від" />
+      <DragonInput type="date" value={filters.dateTo} onChange={(event) => update({ dateTo: event.currentTarget.value })} aria-label="Дата подій до" />
+      <DragonSelect value={sortMode} onChange={(event) => onSortChange(event.currentTarget.value as DragonEventSortMode)} aria-label="Сортування подій">
         {EVENT_SORTS.map((sort) => (
           <option key={sort} value={sort}>
-            {sort}
+            {EVENT_SORT_LABELS[sort]}
           </option>
         ))}
       </DragonSelect>
       <DragonButton type="button" variant="ghost" onClick={() => onChange(DEFAULT_DRAGON_EVENT_FILTERS)}>
-        Clear
+        Очистити
       </DragonButton>
     </DragonPanel>
   );
@@ -503,12 +559,12 @@ export function DragonEventTimeline({ events, onSelect }: { events: DragonEvent[
 
 export function DragonUpcomingEvents({ events, onSelect }: { events: DragonEvent[]; onSelect?: (event: DragonEvent) => void }) {
   return (
-    <DragonSection eyebrow="UPCOMING" title="Next burning seals">
+    <DragonSection eyebrow="Найближчі" title="Заплановані події">
       <div className="dh-event-mini-list">
         {events.length ? (
           events.map((event) => <DragonEventMiniCard key={event.id} event={event} onSelect={onSelect} />)
         ) : (
-          <DragonEmptyState title="No upcoming events" description="The Event Engine is ready for the next family activity." />
+          <DragonEmptyState title="Найближчих подій немає" description="Коли зʼявиться нова сімейна активність, вона буде тут." />
         )}
       </div>
     </DragonSection>
@@ -517,12 +573,12 @@ export function DragonUpcomingEvents({ events, onSelect }: { events: DragonEvent
 
 export function DragonTodayEvents({ events, onSelect }: { events: DragonEvent[]; onSelect?: (event: DragonEvent) => void }) {
   return (
-    <DragonSection eyebrow="TODAY" title="Today's chamber activity">
+    <DragonSection eyebrow="Сьогодні" title="Активність на сьогодні">
       <div className="dh-event-mini-list">
         {events.length ? (
           events.map((event) => <DragonEventMiniCard key={event.id} event={event} onSelect={onSelect} />)
         ) : (
-          <DragonEmptyState title="No events today" description="No Dragon House activity is scheduled for this day." />
+          <DragonEmptyState title="На сьогодні подій немає" description="На цей день активність Dragon House не запланована." />
         )}
       </div>
     </DragonSection>
@@ -531,39 +587,39 @@ export function DragonTodayEvents({ events, onSelect }: { events: DragonEvent[];
 
 export function DragonEventStatistics({ statistics }: { statistics: ReturnType<typeof useDragonEventState>['statistics'] }) {
   return (
-    <div className="dh-event-statistics" aria-label="Dragon Event statistics">
+    <div className="dh-event-statistics" aria-label="Статистика подій Dragon House">
       <div>
-        <span className="dh-dragon-eyebrow">Total</span>
+        <span className="dh-dragon-eyebrow">Усього</span>
         <strong>{statistics.total}</strong>
       </div>
       <div>
-        <span className="dh-dragon-eyebrow">Today</span>
+        <span className="dh-dragon-eyebrow">Сьогодні</span>
         <strong>{statistics.today}</strong>
       </div>
       <div>
-        <span className="dh-dragon-eyebrow">Upcoming</span>
+        <span className="dh-dragon-eyebrow">Заплановано</span>
         <strong>{statistics.upcoming}</strong>
       </div>
-      <DragonProgress value={Math.min(statistics.totalXp, 100)} label="Event XP signal" />
+      <DragonProgress value={Math.min(statistics.totalXp, 100)} label="Бал подій" />
     </div>
   );
 }
 
 export function DragonEventEmptyState() {
-  return <DragonEmptyState title="No event seals found" description="Adjust filters or wait for the next Dragon House activity." />;
+  return <DragonEmptyState title="Подій поки немає" description="Зміни фільтри або дочекайся наступної активності Dragon House." />;
 }
 
 export function DragonEventLoadingState() {
-  return <DragonLoader label="Dragon Event Engine opens the chronicle gates" />;
+  return <DragonLoader label="Завантажуємо події..." />;
 }
 
 export function DragonEventErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return <DragonRetry title="Dragon Event Engine did not open" description={message} onRetry={onRetry} />;
+  return <DragonRetry title="Не вдалося завантажити події" description={message} onRetry={onRetry} />;
 }
 
 function DragonEventMiniCard({ event, onSelect }: { event: DragonEvent; onSelect?: (event: DragonEvent) => void }) {
   const meta = DRAGON_EVENT_TYPE_META[event.type];
-  const time = event.allDay ? 'All day' : getDragonEventTimeKey(event.startsAt) ?? 'Time reserved';
+  const time = event.allDay ? 'Увесь день' : getDragonEventTimeKey(event.startsAt) ?? 'Час уточнюється';
 
   return (
     <DragonCard interactive className={`dh-event-mini-card ${meta.className}`}>
@@ -571,7 +627,7 @@ function DragonEventMiniCard({ event, onSelect }: { event: DragonEvent; onSelect
         <DragonBadge tone={meta.tone}>{meta.label}</DragonBadge>
         <strong>{event.title}</strong>
         <span>
-          {getDragonEventDateKey(event)} at {time}
+          {getDragonEventDateKey(event)}, {time}
         </span>
       </button>
     </DragonCard>
@@ -652,39 +708,39 @@ function DragonEventFormDialog({
     <DragonDialog title={title} onClose={onClose}>
       <form className="dh-event-form space-y-3" onSubmit={submit}>
         {error ? <p role="alert">{error}</p> : null}
-        <DragonInput value={form.title} onChange={(input) => update({ title: input.currentTarget.value })} placeholder="Title" aria-label="Event title" required />
-        <DragonTextarea value={form.description} onChange={(input) => update({ description: input.currentTarget.value })} placeholder="Description" aria-label="Event description" />
+        <DragonInput value={form.title} onChange={(input) => update({ title: input.currentTarget.value })} placeholder="Назва події" aria-label="Назва події" required />
+        <DragonTextarea value={form.description} onChange={(input) => update({ description: input.currentTarget.value })} placeholder="Опис події" aria-label="Опис події" />
         <div className="grid gap-3 md:grid-cols-2">
-          <DragonSelect value={form.eventType} onChange={(input) => update({ eventType: input.currentTarget.value as DragonEventType })} aria-label="Event type">
+          <DragonSelect value={form.eventType} onChange={(input) => update({ eventType: input.currentTarget.value as DragonEventType })} aria-label="Тип події">
             {STANDALONE_EVENT_TYPES.map((type) => (
               <option key={type} value={type}>{DRAGON_EVENT_TYPE_META[type].label}</option>
             ))}
           </DragonSelect>
-          <DragonSelect value={form.category} onChange={(input) => update({ category: input.currentTarget.value as DragonEventFormState['category'] })} aria-label="Event category">
+          <DragonSelect value={form.category} onChange={(input) => update({ category: input.currentTarget.value as DragonEventFormState['category'] })} aria-label="Категорія події">
             {STANDALONE_EVENT_CATEGORIES.map((category) => (
-              <option key={category} value={category}>{category}</option>
+              <option key={category} value={category}>{STANDALONE_EVENT_CATEGORY_LABELS[category]}</option>
             ))}
           </DragonSelect>
-          <DragonInput type="datetime-local" value={form.startsAt} onChange={(input) => update({ startsAt: input.currentTarget.value })} aria-label="Starts at" required />
-          <DragonInput type="datetime-local" value={form.endsAt} onChange={(input) => update({ endsAt: input.currentTarget.value })} aria-label="Ends at" />
-          <DragonInput value={form.timezone} onChange={(input) => update({ timezone: input.currentTarget.value })} placeholder="Europe/Kiev" aria-label="Timezone" />
-          <DragonInput value={form.locationLabel} onChange={(input) => update({ locationLabel: input.currentTarget.value })} placeholder="Location" aria-label="Location" />
-          <DragonInput value={form.organizerFamilyMemberId} onChange={(input) => update({ organizerFamilyMemberId: input.currentTarget.value })} aria-label="Organizer family member id" />
-          <DragonInput type="number" min="1" value={form.maxParticipants} onChange={(input) => update({ maxParticipants: input.currentTarget.value })} placeholder="Max participants" aria-label="Max participants" />
-          <DragonSelect value={form.visibility} onChange={(input) => update({ visibility: input.currentTarget.value as DragonEventVisibility })} aria-label="Event visibility">
+          <DragonInput type="datetime-local" value={form.startsAt} onChange={(input) => update({ startsAt: input.currentTarget.value })} aria-label="Початок події" required />
+          <DragonInput type="datetime-local" value={form.endsAt} onChange={(input) => update({ endsAt: input.currentTarget.value })} aria-label="Завершення події" />
+          <DragonInput value={form.timezone} onChange={(input) => update({ timezone: input.currentTarget.value })} placeholder="Europe/Kiev" aria-label="Часовий пояс" />
+          <DragonInput value={form.locationLabel} onChange={(input) => update({ locationLabel: input.currentTarget.value })} placeholder="Локація" aria-label="Локація" />
+          <DragonInput value={form.organizerFamilyMemberId} onChange={(input) => update({ organizerFamilyMemberId: input.currentTarget.value })} aria-label="ID організатора в сімʼї" />
+          <DragonInput type="number" min="1" value={form.maxParticipants} onChange={(input) => update({ maxParticipants: input.currentTarget.value })} placeholder="Максимум учасників" aria-label="Максимум учасників" />
+          <DragonSelect value={form.visibility} onChange={(input) => update({ visibility: input.currentTarget.value as DragonEventVisibility })} aria-label="Видимість події">
             {EVENT_VISIBILITIES.filter((visibility) => visibility !== 'all').map((visibility) => (
-              <option key={visibility} value={visibility}>{visibility}</option>
+              <option key={visibility} value={visibility}>{EVENT_VISIBILITY_LABELS[visibility]}</option>
             ))}
           </DragonSelect>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.allDay} onChange={(input) => update({ allDay: input.currentTarget.checked })} />
-            All day
+            Увесь день
           </label>
         </div>
-        <DragonTextarea value={form.notes} onChange={(input) => update({ notes: input.currentTarget.value })} placeholder="Notes" aria-label="Event notes" />
+        <DragonTextarea value={form.notes} onChange={(input) => update({ notes: input.currentTarget.value })} placeholder="Нотатки" aria-label="Нотатки події" />
         <div className="flex flex-wrap justify-end gap-2">
-          <DragonButton type="button" variant="ghost" onClick={onClose} disabled={mutating}>Close</DragonButton>
-          <DragonButton type="submit" disabled={mutating || !form.title.trim() || !form.startsAt}>{mutating ? 'Saving' : 'Save'}</DragonButton>
+          <DragonButton type="button" variant="ghost" onClick={onClose} disabled={mutating}>Закрити</DragonButton>
+          <DragonButton type="submit" disabled={mutating || !form.title.trim() || !form.startsAt}>{mutating ? 'Зберігаємо...' : 'Зберегти'}</DragonButton>
         </div>
       </form>
       {event?.backendEventId ? (
@@ -710,10 +766,10 @@ function canManageEvent(user: FamilyUser, event: DragonEvent): boolean {
 }
 
 function sourceLabel(event: DragonEvent): string {
-  if (event.source.sourceModule === 'tower_defense') return 'Tower Defense';
-  if (event.source.sourceModule === 'quest_board') return 'Family Quest';
-  if (event.source.sourceModule === 'birthday') return 'Birthday';
-  return 'Family Event';
+  if (event.source.sourceModule === 'tower_defense') return 'Оборона вишок';
+  if (event.source.sourceModule === 'quest_board') return 'Сімейний квест';
+  if (event.source.sourceModule === 'birthday') return 'День народження';
+  return 'Сімейна подія';
 }
 
 function toDateTimeLocal(value?: string | null): string {

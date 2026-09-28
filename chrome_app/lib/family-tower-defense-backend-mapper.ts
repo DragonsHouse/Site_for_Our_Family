@@ -107,7 +107,11 @@ export function mapBackendTowerDefense(defense: BackendTowerDefenseDto): DragonT
       presentCount: defense.presentCount,
       externalSource: defense.externalSource,
       externalId: defense.externalId,
-      syncIdempotencyKey: defense.syncIdempotencyKey
+      syncIdempotencyKey: defense.syncIdempotencyKey,
+      cooldownAt: readString(defense.metadata.cooldownAt) ?? null,
+      cooldownNeedsUpdate: typeof defense.metadata.cooldownNeedsUpdate === 'boolean' ? defense.metadata.cooldownNeedsUpdate : null,
+      lastDiscordMessageAt: readString(defense.metadata.lastDiscordMessageAt) ?? null,
+      sourceChannelId: readString(defense.metadata.sourceChannelId) ?? defense.discord.channelId ?? null
     },
     createdAt: defense.createdAt,
     updatedAt: defense.updatedAt

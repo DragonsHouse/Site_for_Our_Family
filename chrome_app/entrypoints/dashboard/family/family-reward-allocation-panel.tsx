@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { DragonButton, DragonCard, DragonEmptyState, DragonInput, DragonLoader, DragonRetry, DragonSelect } from '../dragon-ui/dragon-ui';
+﻿import { useEffect, useMemo, useState } from 'react';
+import { DragonBadge, DragonButton, DragonCard, DragonEmptyState, DragonInput, DragonLoader, DragonRetry, DragonSelect } from '../dragon-ui/dragon-ui';
 import { listBackendRewards } from '../../../lib/family-achievements-backend-client';
 import type { BackendRewardDefinitionDto } from '../../../lib/family-achievements-backend-response';
 import { FamilyMemberDirectoryClient, type FamilyMemberDirectoryItem } from '../../../lib/family-member-directory-client';
@@ -57,7 +57,7 @@ export function FamilyRewardAllocationPanel({
       setSelectedMemberId((current) => current || memberResponse.items[0]?.memberId || '');
       setSelectedRewardId((current) => current || activeRewards[0]?.id || '');
     } catch (loadError) {
-      if (!signal?.aborted) setError(loadError instanceof Error ? loadError.message : 'Reward allocations failed to load.');
+      if (!signal?.aborted) setError(loadError instanceof Error ? loadError.message : 'Не вдалося завантажити заплановані нагороди.');
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -78,7 +78,7 @@ export function FamilyRewardAllocationPanel({
       await load();
       setReason('');
     } catch (mutationError) {
-      setError(mutationError instanceof Error ? mutationError.message : 'Reward allocation request failed.');
+      setError(mutationError instanceof Error ? mutationError.message : 'Не вдалося змінити заплановану нагороду.');
     } finally {
       setMutatingKey(null);
     }
@@ -92,19 +92,19 @@ export function FamilyRewardAllocationPanel({
       : createBackendFamilyEventRewardAllocation(sourceId, payload));
   };
   const canMutate = canManage && !closed && !summaryOnly;
-  const panelTitle = summaryOnly ? 'Planned Rewards Summary' : 'Planned Rewards';
+  const panelTitle = summaryOnly ? 'Підсумок запланованих нагород' : 'Заплановані нагороди';
 
   return (
     <DragonCard data-reward-allocation-source="backend" data-reward-allocation-mode={summaryOnly ? 'summary' : 'manager'}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="dh-dragon-eyebrow">{panelTitle}</span>
-        {!loading ? <DragonBadge tone={allocations.length ? 'gold' : 'muted'}>{allocations.length} planned</DragonBadge> : null}
+        {!loading ? <DragonBadge tone={allocations.length ? 'gold' : 'muted'}>{allocations.length} заплановано</DragonBadge> : null}
       </div>
-      {closed ? <p className="text-sm opacity-80">Source is closed. Planned allocations are read-only; earned grants live in reward history.</p> : null}
-      {summaryOnly ? <p className="text-sm opacity-80">These rewards will become earned grants only after backend completion/reconciliation succeeds.</p> : null}
-      {loading ? <DragonLoader label="Loading reward allocations" /> : null}
+      {closed ? <p className="text-sm opacity-80">Джерело закрите. Заплановані нагороди доступні тільки для перегляду, а видані нагороди зберігаються в історії.</p> : null}
+      {summaryOnly ? <p className="text-sm opacity-80">Ці нагороди стануть виданими після завершення події та успішної звірки на сервері.</p> : null}
+      {loading ? <DragonLoader label="Завантаження нагород" /> : null}
       {error ? <DragonRetry description={error} onRetry={() => load()} /> : null}
-      {!loading && !allocations.length ? <DragonEmptyState title="No planned rewards" description="Backend returned an empty allocation list." /> : null}
+      {!loading && !allocations.length ? <DragonEmptyState title="Запланованих нагород немає" description="Для цього джерела нагороди ще не заплановані." /> : null}
       {allocations.length ? (
         <div className="space-y-2">
           {allocations.map((allocation) => (
@@ -120,10 +120,10 @@ export function FamilyRewardAllocationPanel({
                     variant="ghost"
                     disabled={Boolean(mutatingKey)}
                     onClick={() => runMutation(`edit:${allocation.id}`, () => sourceModule === 'tower_defense'
-                      ? updateBackendTowerDefenseRewardAllocation(sourceId, allocation.id, { reason: allocation.reason ? null : 'Planned reward' })
-                      : updateBackendFamilyEventRewardAllocation(sourceId, allocation.id, { reason: allocation.reason ? null : 'Planned reward' }))}
+                      ? updateBackendTowerDefenseRewardAllocation(sourceId, allocation.id, { reason: allocation.reason ? null : 'Запланована нагорода' })
+                      : updateBackendFamilyEventRewardAllocation(sourceId, allocation.id, { reason: allocation.reason ? null : 'Запланована нагорода' }))}
                   >
-                    Edit
+                    Редагувати
                   </DragonButton>
                   <DragonButton
                     type="button"
@@ -133,7 +133,7 @@ export function FamilyRewardAllocationPanel({
                       ? deleteBackendTowerDefenseRewardAllocation(sourceId, allocation.id)
                       : deleteBackendFamilyEventRewardAllocation(sourceId, allocation.id))}
                   >
-                    Remove
+                    Прибрати
                   </DragonButton>
                 </>
               ) : null}
@@ -143,15 +143,15 @@ export function FamilyRewardAllocationPanel({
       ) : null}
       {canMutate ? (
         <div className="mt-3 grid gap-2">
-          <DragonSelect value={selectedMemberId} onChange={(event) => setSelectedMemberId(event.currentTarget.value)} aria-label="Reward recipient">
+          <DragonSelect value={selectedMemberId} onChange={(event) => setSelectedMemberId(event.currentTarget.value)} aria-label="Отримувач нагороди">
             {members.map((member) => <option key={member.memberId} value={member.memberId}>{member.displayName}</option>)}
           </DragonSelect>
-          <DragonSelect value={selectedRewardId} onChange={(event) => setSelectedRewardId(event.currentTarget.value)} aria-label="Reward definition">
+          <DragonSelect value={selectedRewardId} onChange={(event) => setSelectedRewardId(event.currentTarget.value)} aria-label="Тип нагороди">
             {rewards.map((reward) => <option key={reward.id} value={reward.id}>{reward.name} / {formatRewardPreview(reward)}</option>)}
           </DragonSelect>
-          <DragonInput value={reason} onChange={(event) => setReason(event.currentTarget.value)} placeholder="Reason" aria-label="Reward allocation reason" />
+          <DragonInput value={reason} onChange={(event) => setReason(event.currentTarget.value)} placeholder="Причина" aria-label="Причина запланованої нагороди" />
           <DragonButton type="button" disabled={Boolean(mutatingKey) || !selectedMemberId || !selectedRewardId} onClick={addAllocation}>
-            Add planned reward
+            Додати заплановану нагороду
           </DragonButton>
         </div>
       ) : null}
@@ -160,7 +160,7 @@ export function FamilyRewardAllocationPanel({
 }
 
 function formatRewardPreview(reward: BackendRewardDefinitionDto): string {
-  if (reward.rewardType === 'money') return reward.amount === null ? 'money' : `${reward.amount} ${reward.currency ?? 'USD'}`;
+  if (reward.rewardType === 'money') return reward.amount === null ? 'гроші' : `${reward.amount} ${reward.currency ?? 'USD'}`;
   if (reward.rewardType === 'xp') return `${reward.amount ?? reward.value ?? 0} XP`;
   return reward.value ?? reward.rewardType;
 }

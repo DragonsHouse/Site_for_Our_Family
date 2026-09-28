@@ -259,6 +259,7 @@ export type DragonTowerDefenseCreateInput = {
   leaderboardEligible?: boolean;
   statisticsEligible?: boolean;
   source?: DragonTowerDefense['source'];
+  metadata?: Record<string, unknown>;
   discord?: DragonTowerDefense['discord'];
   backendMetadata?: DragonTowerDefense['backendMetadata'];
 };

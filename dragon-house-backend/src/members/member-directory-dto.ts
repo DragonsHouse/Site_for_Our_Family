@@ -15,6 +15,7 @@ export type FamilyMemberDirectoryQuery = {
 
 export type FamilyMemberDirectoryItemDto = {
   memberId: string;
+  staticId: string | null;
   displayName: string;
   role: FamilyRole;
   rank: {
@@ -46,6 +47,7 @@ export type FamilyMemberDirectoryResponseDto = {
 
 export type FamilyMemberPublicDetailsDto = {
   memberId: string;
+  staticId: string | null;
   displayName: string;
   role: FamilyRole;
   rank: {
@@ -73,6 +75,7 @@ export function toFamilyMemberDirectoryItemDto(member: FamilyMember): FamilyMemb
 
   return {
     memberId: member.id,
+    staticId: stringOrNull(member.staticId),
     displayName: serverNickname ?? stringOrNull(member.nickname) ?? 'Unknown member',
     role: member.role,
     rank: {
@@ -95,6 +98,7 @@ export function toFamilyMemberPublicDetailsDto(member: FamilyMember): FamilyMemb
   const item = toFamilyMemberDirectoryItemDto(member);
   return {
     memberId: item.memberId,
+    staticId: item.staticId,
     displayName: item.displayName,
     role: item.role,
     rank: {

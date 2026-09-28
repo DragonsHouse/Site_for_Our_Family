@@ -168,7 +168,7 @@ describe('Dragon Event Engine', () => {
     assert.match(modelsSource, /achievementIds: string\[\]/);
     assert.match(modelsSource, /rewards: DragonEventReward\[\]/);
     assert.match(modelsSource, /DragonEventTowerDefenseMetadata/);
-    assert.match(shellSource, /activeTab === 'events' \? <DragonEventEngineScreen \/>/);
+    assert.match(shellSource, /activeTab === 'events'[\s\S]*<DragonEventEngineScreen/u);
     assert.doesNotMatch(shellSource, /DashboardApp familyTab="events"/);
   });
 

@@ -599,12 +599,13 @@ export const FAMILY_ECONOMY_ENTRIES: FamilyEconomyEntry[] = [
 
 export const RECRUITMENT_SETTINGS: RecruitmentSettings = {
   isOpen: true,
-  text: 'Dragon House приймає активних гравців, які поважають сім’ю, дисципліну та внутрішні правила лігва.',
+  text: 'Dragon House приймає активних гравців, які поважають сім’ю, дисципліну та внутрішні правила лігва. Окремо ведемо напрями каптерів, фармерів, рекрутерів та HR.',
   requirements: [
     'Адекватна поведінка',
     'Готовність брати участь у сімейних активностях',
     'Зміна прізвища на Dragons після прийняття',
-    'Без токсичності й зливу внутрішньої інформації'
+    'Без токсичності й зливу внутрішньої інформації',
+    'Для рекрутерів і HR: ввічлива комунікація, перевірка кандидатів і передача новачків старшим'
   ],
   contact: 'Anastasia_Dragons / Marcel_Dragons',
   author: 'Anastasia_Dragons',
@@ -619,7 +620,7 @@ export const FAMILY_MAP_ZONES: FamilyMapZone[] = [
     type: 'dragon_house',
     color: '#f97316',
     polygon: null,
-    description: 'Placeholder для майбутніх сімейних зон. Координати ще не задані.',
+    description: 'Головна зона Dragon House. Координати, полігони й примітки ведуться через редактор мапи.',
     source: 'family',
     updatedAt: '2026-07-07T00:00:00.000Z',
     updatedBy: 'Anastasia_Dragons',
@@ -632,7 +633,7 @@ export const FAMILY_MAP_ZONES: FamilyMapZone[] = [
     type: 'ally',
     color: '#22c55e',
     polygon: null,
-    description: 'Союзна сім’я. Координати не вигадані й поки не рендеряться на мапі.',
+    description: 'Союзна сімʼя. Зона показується як довідкова частина сімейної мапи.',
     source: 'family',
     updatedAt: '2026-07-07T00:00:00.000Z',
     updatedBy: 'Anastasia_Dragons',
@@ -706,21 +707,4 @@ export const RESOURCE_LINKS: ResourceLink[] = [
   ruleLink('statute-liv', 'statutes', 'Статут LIV')
 ];
 
-export const QUANT_NEWS_ITEMS: QuantNewsItem[] = [
-  {
-    id: 'quant-news-adapter-ready',
-    title: 'Підготовлено місце для новин Quant',
-    body: 'Новини будуть підтягуватись через офіційний Discord bot/backend integration. User token, self-bot і scraping не використовуються.',
-    publishedAt: '2026-07-07T00:00:00.000Z',
-    sourceUrl: 'https://discord.com/channels/981163624980680714/981254995435458590',
-    sourceName: 'Quant Discord news'
-  },
-  {
-    id: 'quant-news-demo',
-    title: 'Demo news item',
-    body: 'Це локальний демонстраційний запис для UI, поки немає офіційного backend adapter.',
-    publishedAt: '2026-07-06T00:00:00.000Z',
-    sourceUrl: 'https://discord.com/channels/981163624980680714/981254995435458590',
-    sourceName: 'Quant Discord news'
-  }
-];
+export const QUANT_NEWS_ITEMS: QuantNewsItem[] = [];

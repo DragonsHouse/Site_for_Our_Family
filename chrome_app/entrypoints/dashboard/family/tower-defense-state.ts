@@ -87,24 +87,34 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     () => sortDragonTowerDefenses(filterDragonTowerDefenses(defenseCollection.items, filters)),
     [defenseCollection.items, filters]
   );
+  const plannedDefenses = useMemo(
+    () => defenses.filter((defense) => !isDiscordTowerGuardProjection(defense)),
+    [defenses]
+  );
+  const currentTowerSignals = useMemo(
+    () => defenses.filter(isDiscordTowerSignalDefense).slice(0, 3),
+    [defenses]
+  );
   const activeDefense = useMemo(
     () =>
-      defenses.find((defense) => defense.status === 'active') ??
-      defenses.find((defense) => defense.status === 'gathering') ??
-      defenses.find((defense) => defense.status === 'scheduled') ??
+      plannedDefenses.find((defense) => defense.status === 'active') ??
+      plannedDefenses.find((defense) => defense.status === 'gathering') ??
+      plannedDefenses.find((defense) => defense.status === 'scheduled') ??
       null,
-    [defenses]
+    [plannedDefenses]
   );
   const selectedDefense = useMemo(
     () => defenseCollection.items.find((defense) => defense.id === selectedDefenseId) ?? activeDefense,
     [activeDefense, defenseCollection.items, selectedDefenseId]
   );
   const upcomingDefenses = useMemo(
-    () => defenses.filter((defense) => defense.status === 'draft' || defense.status === 'scheduled' || defense.status === 'gathering'),
-    [defenses]
+    () => plannedDefenses
+      .filter((defense) => defense.status === 'draft' || defense.status === 'scheduled' || defense.status === 'gathering')
+      .slice(0, 3),
+    [plannedDefenses]
   );
-  const history = useMemo(() => buildDragonDefenseHistory(defenseCollection.items, memberCollection.items), [defenseCollection.items, memberCollection.items]);
-  const statistics = useMemo(() => getDragonTowerDefenseStatistics(defenseCollection.items), [defenseCollection.items]);
+  const history = useMemo(() => buildDragonDefenseHistory(plannedDefenses, memberCollection.items), [plannedDefenses, memberCollection.items]);
+  const statistics = useMemo(() => getDragonTowerDefenseStatistics(plannedDefenses), [plannedDefenses]);
   const roster = useMemo(
     () => (backendReadEnabled ? backendRoster ?? [] : buildDragonFireGuardRoster(activeDefense, memberCollection.items)),
     [activeDefense, backendReadEnabled, backendRoster, memberCollection.items]
@@ -120,7 +130,7 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     if (!dependencies.loadTowerDefenseReadState) return null;
     setBackendLoading(true);
     setBackendError(null);
-    setReadSource('backend_loading');
+    setReadSource((current) => (current === 'backend' || current === 'backend_error' || current === 'dev_mock_fallback' ? current : 'backend_loading'));
     try {
       const result = await dependencies.loadTowerDefenseReadState({
         status: filters.status,
@@ -153,6 +163,26 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
   useEffect(() => {
     if (!dependencies.loadTowerDefenseReadState) return;
     void loadBackendReadState();
+  }, [dependencies.loadTowerDefenseReadState, loadBackendReadState]);
+
+  useEffect(() => {
+    if (!dependencies.loadTowerDefenseReadState) return;
+
+    const refreshFromDiscordProjection = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void loadBackendReadState();
+    };
+    const intervalId = window.setInterval(refreshFromDiscordProjection, 10_000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshFromDiscordProjection();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [dependencies.loadTowerDefenseReadState, loadBackendReadState]);
 
   const refresh = useCallback(() => {
@@ -318,7 +348,7 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     setRosterFilter,
     selectedDefense,
     setSelectedDefenseId,
-    loading: backendReadEnabled ? backendLoading : defenseCollection.loading || eventCollection.loading || memberCollection.loading,
+    loading: backendReadEnabled ? backendLoading && readSource === 'backend_loading' && defenseCollection.items.length === 0 : defenseCollection.loading || eventCollection.loading || memberCollection.loading,
     refreshing: backendReadEnabled ? backendLoading : defenseCollection.refreshing || eventCollection.refreshing || memberCollection.refreshing,
     error: backendReadEnabled ? backendError : defenseCollection.error ?? eventCollection.error ?? memberCollection.error,
     domainError,
@@ -336,6 +366,7 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     roster,
     filteredRoster,
     readiness,
+    currentTowerSignals,
     readSource,
     mutating,
     towerDefinitions,
@@ -354,4 +385,12 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
 
 function isBackendDefense(defense: DragonTowerDefense): boolean {
   return defense.dataSource === 'backend' || defense.backendMetadata?.dataSource === 'backend';
+}
+
+function isDiscordTowerSignalDefense(defense: DragonTowerDefense): boolean {
+  return isDiscordTowerGuardProjection(defense) && ['scheduled', 'gathering', 'active'].includes(defense.status);
+}
+
+function isDiscordTowerGuardProjection(defense: DragonTowerDefense): boolean {
+  return defense.backendMetadata?.externalSource === 'discord_tower_guard';
 }

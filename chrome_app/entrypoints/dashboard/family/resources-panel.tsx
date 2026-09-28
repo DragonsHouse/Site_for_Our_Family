@@ -6,7 +6,7 @@ import type { FamilyUser, ResourceCategory } from '../../../lib/family-types';
 
 const CATEGORY_LABELS: Record<ResourceCategory, string> = {
   general: 'Загальні правила',
-  crime: 'Crime',
+  crime: 'Кримінал',
   captures_business: 'Капти / бізнеси',
   government: 'Державні структури',
   codes_laws: 'Кодекси / закони',
@@ -38,13 +38,14 @@ export function ResourcesPanel({ currentUser }: { currentUser: FamilyUser }) {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-white">Ресурси Dragon House</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Внутрішні файли сім’ї та зовнішня база знань Quant RP. Тексти правил не копіюються, відкривається оригінальне джерело.
+            <p className="mt-1 text-sm text-slate-300">
+              Внутрішні файли сімʼї та зовнішня база знань Quant RP. Тексти правил не копіюються:
+              відкривається оригінальне джерело.
             </p>
           </div>
           {canManageResourceData ? (
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-              Майбутні дії: редагувати версію, дату, посилання й опис ресурсів.
+              Ресурси доступні для керування власницею: оновлюй версію, дату, посилання й опис у конфігурації ресурсів.
             </div>
           ) : null}
         </div>
@@ -52,19 +53,19 @@ export function ResourcesPanel({ currentUser }: { currentUser: FamilyUser }) {
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           {FAMILY_RESOURCES.map((resource) => (
             <article key={resource.id} className="rounded-2xl border border-amber-500/30 bg-amber-950/10 p-4">
-              <div className="text-xs uppercase tracking-[0.22em] text-amber-300">Family file</div>
+              <div className="text-xs uppercase tracking-[0.22em] text-amber-300">Файл сімʼї</div>
               <h3 className="mt-1 text-base font-semibold text-white">{resource.title}</h3>
               <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
                 <div>
-                  <dt className="text-slate-500">Дата</dt>
+                  <dt className="text-slate-400">Дата</dt>
                   <dd className="text-slate-100">{resource.date}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Файл / опис</dt>
+                  <dt className="text-slate-400">Файл / опис</dt>
                   <dd className="text-slate-100">{resource.fileDescription}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Статус</dt>
+                  <dt className="text-slate-400">Статус</dt>
                   <dd className="text-emerald-100">{resource.status}</dd>
                 </div>
               </dl>
@@ -115,7 +116,7 @@ export function ResourcesPanel({ currentUser }: { currentUser: FamilyUser }) {
                     {CATEGORY_LABELS[link.category]}
                   </div>
                   <h3 className="mt-1 font-semibold text-white">{link.title}</h3>
-                  <p className="mt-2 text-sm text-slate-400">{link.description}</p>
+                  <p className="mt-2 text-sm text-slate-300">{link.description}</p>
                   <a
                     href={link.url}
                     target="_blank"
@@ -150,8 +151,8 @@ export function ResourcesPanel({ currentUser }: { currentUser: FamilyUser }) {
                 <article key={item.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
                   <div className="text-xs uppercase tracking-[0.2em] text-amber-300">{item.sourceName}</div>
                   <h3 className="mt-1 font-semibold text-white">{item.title}</h3>
-                  <p className="mt-2 text-sm text-slate-400">{item.body}</p>
-                  <div className="mt-3 text-xs text-slate-500">
+                  <p className="mt-2 text-sm text-slate-300">{item.body}</p>
+                  <div className="mt-3 text-xs text-slate-400">
                     {new Date(item.publishedAt).toLocaleString('uk-UA')}
                   </div>
                 </article>

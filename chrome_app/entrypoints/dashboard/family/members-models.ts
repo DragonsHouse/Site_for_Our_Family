@@ -9,7 +9,7 @@ export type DragonMemberRole =
   | 'dragon'
   | 'egg';
 
-export type DragonMemberStatus = 'online' | 'offline' | 'away' | 'in_voice' | 'recently_active';
+export type DragonMemberStatus = 'active' | 'inactive' | 'online' | 'offline' | 'away' | 'in_voice' | 'recently_active';
 export type DragonMemberDiscordSyncState = 'not-linked' | 'linked' | 'synchronized' | 'guild-inactive' | 'conflict';
 
 export type DragonMembersView = 'grid' | 'list';
@@ -58,46 +58,46 @@ export const DRAGON_MEMBER_ROLE_META: Record<
   }
 > = {
   volodarka_predvichnoho_polumia: {
-    label: 'Volodarka Predvichnoho Polumia',
+    label: 'Володарка Предвічного Полум’я',
     order: 6,
     tone: 'gold',
     className: 'dh-members-role-volodarka',
-    seal: 'Crown Flame'
+    seal: 'Корона полум’я'
   },
   keeper_of_flame: {
-    label: 'Keeper of Flame',
+    label: 'Хранитель полум’я',
     order: 5,
     tone: 'ember',
     className: 'dh-members-role-keeper',
-    seal: 'Keeper Seal'
+    seal: 'Печатка хранителя'
   },
   elder: {
-    label: 'Elders',
+    label: 'Старійшини',
     order: 4,
     tone: 'gold',
     className: 'dh-members-role-elder',
-    seal: 'Ancient Seal'
+    seal: 'Давня печатка'
   },
   senior_dragon: {
-    label: 'Senior Dragons',
+    label: 'Старші дракони',
     order: 3,
     tone: 'success',
     className: 'dh-members-role-senior',
-    seal: 'Wing Seal'
+    seal: 'Печатка крила'
   },
   dragon: {
-    label: 'Dragon',
+    label: 'Дракон',
     order: 2,
     tone: 'ember',
     className: 'dh-members-role-dragon',
-    seal: 'Dragon Seal'
+    seal: 'Печатка дракона'
   },
   egg: {
-    label: 'Egg',
+    label: 'Новачок',
     order: 1,
     tone: 'muted',
     className: 'dh-members-role-egg',
-    seal: 'Hatchling Seal'
+    seal: 'Печатка новачка'
   }
 };
 
@@ -109,28 +109,38 @@ export const DRAGON_MEMBER_STATUS_META: Record<
     className: string;
   }
 > = {
+  active: {
+    label: 'Активний',
+    tone: 'success',
+    className: 'dh-members-status-active'
+  },
+  inactive: {
+    label: 'Неактивний',
+    tone: 'muted',
+    className: 'dh-members-status-inactive'
+  },
   online: {
-    label: 'Online',
+    label: 'Онлайн',
     tone: 'success',
     className: 'dh-members-status-online'
   },
   offline: {
-    label: 'Offline',
+    label: 'Недоступний',
     tone: 'muted',
     className: 'dh-members-status-offline'
   },
   away: {
-    label: 'Away',
+    label: 'Відійшов',
     tone: 'gold',
     className: 'dh-members-status-away'
   },
   in_voice: {
-    label: 'In Voice',
+    label: 'У голосі',
     tone: 'ember',
     className: 'dh-members-status-voice'
   },
   recently_active: {
-    label: 'Recently Active',
+    label: 'Нещодавно активний',
     tone: 'success',
     className: 'dh-members-status-recent'
   }

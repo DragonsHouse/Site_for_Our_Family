@@ -7,7 +7,25 @@ import {
   notifyQuestReportAccepted
 } from '../../../lib/family-notifications';
 import { canManageDiscordIntegration, canManageFamilyQuests } from '../../../lib/family-permissions';
-import { FamilyQuestPayoutApiError, issueBackendQuestPayout } from '../../../lib/family-quest-backend-client';
+import {
+  archiveBackendFamilyQuestTemplate,
+  completeBackendFamilyQuest,
+  createBackendFamilyQuest,
+  createBackendFamilyQuestReport,
+  createBackendFamilyQuestTemplate,
+  FamilyQuestPayoutApiError,
+  issueBackendQuestPayout,
+  joinBackendFamilyQuest,
+  transferBackendFamilyQuestReportToAccounting,
+  updateBackendFamilyQuest,
+  updateBackendFamilyQuestTemplate,
+  withdrawBackendFamilyQuest
+} from '../../../lib/family-quest-backend-client';
+import {
+  mapBackendQuest,
+  mapBackendQuestReport,
+  mapBackendQuestTemplate
+} from '../../../lib/family-quest-backend-mapper';
 import { loadFamilyQuestReadState, type FamilyQuestReadSource } from '../../../lib/family-quest-read-adapter';
 import {
   applyQuestRewardPlan,
@@ -51,10 +69,15 @@ type BackendPayoutFeedback = {
   message: string;
 };
 
-const BACKEND_WRITE_PENDING_MESSAGE = 'Ця дія буде доступна після підключення серверного збереження.';
+type OperationMessage = {
+  tone: 'success' | 'error' | 'info';
+  text: string;
+};
+
+const BACKEND_WRITE_ERROR_MESSAGE = 'Не вдалося зберегти зміни квесту.';
 
 const STATUS_LABELS: Record<FamilyQuestStatus, string> = {
-  draft: 'Draft',
+  draft: 'Чернетка',
   recruiting: 'Набір відкрито',
   scheduled: 'Набір закрито',
   active: 'Активний',
@@ -64,7 +87,7 @@ const STATUS_LABELS: Record<FamilyQuestStatus, string> = {
   reported: 'Звіт створено',
   sent_to_accounting: 'Передано в бухгалтерію',
   paid: 'Виплачено',
-  cooldown: 'Cooldown',
+  cooldown: 'Відкат',
   closed: 'Набір закрито',
   in_progress: 'Активний',
   submitted: 'Передано',
@@ -186,7 +209,7 @@ function QuestImage({ template }: { template: FamilyQuestTemplate }) {
   return (
     <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-red-950/70 bg-gradient-to-br from-red-950/70 via-black to-amber-950/40">
       <div className="absolute inset-0 flex items-center justify-center px-5 text-center text-sm text-amber-100/80">
-        Quest image
+        Зображення квесту
         <br />
         {slot ?? template.imageAsset}
       </div>
@@ -233,7 +256,7 @@ function QuestEditor({
       rewardMode: 'equal',
       cooldownUntil: null,
       cooldownHours: 24,
-      rewardLabel: 'Reward is not configured',
+      rewardLabel: 'Нагороду не налаштовано',
       steps: [''],
       hint: null,
       route: null,
@@ -248,6 +271,7 @@ function QuestEditor({
     }
   );
   const [stepsText, setStepsText] = useState(draft.steps.join('\n'));
+  const [editorError, setEditorError] = useState<string | null>(null);
 
   function save() {
     const steps = stepsText
@@ -256,19 +280,20 @@ function QuestEditor({
       .filter(Boolean);
     const familyReward = draft.familyReward ?? draft.familyBankShare;
     if (draft.memberRewardPool + familyReward > draft.totalReward) {
-      window.alert('memberRewardPool + familyReward не може перевищувати totalReward.');
+      setEditorError('Сума для учасників і сімейного банку не може перевищувати загальну нагороду.');
       return;
     }
+    setEditorError(null);
     onSave({
       ...draft,
-      title: draft.title.trim() || 'New family quest',
+      title: draft.title.trim() || 'Новий сімейний квест',
       rewardAmount: draft.memberRewardPool,
       familyBankShare: familyReward,
       familyReward,
       splitMode: draft.rewardMode ?? draft.splitMode,
       rewardMode: draft.rewardMode ?? draft.splitMode,
       rewardLabel: `${money(draft.memberRewardPool)} для людей`,
-      steps: steps.length ? steps : ['Describe quest steps'],
+      steps: steps.length ? steps : ['Опишіть кроки квесту'],
       hint: draft.hint?.trim() || null,
       route: draft.route?.trim() || null,
       items: draft.requiredItems?.trim() || null,
@@ -283,7 +308,7 @@ function QuestEditor({
       <section className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/10 bg-[#111111] p-5 shadow-2xl shadow-red-950/40">
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Quest manager</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Керування квестом</p>
             <h3 className="mt-1 text-xl font-semibold text-white">{template ? 'Редагувати квест' : 'Створити квест'}</h3>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">
@@ -297,9 +322,9 @@ function QuestEditor({
             <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300">
-            Image asset slot
+            Слот зображення
             <select value={draft.imageSlot ?? ''} onChange={(event) => setDraft({ ...draft, imageSlot: (event.target.value || null) as FamilyAssetSlot | null })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100">
-              <option value="">No slot</option>
+              <option value="">Без слота</option>
               {QUEST_ASSET_SLOTS.map((definition) => (
                 <option key={definition.slot} value={definition.slot}>
                   {definition.slot}
@@ -322,19 +347,19 @@ function QuestEditor({
             <input value={draft.recommendedTeamSize} onChange={(event) => setDraft({ ...draft, recommendedTeamSize: Number(event.target.value) || 1 })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300">
-            Total reward
+            Загальна нагорода
             <input value={draft.totalReward} onChange={(event) => setDraft({ ...draft, totalReward: Number(event.target.value) || 0 })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300">
-            Member reward pool
+            Фонд нагород для учасників
             <input value={draft.memberRewardPool} onChange={(event) => setDraft({ ...draft, memberRewardPool: Number(event.target.value) || 0 })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300">
-            Family reward
+            Нагорода сім’ї
             <input value={draft.familyReward ?? draft.familyBankShare} onChange={(event) => setDraft({ ...draft, familyReward: Number(event.target.value) || 0, familyBankShare: Number(event.target.value) || 0 })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300">
-            Reward mode
+            Режим нагороди
             <select value={draft.rewardMode ?? draft.splitMode} onChange={(event) => setDraft({ ...draft, rewardMode: event.target.value as FamilyQuestRewardMode, splitMode: event.target.value as FamilyQuestRewardMode })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100">
               {REWARD_MODES.map((mode) => (
                 <option key={mode} value={mode}>
@@ -344,15 +369,15 @@ function QuestEditor({
             </select>
           </label>
           <label className="block text-sm text-slate-300">
-            Cooldown hours
+            Відкат, годин
             <input value={draft.cooldownHours} onChange={(event) => setDraft({ ...draft, cooldownHours: Number(event.target.value) || 24 })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-slate-200">
             <input type="checkbox" checked={draft.isActive} onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })} />
-            Active
+            Активний
           </label>
           <label className="block text-sm text-slate-300 lg:col-span-2">
-            Опис / steps, one per line
+            Опис / кроки, по одному в рядку
             <textarea value={stepsText} onChange={(event) => setStepsText(event.target.value)} rows={5} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300">
@@ -364,17 +389,23 @@ function QuestEditor({
             <input value={draft.route ?? ''} onChange={(event) => setDraft({ ...draft, route: event.target.value })} placeholder="Можна вказати дату/час або маршрут" className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300 lg:col-span-2">
-            Предмети / requirements
+            Предмети / вимоги
             <input value={draft.requiredItems ?? draft.items ?? ''} onChange={(event) => setDraft({ ...draft, requiredItems: event.target.value, items: event.target.value })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
         </div>
 
+        {editorError ? (
+          <div className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-100" role="alert">
+            {editorError}
+          </div>
+        ) : null}
+
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200">
-            Cancel
+            Скасувати
           </button>
           <button type="button" onClick={save} className="dh-fire-button rounded-xl px-4 py-2 text-sm font-semibold text-white">
-            Save
+            Зберегти
           </button>
         </div>
       </section>
@@ -432,7 +463,7 @@ function RewardManager({
   }
 
   function addManualPerson(type: 'participant' | 'helper') {
-    const value = window.prompt(type === 'participant' ? 'Nickname participant' : 'Nickname helper', activeUsers[0]?.nickname ?? '');
+    const value = window.prompt(type === 'participant' ? 'Нікнейм учасника' : 'Нікнейм помічника', activeUsers[0]?.nickname ?? '');
     if (!value?.trim()) return;
     const matchedUser = activeUsers.find((user) => user.id === value.trim() || user.nickname.toLowerCase() === value.trim().toLowerCase());
     const userId = matchedUser?.id ?? value.trim();
@@ -459,7 +490,7 @@ function RewardManager({
         ) : null}
 
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <div className="dh-card rounded-2xl p-3 text-sm"><span className="text-slate-500">Total</span><div className="text-lg font-semibold text-white">{money(quest.totalReward)}</div></div>
+          <div className="dh-card rounded-2xl p-3 text-sm"><span className="text-slate-500">Усього</span><div className="text-lg font-semibold text-white">{money(quest.totalReward)}</div></div>
           <div className="dh-card rounded-2xl p-3 text-sm"><span className="text-slate-500">Людям</span><div className="text-lg font-semibold text-amber-100">{money(quest.memberRewardPool)}</div></div>
           <div className="dh-card rounded-2xl p-3 text-sm"><span className="text-slate-500">Сім’ї</span><div className="text-lg font-semibold text-orange-100">{money(quest.familyReward ?? quest.familyBankShare)}</div></div>
           <div className="dh-card rounded-2xl p-3 text-sm"><span className="text-slate-500">Видано</span><div className="text-lg font-semibold text-emerald-100">{money(plan.paidToMembers)}</div></div>
@@ -468,7 +499,7 @@ function RewardManager({
         <div className="mt-4 grid gap-3 lg:grid-cols-[220px_1fr]">
           <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
             <label className="block text-sm text-slate-300">
-              Reward mode
+              Режим нагороди
               <select
                 value={quest.rewardMode ?? quest.splitMode}
                 onChange={(event) => onUpdateQuest(applyQuestRewardPlan({ ...quest, rewardMode: event.target.value as FamilyQuestRewardMode, splitMode: event.target.value as FamilyQuestRewardMode }))}
@@ -488,20 +519,21 @@ function RewardManager({
             {plan.errors.length ? <div className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 p-2 text-sm text-red-100">{plan.errors.join('; ')}</div> : null}
             {quest.rewardMode === 'percentage' || quest.splitMode === 'percentage' ? (
               <div className={plan.isComplete ? 'mt-3 text-sm text-emerald-100' : 'mt-3 text-sm text-amber-100'}>
-                Percentage mode можна фіналізувати тільки при рівно 100%.
+                Відсотковий режим можна фіналізувати тільки при рівно 100%.
               </div>
             ) : null}
             <div className="mt-4 flex flex-col gap-2">
-              <button type="button" onClick={() => addManualPerson('participant')} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Додати participant</button>
-              <button type="button" onClick={() => addManualPerson('helper')} className="rounded-xl border border-orange-500/40 px-3 py-2 text-sm text-orange-100">Додати helper</button>
+              <button type="button" onClick={() => addManualPerson('participant')} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Додати учасника</button>
+              <button type="button" onClick={() => addManualPerson('helper')} className="rounded-xl border border-orange-500/40 px-3 py-2 text-sm text-orange-100">Додати помічника</button>
               <button type="button" onClick={() => onIssueAll(quest.id)} disabled={hasBackendPayouts || !plan.isComplete || plan.errors.length > 0} className="dh-fire-button rounded-xl px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Видати все</button>
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-white/10">
-            <div className="grid grid-cols-[1.1fr_0.7fr_0.7fr_0.8fr_0.7fr_1fr_0.8fr] bg-black/35 px-3 py-2 text-xs uppercase tracking-wide text-slate-400">
-              <div>Людина</div><div>Тип</div><div>%</div><div>Сума</div><div>Бонус</div><div>Предмети</div><div>Статус</div>
-            </div>
+          <section className="overflow-x-auto rounded-2xl border border-white/10">
+            <div className="min-w-[920px]">
+              <div className="grid grid-cols-[1.1fr_0.7fr_0.7fr_0.8fr_0.7fr_1fr_0.8fr] bg-black/35 px-3 py-2 text-xs uppercase tracking-wide text-slate-400">
+                <div>Людина</div><div>Тип</div><div>%</div><div>Сума</div><div>Бонус</div><div>Предмети</div><div>Статус</div>
+              </div>
             {people.map((person) => {
               const payout = plan.payouts.find((item) => item.userId === person.userId);
               const backendTarget = resolveBackendPayoutTarget(quest, payout);
@@ -513,23 +545,23 @@ function RewardManager({
                     <div className="font-medium text-white">{person.userId}</div>
                     <label className="mt-2 flex items-center gap-2 text-xs text-slate-300">
                       <input type="checkbox" checked={person.joinedLate ?? false} onChange={(event) => updatePerson(person.userId, { joinedLate: event.target.checked })} />
-                      joined late
+                      запізнився
                     </label>
                     <label className="mt-1 flex items-center gap-2 text-xs text-amber-100">
                       <input
                         type="checkbox"
                         checked={person.isBestParticipant ?? false}
-                        onChange={(event) => updatePerson(person.userId, { isBestParticipant: event.target.checked, bestParticipantReason: event.target.checked ? person.bestParticipantReason ?? 'Best participant' : null })}
+                        onChange={(event) => updatePerson(person.userId, { isBestParticipant: event.target.checked, bestParticipantReason: event.target.checked ? person.bestParticipantReason ?? 'Найкращий учасник' : null })}
                       />
-                      best
+                      найкращий
                     </label>
                   </div>
                   <div>
                     <select value={person.type ?? 'participant'} onChange={(event) => onUpdateQuest(upsertQuestPerson(quest, { userId: person.userId, type: event.target.value as 'participant' | 'helper', actor: quest.organizer }))} className="w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-slate-100">
-                      <option value="participant">participant</option>
-                      <option value="helper">helper</option>
+                <option value="participant">учасник</option>
+                <option value="helper">помічник</option>
                     </select>
-                    <button type="button" onClick={() => onUpdateQuest(removeQuestPerson(quest, person.userId, quest.organizer))} className="mt-2 rounded-lg border border-red-500/40 px-2 py-1 text-xs text-red-100">remove</button>
+                    <button type="button" onClick={() => onUpdateQuest(removeQuestPerson(quest, person.userId, quest.organizer))} className="mt-2 rounded-lg border border-red-500/40 px-2 py-1 text-xs text-red-100">Прибрати</button>
                   </div>
                   <input value={person.rewardPercent ?? ''} onChange={(event) => updatePerson(person.userId, { rewardPercent: event.target.value === '' ? null : Number(event.target.value) || 0 })} className="h-9 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-slate-100" />
                   <input value={person.rewardAmount ?? 0} onChange={(event) => updatePerson(person.userId, { rewardAmount: Number(event.target.value) || 0 })} className="h-9 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-slate-100" />
@@ -540,15 +572,15 @@ function RewardManager({
                   <div>
                     <div className="text-xs text-slate-300">{rewardItemsText(person.rewardItems)}</div>
                     <div className="mt-2 flex gap-1">
-                      <input value={itemText[person.userId] ?? ''} onChange={(event) => setItemText({ ...itemText, [person.userId]: event.target.value })} className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-slate-100" placeholder="item" />
+                    <input value={itemText[person.userId] ?? ''} onChange={(event) => setItemText({ ...itemText, [person.userId]: event.target.value })} className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-slate-100" placeholder="предмет" />
                       <button type="button" onClick={() => addItem(person.userId)} className="rounded-lg border border-amber-500/40 px-2 py-1 text-xs text-amber-100">+</button>
                     </div>
-                    <textarea value={person.participationNote ?? ''} onChange={(event) => updatePerson(person.userId, { participationNote: event.target.value })} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-xs text-slate-100" placeholder="comment" />
+                    <textarea value={person.participationNote ?? ''} onChange={(event) => updatePerson(person.userId, { participationNote: event.target.value })} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-xs text-slate-100" placeholder="коментар" />
                   </div>
                   <div>
                     <div className="text-amber-100">{money(payout?.amount ?? 0)}</div>
                     <div className="text-xs text-slate-400">{payout?.status ?? 'pending'}</div>
-                    <button type="button" onClick={() => void onIssueOne(quest.id, person.userId)} disabled={isIssuing || payout?.status === 'paid' || !plan.isComplete || plan.errors.length > 0} className="mt-2 rounded-lg border border-emerald-500/40 px-2 py-1 text-xs text-emerald-100 disabled:opacity-50">{isIssuing ? 'Processing...' : 'Видати'}</button>
+                    <button type="button" onClick={() => void onIssueOne(quest.id, person.userId)} disabled={isIssuing || payout?.status === 'paid' || !plan.isComplete || plan.errors.length > 0} className="mt-2 rounded-lg border border-emerald-500/40 px-2 py-1 text-xs text-emerald-100 disabled:opacity-50">{isIssuing ? 'Обробка...' : 'Видати'}</button>
                     {feedback ? (
                       <div className={feedback.status === 'error' ? 'mt-2 text-xs text-red-200' : 'mt-2 text-xs text-emerald-100'}>
                         {feedback.message}
@@ -557,7 +589,8 @@ function RewardManager({
                   </div>
                 </div>
               );
-            })}
+              })}
+            </div>
           </section>
         </div>
       </aside>
@@ -576,7 +609,8 @@ function ManagerPanel({
   onTransferReport,
   onReminder,
   onIssueAll,
-  onUpdateQuest
+  onUpdateQuest,
+  onShowMessage
 }: {
   quest: FamilyQuest;
   report: FamilyQuestReport | null;
@@ -589,6 +623,7 @@ function ManagerPanel({
   onReminder: (quest: FamilyQuest) => void;
   onIssueAll: (questId: string) => void;
   onUpdateQuest: (quest: FamilyQuest) => void;
+  onShowMessage: (text: string, tone?: OperationMessage['tone']) => void;
 }) {
   const people = getFamilyQuestPeople(quest);
   const plan = calculateQuestRewardPlan(quest);
@@ -678,10 +713,10 @@ function ManagerPanel({
         <button type="button" onClick={() => onEditQuest(quest)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Редагувати</button>
         <button type="button" onClick={changeTime} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Змінити дату й час</button>
         <button type="button" onClick={() => onReminder(quest)} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Нагадати</button>
-        <button type="button" onClick={() => window.alert(`Participants:\n${quest.participants.map((item) => item.userId).join('\n') || '-'}`)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Переглянути учасників</button>
-        <button type="button" onClick={() => window.alert(`Helpers:\n${(quest.helpers ?? []).map((item) => item.userId).join('\n') || '-'}`)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Переглянути помічників</button>
-        <button type="button" onClick={() => addPerson('participant')} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Додати participant</button>
-        <button type="button" onClick={() => addPerson('helper')} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Додати helper</button>
+        <button type="button" onClick={() => onShowMessage(`Учасники:\n${quest.participants.map((item) => item.userId).join('\n') || '-'}`)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Переглянути учасників</button>
+        <button type="button" onClick={() => onShowMessage(`Помічники:\n${(quest.helpers ?? []).map((item) => item.userId).join('\n') || '-'}`)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Переглянути помічників</button>
+        <button type="button" onClick={() => addPerson('participant')} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Додати учасника</button>
+        <button type="button" onClick={() => addPerson('helper')} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Додати помічника</button>
         <button type="button" onClick={addRewardMoney} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Додати гроші</button>
         <button type="button" onClick={addRewardItem} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Додати предмет</button>
         <button type="button" onClick={() => onCreateReport(quest.id)} disabled={!plan.isComplete || plan.errors.length > 0} className="rounded-xl border border-orange-500/40 px-3 py-2 text-sm text-orange-100 disabled:opacity-50">Створити звіт</button>
@@ -712,7 +747,8 @@ function QuestCard({
   onTransferReport,
   onReminder,
   onIssueAll,
-  onUpdateQuest
+  onUpdateQuest,
+  onShowMessage
 }: {
   template: FamilyQuestTemplate;
   quest: FamilyQuest | null;
@@ -734,12 +770,13 @@ function QuestCard({
   onReminder: (quest: FamilyQuest) => void;
   onIssueAll: (questId: string) => void;
   onUpdateQuest: (quest: FamilyQuest) => void;
+  onShowMessage: (text: string, tone?: OperationMessage['tone']) => void;
 }) {
   const names = allNames(quest);
   const joined = names.includes(currentUser.id);
   const cooldownText = formatCooldown(template.cooldownUntil);
   const plan = quest ? calculateQuestRewardPlan(quest) : null;
-  const status = quest ? STATUS_LABELS[quest.status] : template.isActive ? 'Template' : 'Inactive';
+  const status = quest ? STATUS_LABELS[quest.status] : template.isActive ? 'Шаблон' : 'Неактивний';
   const totalPeople = quest ? getFamilyQuestPeople(quest).length : 0;
 
   return (
@@ -750,14 +787,14 @@ function QuestCard({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${categoryStyle(template.category, categories)}`}>{template.category}</span>
-              <span className="rounded-full border border-slate-700 bg-black/25 px-3 py-1 text-xs text-slate-200">Team: {totalPeople}/{template.recommendedTeamSize}</span>
+              <span className="rounded-full border border-slate-700 bg-black/25 px-3 py-1 text-xs text-slate-200">Команда: {totalPeople}/{template.recommendedTeamSize}</span>
               <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-100">{status}</span>
-              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs text-slate-300">mode: {quest?.rewardMode ?? template.rewardMode ?? template.splitMode}</span>
+              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs text-slate-300">Режим: {quest?.rewardMode ?? template.rewardMode ?? template.splitMode}</span>
             </div>
             <h3 className="mt-3 text-2xl font-semibold text-white">{template.title}</h3>
             <p className="mt-2 text-sm text-slate-300">{quest?.description ?? template.hint ?? template.steps[0]}</p>
             <div className="mt-3 grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-white/10 bg-black/25 p-3">Total <span className="block text-amber-100">{money(template.totalReward)}</span></div>
+              <div className="rounded-xl border border-white/10 bg-black/25 p-3">Усього <span className="block text-amber-100">{money(template.totalReward)}</span></div>
               <div className="rounded-xl border border-white/10 bg-black/25 p-3">Людям <span className="block text-amber-100">{money(template.memberRewardPool)}</span></div>
               <div className="rounded-xl border border-white/10 bg-black/25 p-3">Сім’ї <span className="block text-orange-100">{money(template.familyReward ?? template.familyBankShare)}</span></div>
               <div className="rounded-xl border border-white/10 bg-black/25 p-3">Видано <span className="block text-emerald-100">{money(plan?.paidToMembers ?? 0)}</span></div>
@@ -765,20 +802,20 @@ function QuestCard({
             <div className="mt-2 text-sm text-slate-400">
               Автор: {quest?.organizer ?? template.createdBy} · Дата: {date(quest?.scheduledAt ?? template.updatedAt)} · Залишилось видати: {money(plan?.remainingMemberPool ?? template.memberRewardPool)}
             </div>
-            {cooldownText ? <div className="mt-2 text-sm text-orange-200">Cooldown: {cooldownText}</div> : null}
+            {cooldownText ? <div className="mt-2 text-sm text-orange-200">Відкат: {cooldownText}</div> : null}
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
             <div className="rounded-2xl border border-slate-800 bg-black/30 p-3">
               <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Основні учасники</div>
               <div className="mt-2 flex flex-wrap gap-2">
-                {quest?.participants.length ? quest.participants.map((person) => <span key={person.userId} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-100">{person.userId}{person.joinedLate ? ' · late' : ''}</span>) : <span className="text-sm text-slate-500">Немає.</span>}
+                {quest?.participants.length ? quest.participants.map((person) => <span key={person.userId} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-100">{person.userId}{person.joinedLate ? ' · запізнився' : ''}</span>) : <span className="text-sm text-slate-500">Немає.</span>}
               </div>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-black/30 p-3">
               <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Помічники</div>
               <div className="mt-2 flex flex-wrap gap-2">
-                {quest?.helpers?.length ? quest.helpers.map((person) => <span key={person.userId} className="rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs text-orange-100">{person.userId}{person.joinedLate ? ' · late' : ''}</span>) : <span className="text-sm text-slate-500">Немає.</span>}
+                {quest?.helpers?.length ? quest.helpers.map((person) => <span key={person.userId} className="rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs text-orange-100">{person.userId}{person.joinedLate ? ' · запізнився' : ''}</span>) : <span className="text-sm text-slate-500">Немає.</span>}
               </div>
             </div>
           </div>
@@ -791,9 +828,9 @@ function QuestCard({
                 {joined ? <button type="button" onClick={() => onLeave(quest.id)} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200">Покинути</button> : null}
               </>
             ) : null}
-            <button type="button" onClick={() => window.alert(`${template.title}\n\n${template.hint ?? template.steps.join('\n')}\n\nRoute: ${template.route ?? '-'}\nItems: ${template.requiredItems ?? template.items ?? '-'}`)} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200">Про квест</button>
-            {canManage ? <button type="button" onClick={() => onEditTemplate(template)} className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200">Template</button> : null}
-            {canManage ? <button type="button" onClick={() => onDeleteTemplate(template.id)} className="rounded-xl border border-red-500/40 px-4 py-2 text-sm text-red-100">Delete</button> : null}
+            <button type="button" onClick={() => onShowMessage(`${template.title}\n\n${template.hint ?? template.steps.join('\n')}\n\nМаршрут: ${template.route ?? '-'}\nПредмети: ${template.requiredItems ?? template.items ?? '-'}`)} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200">Про квест</button>
+            {canManage ? <button type="button" onClick={() => onEditTemplate(template)} className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200">Шаблон</button> : null}
+            {canManage ? <button type="button" onClick={() => onDeleteTemplate(template.id)} className="rounded-xl border border-red-500/40 px-4 py-2 text-sm text-red-100">Видалити</button> : null}
           </div>
 
           {report ? (
@@ -815,6 +852,7 @@ function QuestCard({
               onReminder={onReminder}
               onIssueAll={onIssueAll}
               onUpdateQuest={onUpdateQuest}
+              onShowMessage={onShowMessage}
             />
           ) : null}
         </div>
@@ -833,6 +871,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   const [rewardQuest, setRewardQuest] = useState<FamilyQuest | null>(null);
   const issuingBackendPayoutsRef = useRef(new Set<string>());
   const [payoutFeedback, setPayoutFeedback] = useState<Record<string, BackendPayoutFeedback>>({});
+  const [operationMessage, setOperationMessage] = useState<OperationMessage | null>(null);
   const [questReadSource, setQuestReadSource] = useState<FamilyQuestReadSource>('backend_loading');
   const [questReadError, setQuestReadError] = useState<Error | null>(null);
   const [creating, setCreating] = useState(false);
@@ -861,7 +900,20 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     [canManage, category, templates]
   );
 
+  async function reloadBackendQuests() {
+    const state = await loadFamilyQuestReadState();
+    setTemplates(state.templates);
+    setQuests(state.quests);
+    setReports(state.reports);
+    setQuestReadSource(state.source);
+    setQuestReadError(state.error);
+  }
+
   function refresh() {
+    if (questReadSource === 'backend') {
+      void reloadBackendQuests();
+      return;
+    }
     setQuests(readFamilyQuests());
     setReports(readFamilyQuestReports());
   }
@@ -898,37 +950,58 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     return template?.source === 'backend';
   }
 
-  function preventBackendWrite() {
-    window.alert(BACKEND_WRITE_PENDING_MESSAGE);
+  function showOperationMessage(text: string, tone: OperationMessage['tone'] = 'info') {
+    setOperationMessage({ text, tone });
+  }
+
+  function showBackendWriteError(error: unknown) {
+    showOperationMessage(error instanceof Error ? error.message : BACKEND_WRITE_ERROR_MESSAGE, 'error');
   }
 
   function startCreatingTemplate() {
-    if (questReadSource === 'backend') {
-      preventBackendWrite();
-      return;
-    }
     setCreating(true);
   }
 
   function startEditingTemplate(template: FamilyQuestTemplate) {
-    if (questReadSource === 'backend' || isBackendTemplate(template)) {
-      preventBackendWrite();
-      return;
-    }
     setEditingTemplate(template);
   }
 
   function startEditingQuest(quest: FamilyQuest) {
-    if (isBackendQuest(quest)) {
-      preventBackendWrite();
-      return;
-    }
     setEditingQuest(quest);
   }
 
-  function saveTemplate(template: FamilyQuestTemplate) {
-    if (isBackendTemplate(template)) {
-      preventBackendWrite();
+  async function saveTemplate(template: FamilyQuestTemplate) {
+    if (questReadSource === 'backend' || isBackendTemplate(template)) {
+      const payload = {
+        title: template.title,
+        category: template.category,
+        description: template.hint ?? null,
+        steps: template.steps,
+        recommendedTeamSize: template.recommendedTeamSize,
+        totalReward: template.totalReward ?? template.rewardAmount,
+        memberRewardPool: template.memberRewardPool ?? template.rewardAmount,
+        familyReward: template.familyReward ?? template.familyBankShare ?? 0,
+        rewardMode: template.rewardMode ?? template.splitMode,
+        requiredItems: template.requiredItems ?? template.items ?? null,
+        imageAssetId: template.imageAsset ?? null,
+        isActive: template.isActive,
+        cooldownHours: template.cooldownHours ?? 24,
+      };
+      try {
+        const saved = isBackendTemplate(template)
+          ? await updateBackendFamilyQuestTemplate(template.id, payload)
+          : await createBackendFamilyQuestTemplate(payload);
+        setTemplates((current) => {
+          const mapped = mapBackendQuestTemplate(saved);
+          return current.some((item) => item.id === mapped.id) ? current.map((item) => (item.id === mapped.id ? mapped : item)) : [mapped, ...current];
+        });
+        await reloadBackendQuests();
+      } catch (error) {
+        showBackendWriteError(error);
+        return;
+      }
+      setEditingTemplate(null);
+      setCreating(false);
       return;
     }
     persistTemplates(templates.some((item) => item.id === template.id) ? templates.map((item) => (item.id === template.id ? template : item)) : [template, ...templates]);
@@ -936,29 +1009,70 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     setCreating(false);
   }
 
-  function deleteTemplate(templateId: string) {
+  async function deleteTemplate(templateId: string) {
     const template = templates.find((item) => item.id === templateId);
-    if (isBackendTemplate(template)) {
-      preventBackendWrite();
+    if (!window.confirm('Архівувати цей шаблон квесту?')) return;
+    if (questReadSource === 'backend' || isBackendTemplate(template)) {
+      try {
+        await archiveBackendFamilyQuestTemplate(templateId);
+        await reloadBackendQuests();
+      } catch (error) {
+        showBackendWriteError(error);
+      }
       return;
     }
-    if (!window.confirm('Delete this quest template and active quest?')) return;
     persistTemplates(templates.filter((template) => template.id !== templateId));
     persistQuests(quests.filter((quest) => quest.templateId !== templateId));
   }
 
-  function openRecruiting(template: FamilyQuestTemplate) {
-    if (isBackendTemplate(template)) {
-      preventBackendWrite();
+  async function openRecruiting(template: FamilyQuestTemplate) {
+    if (formatCooldown(template.cooldownUntil)) return;
+    if (questReadSource === 'backend' || isBackendTemplate(template)) {
+      try {
+        const created = await createBackendFamilyQuest({
+          templateId: template.backendTemplateId ?? template.id,
+          title: template.title,
+          description: template.hint ?? '',
+          category: template.backendCategory ?? template.category,
+          status: 'recruiting',
+          scheduledAt: new Date().toISOString(),
+          totalReward: template.totalReward ?? template.rewardAmount,
+          memberRewardPool: template.memberRewardPool ?? template.rewardAmount,
+          familyReward: template.familyReward ?? template.familyBankShare ?? 0,
+          rewardMode: template.rewardMode ?? template.splitMode,
+          requiredItems: template.requiredItems ?? template.items ?? null,
+        });
+        const mapped = mapBackendQuest(created);
+        setQuests((current) => [mapped, ...current.filter((quest) => quest.id !== mapped.id)]);
+        await reloadBackendQuests();
+      } catch (error) {
+        showBackendWriteError(error);
+      }
       return;
     }
-    if (formatCooldown(template.cooldownUntil)) return;
     persistQuests([buildQuestFromTemplate(template, currentUser), ...quests]);
   }
 
-  function updateQuest(nextQuest: FamilyQuest) {
-    if (isBackendQuest(nextQuest)) {
-      preventBackendWrite();
+  async function updateQuest(nextQuest: FamilyQuest) {
+    if (questReadSource === 'backend' || isBackendQuest(nextQuest)) {
+      try {
+        const updated = await updateBackendFamilyQuest(nextQuest.id, {
+          title: nextQuest.title,
+          description: nextQuest.description ?? nextQuest.hint ?? '',
+          category: nextQuest.backendCategory ?? nextQuest.category,
+          status: nextQuest.status,
+          scheduledAt: nextQuest.scheduledAt,
+          totalReward: nextQuest.totalReward,
+          memberRewardPool: nextQuest.memberRewardPool,
+          familyReward: nextQuest.familyReward ?? nextQuest.familyBankShare ?? 0,
+          rewardMode: nextQuest.rewardMode ?? nextQuest.splitMode,
+          requiredItems: nextQuest.requiredItems ?? nextQuest.items ?? null,
+        });
+        persistBackendQuestUpdate(mapBackendQuest(updated));
+        await reloadBackendQuests();
+      } catch (error) {
+        showBackendWriteError(error);
+      }
       return;
     }
     const planned = applyQuestRewardPlan(nextQuest);
@@ -983,19 +1097,27 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     if (editingQuest?.id === planned.id) setEditingQuest(planned);
   }
 
-  function changeState(questId: string, status: FamilyQuestStatus, comment: string | null = null) {
+  async function changeState(questId: string, status: FamilyQuestStatus, comment: string | null = null) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest) return;
-    if (isBackendQuest(quest)) {
-      preventBackendWrite();
+    if (questReadSource === 'backend' || isBackendQuest(quest)) {
+      try {
+        const updated = status === 'completed'
+          ? await completeBackendFamilyQuest(questId, comment)
+          : await updateBackendFamilyQuest(questId, { status });
+        persistBackendQuestUpdate(mapBackendQuest(updated));
+        await reloadBackendQuests();
+      } catch (error) {
+        showBackendWriteError(error);
+      }
       return;
     }
     const next = updateFamilyQuestState(quest, status, currentUser.id, comment);
     if (next === quest) {
-      window.alert(`Нелогічний перехід стану: ${quest.status} → ${status}`);
+      showOperationMessage(`Нелогічний перехід стану: ${quest.status} → ${status}`, 'error');
       return;
     }
-    updateQuest(next);
+    void updateQuest(next);
     if (status === 'completed' && quest.templateId) {
       const template = templates.find((item) => item.id === quest.templateId);
       const cooldownUntil = new Date(Date.now() + (template?.cooldownHours ?? 24) * 60 * 60 * 1000).toISOString();
@@ -1003,17 +1125,22 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     }
   }
 
-  function joinQuest(questId: string) {
+  async function joinQuest(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest || quest.status !== 'recruiting') return;
-    if (isBackendQuest(quest)) {
-      preventBackendWrite();
+    if (questReadSource === 'backend' || isBackendQuest(quest)) {
+      try {
+        await joinBackendFamilyQuest(questId, 'participant');
+        await reloadBackendQuests();
+      } catch (error) {
+        showBackendWriteError(error);
+      }
       return;
     }
     const alreadyJoined = getFamilyQuestPeople(quest).some((person) => person.userId === currentUser.id);
     if (alreadyJoined) return;
     const next = upsertQuestPerson(quest, { userId: currentUser.id, nickname: currentUser.nickname, type: 'participant', actor: currentUser.id, addedManually: false });
-    updateQuest(next);
+    void updateQuest(next);
     void addFamilyNotificationOnce({
       eventKey: `quest-joined:${questId}:${currentUser.id}`,
       userId: currentUser.id,
@@ -1026,16 +1153,21 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     });
   }
 
-  function leaveQuest(questId: string) {
+  async function leaveQuest(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest || quest.status !== 'recruiting') return;
-    if (isBackendQuest(quest)) {
-      preventBackendWrite();
+    if (questReadSource === 'backend' || isBackendQuest(quest)) {
+      try {
+        await withdrawBackendFamilyQuest(questId);
+        await reloadBackendQuests();
+      } catch (error) {
+        showBackendWriteError(error);
+      }
       return;
     }
     const now = new Date().toISOString();
     const markLeft = (person: FamilyQuestParticipant) => person.userId === currentUser.id ? { ...person, leftAt: now } : person;
-    updateQuest(
+    void updateQuest(
       removeQuestPerson(
         { ...quest, participants: quest.participants.map(markLeft), helpers: (quest.helpers ?? []).map(markLeft) },
         currentUser.id,
@@ -1045,11 +1177,16 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     );
   }
 
-  function createReport(questId: string) {
+  async function createReport(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest) return;
     if (isBackendQuest(quest)) {
-      preventBackendWrite();
+      try {
+        await createBackendFamilyQuestReport(quest.id, 'Звіт створено в Hub.');
+        await reloadBackendQuests();
+      } catch (error) {
+        showBackendWriteError(error);
+      }
       return;
     }
     try {
@@ -1058,16 +1195,22 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
       updateQuest({ ...updateFamilyQuestState(quest, 'reported', currentUser.id), reportId: report.id, approvedBy: currentUser.id });
       void notifyQuestReportAccepted(report);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Cannot create report');
+      showOperationMessage(error instanceof Error ? error.message : 'Не вдалося створити звіт', 'error');
     }
   }
 
-  function transferReport(reportId: string) {
+  async function transferReport(reportId: string) {
     const report = reports.find((item) => item.id === reportId);
     if (!report) return;
     const quest = quests.find((item) => item.id === report.questId);
+    if (!quest) return;
     if (isBackendQuest(quest)) {
-      preventBackendWrite();
+      try {
+        await transferBackendFamilyQuestReportToAccounting(quest.id);
+        await reloadBackendQuests();
+      } catch (error) {
+        showBackendWriteError(error);
+      }
       return;
     }
     const month = transferQuestReportToAccounting(report, currentUser.id);
@@ -1081,7 +1224,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
 
   function remind(quest: FamilyQuest) {
     if (isBackendQuest(quest)) {
-      preventBackendWrite();
+      showBackendWriteError(new Error('Нагадування для backend-квестів проходять через Discord-синхронізацію.'));
       return;
     }
     const recipients = getFamilyQuestPeople(quest);
@@ -1117,22 +1260,22 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
       ],
       updatedAt: new Date().toISOString()
     });
-    window.alert('Внутрішнє нагадування надіслано учасникам квесту');
+    showOperationMessage('Внутрішнє нагадування надіслано учасникам квесту', 'success');
   }
 
   function backendPayoutErrorMessage(error: unknown) {
     if (error instanceof FamilyQuestPayoutApiError) {
-      if (error.code === 'QUEST_PAYOUT_UNAUTHORIZED') return 'Немає прав видати цю backend виплату.';
-      if (error.code === 'QUEST_NOT_FOUND') return 'Backend quest не знайдено. Онови список і перевір запис.';
-      if (error.code === 'QUEST_PAYOUT_NOT_FOUND') return 'Backend payout не знайдено. Онови quest перед повтором.';
-      if (error.code === 'QUEST_PAYOUT_MISMATCH') return 'Payout не належить цьому quest. Виплату зупинено.';
-      if (error.code === 'QUEST_PAYOUT_ALREADY_PAID') return 'Цей payout уже оплачено в backend.';
-      if (error.code === 'QUEST_PAYOUT_IDEMPOTENCY_CONFLICT') return 'Idempotency key уже використано для іншої виплати. Виплату зупинено.';
-      if (error.code === 'BACKEND_UNAVAILABLE' || error.code === 'FINANCE_SERVICE_UNAVAILABLE') return 'Backend тимчасово недоступний. Local fallback для backend payout вимкнено.';
-      if (error.code === 'MALFORMED_RESPONSE') return 'Backend повернув неочікувану відповідь. Виплату не позначено local.';
+      if (error.code === 'QUEST_PAYOUT_UNAUTHORIZED') return 'Немає прав видати цю виплату.';
+      if (error.code === 'QUEST_NOT_FOUND') return 'Квест не знайдено. Онови список і перевір запис.';
+      if (error.code === 'QUEST_PAYOUT_NOT_FOUND') return 'Виплату не знайдено. Онови квест перед повтором.';
+      if (error.code === 'QUEST_PAYOUT_MISMATCH') return 'Виплата не належить цьому квесту. Дію зупинено.';
+      if (error.code === 'QUEST_PAYOUT_ALREADY_PAID') return 'Цю виплату вже проведено.';
+      if (error.code === 'QUEST_PAYOUT_IDEMPOTENCY_CONFLICT') return 'Повтор цієї виплати конфліктує з іншим запитом. Дію зупинено.';
+      if (error.code === 'BACKEND_UNAVAILABLE' || error.code === 'FINANCE_SERVICE_UNAVAILABLE') return 'Сервіс виплат тимчасово недоступний. Виплату не позначено виконаною.';
+      if (error.code === 'MALFORMED_RESPONSE') return 'Сервіс повернув неочікувану відповідь. Виплату не позначено виконаною.';
       return error.message;
     }
-    return error instanceof Error ? error.message : 'Cannot issue backend payout';
+    return error instanceof Error ? error.message : 'Не вдалося видати виплату';
   }
 
   async function issueOne(questId: string, userId: string) {
@@ -1145,7 +1288,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
       issuingBackendPayoutsRef.current.add(backendTarget.payoutKey);
       setPayoutFeedback((current) => ({
         ...current,
-        [backendTarget.payoutKey]: { status: 'issuing', message: 'Issuing through backend...' }
+        [backendTarget.payoutKey]: { status: 'issuing', message: 'Видаємо виплату...' }
       }));
       try {
         const result = await issueBackendQuestPayout({
@@ -1154,12 +1297,13 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
           idempotencyKey: backendTarget.idempotencyKey
         });
         const storedQuest = readFamilyQuests().find((item) => item.id === questId) ?? planned;
+        if (!storedQuest) throw new Error('Квест не знайдено для оновлення виплати.');
         persistBackendQuestUpdate(applyBackendPayoutResultToQuest(storedQuest, result));
         setPayoutFeedback((current) => ({
           ...current,
           [backendTarget.payoutKey]: {
             status: 'success',
-            message: result.alreadyIssued ? 'Backend already completed this payout.' : 'Backend payout issued.'
+            message: result.alreadyIssued ? 'Цю виплату вже проведено.' : 'Виплату проведено.'
           }
         }));
       } catch (error) {
@@ -1178,19 +1322,19 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
       refresh();
       void Promise.all(result.issuedBonuses.map((bonus) => notifyBonusPaid(bonus)));
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Cannot issue payout');
+      showOperationMessage(error instanceof Error ? error.message : 'Не вдалося видати виплату', 'error');
     }
   }
 
   function issueAll(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (isBackendQuest(quest)) {
-      window.alert('Backend-backed payouts must be issued one at a time through backend.');
+      showOperationMessage('Ці виплати потрібно видавати по одній через офіційний сервіс.', 'info');
       return;
     }
     const plan = quest ? calculateQuestRewardPlan(quest) : null;
     if (quest && plan?.payouts.some((payout) => Boolean(resolveBackendPayoutTarget(quest, payout)))) {
-      window.alert('Backend-backed payouts must be issued one at a time through backend.');
+      showOperationMessage('Ці виплати потрібно видавати по одній через офіційний сервіс.', 'info');
       return;
     }
     try {
@@ -1198,7 +1342,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
       refresh();
       void Promise.all(result.issuedBonuses.map((bonus) => notifyBonusPaid(bonus)));
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Cannot issue payouts');
+      showOperationMessage(error instanceof Error ? error.message : 'Не вдалося видати виплати', 'error');
     }
   }
 
@@ -1208,27 +1352,55 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">Dragon House</p>
-            <h2 className="mt-1 text-2xl font-semibold text-white">Family quests</h2>
-            <p className="mt-2 max-w-3xl text-sm text-slate-400">Локальна quest система Family Hub. Discord integration: not configured.</p>
+            <h2 className="mt-1 text-2xl font-semibold text-white">Квести Dragon House</h2>
+            <p className="mt-2 max-w-3xl text-sm text-slate-400">Квести показуються з офіційного сервісу. Локальні зміни не видаються за справжні дані.</p>
             <p className={questReadSource === 'backend' ? 'mt-2 text-xs text-emerald-100' : 'mt-2 text-xs text-amber-100'}>
               {questReadSource === 'backend'
-                ? 'Backend quests loaded from PostgreSQL.'
+                ? 'Квести завантажено.'
                 : questReadSource === 'dev_local_fallback'
-                  ? 'Backend quests unavailable. Showing dev local fallback.'
+                  ? 'Офіційний сервіс квестів недоступний. Показано режим розробки.'
                   : questReadError
-                    ? 'Backend quests unavailable. Retry after the backend is reachable.'
-                    : 'Loading backend quests...'}
+                    ? 'Не вдалося завантажити дані. Спробуй ще раз після відновлення сервісу.'
+                    : 'Завантаження...'}
             </p>
           </div>
-          {canManage ? <button type="button" onClick={startCreatingTemplate} className="dh-fire-button rounded-xl px-4 py-2 text-sm font-semibold text-white">Create quest</button> : null}
+          {canManage ? (
+            <button
+              type="button"
+              onClick={startCreatingTemplate}
+              className="dh-fire-button rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Створити квест
+            </button>
+          ) : null}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {(['all', ...categories] as Array<FamilyQuestCategory | 'all'>).map((item) => (
             <button key={item} type="button" onClick={() => setCategory(item)} className={category === item ? 'dh-tab-active rounded-xl px-3 py-2 text-sm font-semibold' : 'dh-tab rounded-xl px-3 py-2 text-sm font-semibold'}>
-              {item === 'all' ? 'All' : item}
+              {item === 'all' ? 'Усі' : item}
             </button>
           ))}
         </div>
+        {operationMessage ? (
+          <div
+            className={
+              operationMessage.tone === 'error'
+                ? 'mt-4 whitespace-pre-wrap rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-100'
+                : operationMessage.tone === 'success'
+                  ? 'mt-4 whitespace-pre-wrap rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-100'
+                  : 'mt-4 whitespace-pre-wrap rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100'
+            }
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <span>{operationMessage.text}</span>
+              <button type="button" onClick={() => setOperationMessage(null)} className="self-start rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-200">
+                Закрити
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4">
@@ -1258,6 +1430,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
               onReminder={remind}
               onIssueAll={issueAll}
               onUpdateQuest={updateQuest}
+              onShowMessage={showOperationMessage}
             />
           );
         })}

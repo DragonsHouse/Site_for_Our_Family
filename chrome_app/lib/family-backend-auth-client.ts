@@ -13,11 +13,13 @@ export type { AuthenticatedMember } from './family-authenticated-member';
 const SESSION_TOKEN_KEY = 'dragon_house_family_backend_session_token_v1';
 const PERSISTENT_SESSION_TOKEN_KEY = 'dragon_house_family_backend_persistent_session_token_v1';
 const AUTH_SESSION_MODE_KEY = 'dragon_house_family_backend_session_mode_v1';
-const DEFAULT_BACKEND_API_BASE_URL = 'http://localhost:8787';
+const DISCORD_LOGIN_API_BASE_URL_KEY = 'dragon_house_discord_login_api_base_url_v1';
+const LOCAL_BACKEND_API_BASE_URL = 'http://localhost:8787';
 const DISCORD_LOGIN_REDIRECT_PATH = 'dragon-house-discord-login';
 let memorySessionToken: string | null = null;
 let memoryPersistentSessionToken: string | null = null;
 let memoryAuthSessionMode: AuthSessionMode | null = null;
+let memoryDiscordLoginApiBaseUrl: string | null = null;
 
 export type LegacyCreatedAuthUser = {
   familyMemberId: string;
@@ -65,7 +67,48 @@ export class BirthdayValidationError extends Error {
 }
 
 export function getBackendApiBaseUrl(): string {
-  return readDiscordFamilySettings().backend.apiBaseUrl ?? DEFAULT_BACKEND_API_BASE_URL;
+  const configured = readDiscordFamilySettings().backend.apiBaseUrl;
+  if (configured && isUsableConfiguredBackendApiBaseUrl(configured)) return configured;
+  return getDefaultBackendApiBaseUrl();
+}
+
+function getStoredDiscordLoginApiBaseUrl(): string | null {
+  const stored = getWebStorageValue('session', DISCORD_LOGIN_API_BASE_URL_KEY) ?? memoryDiscordLoginApiBaseUrl;
+  return stored && isUsableConfiguredBackendApiBaseUrl(stored) ? stored : null;
+}
+
+function setStoredDiscordLoginApiBaseUrl(apiBaseUrl: string | null): void {
+  memoryDiscordLoginApiBaseUrl = apiBaseUrl;
+  if (typeof window === 'undefined') return;
+  try {
+    if (apiBaseUrl) window.sessionStorage.setItem(DISCORD_LOGIN_API_BASE_URL_KEY, apiBaseUrl);
+    else window.sessionStorage.removeItem(DISCORD_LOGIN_API_BASE_URL_KEY);
+  } catch {
+    // The in-memory value still covers extension auth flows without web storage.
+  }
+}
+
+function getDefaultBackendApiBaseUrl(): string {
+  const env = (import.meta as { env?: Record<string, string | undefined> }).env;
+  const configured = env?.VITE_DRAGON_HOUSE_BACKEND_API_BASE_URL ?? env?.VITE_FAMILY_BACKEND_API_BASE_URL;
+  if (configured?.trim()) return configured.trim();
+  if (typeof window !== 'undefined' && (window.location.protocol === 'https:' || window.location.protocol === 'http:')) {
+    return window.location.origin;
+  }
+  return LOCAL_BACKEND_API_BASE_URL;
+}
+
+function isUsableConfiguredBackendApiBaseUrl(value: string): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    const configured = new URL(value);
+    const current = window.location;
+    const currentIsLocal = ['localhost', '127.0.0.1', '[::1]'].includes(current.hostname);
+    const configuredIsLocal = ['localhost', '127.0.0.1', '[::1]'].includes(configured.hostname);
+    return currentIsLocal || !configuredIsLocal;
+  } catch {
+    return false;
+  }
 }
 
 export async function getDiscordBackendRuntimeConfig() {
@@ -100,6 +143,8 @@ async function getAuthSessionMode(): Promise<AuthSessionMode | null> {
       return result[AUTH_SESSION_MODE_KEY];
     }
   }
+  const webMode = getWebStorageValue('local', AUTH_SESSION_MODE_KEY);
+  if (webMode === 'session' || webMode === 'persistent') return webMode;
   return memoryAuthSessionMode;
 }
 
@@ -108,6 +153,8 @@ async function getSessionOnlyToken(): Promise<string | null> {
     const result = await chrome.storage.session.get(SESSION_TOKEN_KEY);
     if (typeof result[SESSION_TOKEN_KEY] === 'string') return result[SESSION_TOKEN_KEY];
   }
+  const webToken = getWebStorageValue('session', SESSION_TOKEN_KEY);
+  if (webToken) return webToken;
   return memorySessionToken;
 }
 
@@ -116,6 +163,8 @@ async function getPersistentSessionToken(): Promise<string | null> {
     const result = await chrome.storage.local.get(PERSISTENT_SESSION_TOKEN_KEY);
     return typeof result[PERSISTENT_SESSION_TOKEN_KEY] === 'string' ? result[PERSISTENT_SESSION_TOKEN_KEY] : null;
   }
+  const webToken = getWebStorageValue('local', PERSISTENT_SESSION_TOKEN_KEY);
+  if (webToken) return webToken;
   return memoryPersistentSessionToken;
 }
 
@@ -140,6 +189,7 @@ async function setSessionToken(token: string | null, mode: AuthSessionMode = 'se
       await chrome.storage.local.remove(AUTH_SESSION_MODE_KEY);
     }
   }
+  setWebSessionToken(token, mode);
   if (mode === 'session') {
     memorySessionToken = token;
     if (token) memoryPersistentSessionToken = null;
@@ -155,8 +205,38 @@ async function setSessionToken(token: string | null, mode: AuthSessionMode = 'se
   }
 }
 
+function setWebSessionToken(token: string | null, mode: AuthSessionMode): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (token && mode === 'session') window.sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+    else window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    // Web storage is optional; in-memory storage remains as a fallback.
+  }
+  try {
+    if (token && mode === 'persistent') window.localStorage.setItem(PERSISTENT_SESSION_TOKEN_KEY, token);
+    else window.localStorage.removeItem(PERSISTENT_SESSION_TOKEN_KEY);
+    if (token) window.localStorage.setItem(AUTH_SESSION_MODE_KEY, mode);
+    else window.localStorage.removeItem(AUTH_SESSION_MODE_KEY);
+  } catch {
+    // Web storage is optional; in-memory storage remains as a fallback.
+  }
+}
+
+function getWebStorageValue(area: 'local' | 'session', key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storage = area === 'local' ? window.localStorage : window.sessionStorage;
+    const value = storage.getItem(key);
+    return value?.trim() ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function clearAuthSession(): Promise<void> {
   await setSessionToken(null);
+  setStoredDiscordLoginApiBaseUrl(null);
 }
 
 export async function authenticatedFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -164,10 +244,27 @@ export async function authenticatedFetch(path: string, init: RequestInit = {}): 
   const headers = new Headers(init.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  return fetch(`${getBackendApiBaseUrl().replace(/\/+$/u, '')}${path}`, {
-    ...init,
-    headers,
-    credentials: 'omit',
+  const apiBaseUrl = getBackendApiBaseUrl();
+  try {
+    return await fetch(`${apiBaseUrl.replace(/\/+$/u, '')}${path}`, {
+      ...init,
+      headers,
+      credentials: 'omit',
+    });
+  } catch {
+    throw createAuthUnavailableError(`Не вдалося підключитися до backend endpoint ${path} через ${apiBaseUrl}.`);
+  }
+}
+
+function createAuthUnavailableError(message: string): AuthOutcomeError {
+  return new AuthOutcomeError({
+    httpStatus: null,
+    legacyError: null,
+    displayMessage: message,
+    outcome: {
+      code: 'auth_unavailable',
+      message,
+    },
   });
 }
 
@@ -233,37 +330,53 @@ export function getDiscordLoginCompletionRedirectUrl(): string | null {
   return null;
 }
 
-export async function startDiscordLogin(redirectTarget: string | null = getDiscordLoginCompletionRedirectUrl()): Promise<{ authorizationUrl: string; expiresAt: string }> {
+export async function startDiscordLogin(
+  redirectTarget: string | null = getDiscordLoginCompletionRedirectUrl(),
+  clientType: 'web' | 'chrome_extension' = 'chrome_extension',
+): Promise<{ authorizationUrl: string; expiresAt: string }> {
+  const apiBaseUrl = getBackendApiBaseUrl();
+  const endpoint = `${apiBaseUrl.replace(/\/+$/u, '')}/api/auth/discord/start`;
   return parseJsonResponse<{ authorizationUrl: string; expiresAt: string }>(
-    await fetch(`${getBackendApiBaseUrl().replace(/\/+$/u, '')}/api/auth/discord/start`, {
+    await fetch(endpoint, {
       method: 'POST',
       credentials: 'omit',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ clientType: 'chrome_extension', ...(redirectTarget ? { redirectTarget } : {}) }),
+      body: JSON.stringify({ clientType, ...(redirectTarget ? { redirectTarget } : {}) }),
+    }).catch(() => {
+      throw createAuthUnavailableError(`Не вдалося підключитися до backend endpoint /api/auth/discord/start через ${apiBaseUrl}.`);
     }),
-  );
+  ).then((result) => {
+    setStoredDiscordLoginApiBaseUrl(apiBaseUrl);
+    return result;
+  });
 }
 
-export async function completeDiscordLogin(completionCode: string): Promise<LoginResponse> {
+export async function completeDiscordLogin(
+  completionCode: string,
+  clientType: 'web' | 'chrome_extension' = 'chrome_extension',
+): Promise<LoginResponse> {
+  const apiBaseUrl = getStoredDiscordLoginApiBaseUrl() ?? getBackendApiBaseUrl();
+  const endpoint = `${apiBaseUrl.replace(/\/+$/u, '')}/api/auth/discord/complete`;
   const result = await parseLoginResponse(
-    await fetch(`${getBackendApiBaseUrl().replace(/\/+$/u, '')}/api/auth/discord/complete`, {
+    await fetch(endpoint, {
       method: 'POST',
       credentials: 'omit',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ completionCode, clientType: 'chrome_extension' }),
+      body: JSON.stringify({ completionCode, clientType }),
+    }).catch(() => {
+      throw createAuthUnavailableError(`Не вдалося підключитися до backend endpoint /api/auth/discord/complete через ${apiBaseUrl}.`);
     }),
   );
+  setStoredDiscordLoginApiBaseUrl(null);
   await setSessionToken(result.token, 'session');
   return result;
 }
 
 export async function loginWithDiscord(): Promise<LoginResponse> {
-  if (typeof chrome === 'undefined' || !chrome.identity?.launchWebAuthFlow) {
-    throw new AuthOutcomeError(normalizeAuthFailure(503, { error: 'OAUTH_DISABLED' }));
-  }
+  if (typeof chrome === 'undefined' || !chrome.identity?.launchWebAuthFlow) return startWebDiscordLogin();
   const redirectTarget = getDiscordLoginCompletionRedirectUrl();
-  if (!redirectTarget) throw new AuthOutcomeError(normalizeAuthFailure(503, { error: 'OAUTH_DISABLED' }));
-  const start = await startDiscordLogin(redirectTarget);
+  if (!redirectTarget) return startWebDiscordLogin();
+  const start = await startDiscordLogin(redirectTarget, 'chrome_extension');
   const finalUrl = await chrome.identity.launchWebAuthFlow({
     url: start.authorizationUrl,
     interactive: true,
@@ -277,7 +390,16 @@ export async function loginWithDiscord(): Promise<LoginResponse> {
   }
   const completionCode = url.searchParams.get('completionCode');
   if (!completionCode) throw new AuthOutcomeError(normalizeAuthFailure(400, { error: 'LOGIN_COMPLETION_EXPIRED' }));
-  return completeDiscordLogin(completionCode);
+  return completeDiscordLogin(completionCode, 'chrome_extension');
+}
+
+async function startWebDiscordLogin(): Promise<LoginResponse> {
+  if (typeof window === 'undefined') {
+    throw new AuthOutcomeError(normalizeAuthFailure(503, { error: 'OAUTH_DISABLED' }));
+  }
+  const start = await startDiscordLogin(null, 'web');
+  window.location.assign(start.authorizationUrl);
+  return new Promise(() => undefined);
 }
 
 export async function getCurrentUser(): Promise<AuthenticatedMember> {

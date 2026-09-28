@@ -48,6 +48,7 @@ const requiredTables = [
   'family_reward_definitions',
   'family_member_reward_grants',
   'family_reward_allocations',
+  'family_treasury_entries',
 ];
 
 async function tableExists(pool: NonNullable<ReturnType<typeof createPgPool>>, tableName: string) {
@@ -406,6 +407,16 @@ async function runChecks() {
     ]) {
       checks.push({ name: `${indexName} exists`, ok: await indexExists(pool, indexName) });
     }
+    checks.push({ name: 'family_treasury_entries.id primary key', ok: await constraintExists(pool, 'family_treasury_entries', 'p', 'id') });
+    checks.push({
+      name: 'family_treasury_entries.created_by_family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'family_treasury_entries', 'created_by_family_member_id', 'family_members', 'id'),
+    });
+    checks.push({
+      name: 'family_treasury_entries.updated_by_family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'family_treasury_entries', 'updated_by_family_member_id', 'family_members', 'id'),
+    });
+    checks.push({ name: 'idx_family_treasury_entries_active_category exists', ok: await indexExists(pool, 'idx_family_treasury_entries_active_category') });
     checks.push({ name: 'family_towers.id primary key', ok: await constraintExists(pool, 'family_towers', 'p', 'id') });
     checks.push({ name: 'family_towers.tower_code unique', ok: await constraintExists(pool, 'family_towers', 'u', 'tower_code') });
     checks.push({ name: 'family_tower_defenses.id primary key', ok: await constraintExists(pool, 'family_tower_defenses', 'p', 'id') });

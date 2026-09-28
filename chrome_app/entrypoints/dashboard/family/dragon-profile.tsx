@@ -16,7 +16,8 @@ import { DragonAchievementCard, DragonActivityHeatmap, DragonStatisticCard, Drag
 import { FamilyMemberActivityPanel } from './family-member-activity-panel';
 import { FamilyPersonalAccountingPanel } from './family-personal-accounting-panel';
 import { formatDragonBirthday } from './birthday-service';
-import { DRAGON_PROFILE_STATUS_META } from './profile-models';
+import { DRAGON_PROFILE_STATUS_META, type DragonProfileAchievement, type DragonProfileAchievementRarity } from './profile-models';
+import type { DragonAchievement } from './achievement-models';
 import { formatDragonProfileDate } from './profile-service';
 import { useDragonProfileState } from './profile-state';
 import { useDragonAchievementState } from './achievement-state';
@@ -27,17 +28,17 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
   const profileAchievements = useDragonAchievementState(achievementRepository);
   const { profile } = chamber;
   const identity = profile.identity;
-  const statusMeta = DRAGON_PROFILE_STATUS_META[identity.currentStatus];
+  const statusMeta = DRAGON_PROFILE_STATUS_META[identity.currentStatus] ?? DRAGON_PROFILE_STATUS_META.offline;
 
   return (
-    <div className="dh-profile-room" data-profile-member="authenticated" data-dragon-profile="command-chamber">
+    <div className="dh-profile-room" data-profile-member="authenticated" data-dragon-profile="profile-room">
       <DragonHero
-        eyebrow="DRAGON COMMAND CHAMBER"
-        title={identity.bannerTitle}
-        description="A personal fortress chamber for identity, rank, history, achievements, permissions, inventory and future Discord presence."
+        eyebrow="Профіль"
+        title="Профіль дракона"
+        description="Особиста зала з профілем, рангом, активністю, нагородами та доступами."
         className="dh-profile-hero"
       >
-        <div className="dh-profile-hero-aside" aria-label="Dragon Profile status">
+        <div className="dh-profile-hero-aside" aria-label="Стан профілю">
           <DragonAvatar src={identity.avatarUrl} name={identity.discordNickname} size="lg" />
           <div>
             <DragonBadge tone={statusMeta.tone} className={statusMeta.className}>
@@ -50,12 +51,12 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
 
       <DragonPanel variant="ceremonial" className="dh-profile-banner">
         <div className="dh-profile-banner-mark" aria-hidden="true">
-          Command Seal
+          Профіль
         </div>
         <div className="dh-profile-banner-identity">
           <DragonAvatar src={identity.avatarUrl} name={identity.discordNickname} size="lg" />
           <div>
-            <p className="dh-dragon-eyebrow">{identity.element}</p>
+            <p className="dh-dragon-eyebrow">{identity.currentRank}</p>
             <h2>{identity.dragonName}</h2>
             <p>{identity.dragonTitle}</p>
           </div>
@@ -66,63 +67,63 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
             <dd>{identity.discordNickname}</dd>
           </div>
           <div>
-            <dt>Static ID</dt>
+            <dt>Статичний ID</dt>
             <dd>{identity.staticId}</dd>
           </div>
           <div>
-            <dt>Joined</dt>
+            <dt>У сім’ї з</dt>
             <dd>{formatDragonProfileDate(identity.joinDate)}</dd>
           </div>
           <div>
-            <dt>Branch</dt>
+            <dt>Гілка</dt>
             <dd>{identity.familyBranch}</dd>
           </div>
         </dl>
       </DragonPanel>
 
-      {chamber.loading ? <DragonLoader label="Dragon Profile opens the Command Chamber" /> : null}
-      {chamber.error ? <DragonRetry title="Command Chamber did not open" description={chamber.error.message} onRetry={chamber.refresh} /> : null}
+      {chamber.loading ? <DragonLoader label="Завантаження..." /> : null}
+      {chamber.error ? <DragonRetry title="Не вдалося завантажити дані" description={chamber.error.message} onRetry={chamber.refresh} /> : null}
 
       <section className="dh-profile-command-stats" aria-label="Dragon Profile command totals">
         <DragonCard>
-          <span className="dh-dragon-eyebrow">Unlocked seals</span>
+          <span className="dh-dragon-eyebrow">Відкриті відзнаки</span>
           <strong>{profileAchievements.statistics.unlocked}</strong>
-          <p>backend achievement awards</p>
+          <p>Підтверджені досягнення</p>
         </DragonCard>
         <DragonCard>
-          <span className="dh-dragon-eyebrow">Legendary</span>
+          <span className="dh-dragon-eyebrow">Легендарні</span>
           <strong>{profileAchievements.statistics.legendaryCount}</strong>
-          <p>legendary backend seals</p>
+          <p>Особливі відзнаки</p>
         </DragonCard>
         <DragonCard>
-          <span className="dh-dragon-eyebrow">Permissions</span>
+          <span className="dh-dragon-eyebrow">Доступи</span>
           <strong>{chamber.primaryStats.grantedPermissions}</strong>
-          <p>granted magical seals</p>
+          <p>Надані права</p>
         </DragonCard>
         <DragonCard>
-          <span className="dh-dragon-eyebrow">Activity fire</span>
+          <span className="dh-dragon-eyebrow">Активність</span>
           <strong>{chamber.primaryStats.activityTotal}</strong>
-          <p>mock heatmap energy</p>
+          <p>Балів активності з backend профілю</p>
         </DragonCard>
       </section>
 
       <FamilyPersonalAccountingPanel memberId={user.id} />
       <FamilyMemberActivityPanel memberId={user.id} />
 
-      <DragonSection eyebrow="DRAGON IDENTITY" title="Identity command seal">
+      <DragonSection eyebrow="Профіль" title="Особисті дані">
         <div className="dh-profile-identity-grid">
           {[
-            ['Avatar', identity.avatarUrl ? 'Custom image' : 'Dragon Avatar seal'],
-            ['Dragon Name', identity.dragonName],
-            ['Discord Nickname', identity.discordNickname],
-            ['Dragon Title', identity.dragonTitle],
-            ['Current Rank', `${identity.currentRank} (${identity.rankLevel})`],
-            ['Element', identity.element],
-            ['Birthday', formatDragonBirthday(identity.birthday)],
-            ['Join Date', formatDragonProfileDate(identity.joinDate)],
-            ['Current Status', statusMeta.label],
-            ['Static ID', identity.staticId],
-            ['Family Branch', identity.familyBranch]
+            ['Аватар', identity.avatarUrl ? 'Власне зображення' : 'Даних поки немає'],
+            ['Ім’я дракона', identity.dragonName],
+            ['Discord nickname', identity.discordNickname],
+            ['Титул', identity.dragonTitle],
+            ['Поточний ранг', `${identity.currentRank} (${identity.rankLevel})`],
+            ['Ранг', identity.currentRank],
+            ['Дата народження', formatDragonBirthday(identity.birthday)],
+            ['У сім’ї з', formatDragonProfileDate(identity.joinDate)],
+            ['Поточний стан', statusMeta.label],
+            ['Статичний ID', identity.staticId],
+            ['Гілка сім’ї', identity.familyBranch]
           ].map(([label, value]) => (
             <DragonCard key={label} className="dh-profile-identity-card">
               <span>{label}</span>
@@ -132,7 +133,7 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
         </div>
       </DragonSection>
 
-      <DragonSection eyebrow="DRAGON STATISTICS" title="Command statistics">
+      <DragonSection eyebrow="Статистика" title="Показники профілю">
         <div className="dh-profile-stat-grid">
           {profile.statistics.map((statistic) => (
             <DragonStatisticCard key={statistic.id} statistic={statistic} />
@@ -140,21 +141,21 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
         </div>
       </DragonSection>
 
-      <DragonSection eyebrow="ACHIEVEMENTS" title="Seals and hidden honors">
-        {profileAchievements.loading ? <DragonLoader label="Profile achievements are loading" /> : null}
-        {profileAchievements.error ? <DragonRetry title="Profile achievements did not load" description={profileAchievements.error.message} onRetry={profileAchievements.refresh} /> : null}
+      <DragonSection eyebrow="Нагороди" title="Досягнення">
+        {profileAchievements.loading ? <DragonLoader label="Завантаження..." /> : null}
+        {profileAchievements.error ? <DragonRetry title="Не вдалося завантажити дані" description={profileAchievements.error.message} onRetry={profileAchievements.refresh} /> : null}
         <div className="dh-profile-achievement-grid">
           {profileAchievements.achievements.map((achievement) => (
-            <DragonAchievementCard key={achievement.id} achievement={achievement} />
+            <DragonAchievementCard key={achievement.id} achievement={toProfileAchievement(achievement)} />
           ))}
         </div>
       </DragonSection>
 
-      <DragonSection eyebrow="DRAGON TIMELINE" title="Chronicle of the chamber">
+      <DragonSection eyebrow="Історія" title="Хроніка профілю">
         <DragonTimeline events={chamber.timeline} />
       </DragonSection>
 
-      <DragonSection eyebrow="DRAGON INVENTORY" title="Vault inventory">
+      <DragonSection eyebrow="Інвентар" title="Особистий інвентар">
         <div className="dh-profile-inventory-grid">
           {profile.inventory.map((category) => (
             <DragonCard key={category.id} className="dh-profile-inventory-card">
@@ -172,39 +173,39 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
         </div>
       </DragonSection>
 
-      <DragonSection eyebrow="PERMISSIONS" title="Magical permission seals">
+      <DragonSection eyebrow="Доступи" title="Права та доступи">
         <div className="dh-profile-permission-grid">
           {profile.permissions.map((permission) => (
             <DragonCard key={permission.id} className={`dh-profile-permission-seal ${permission.granted ? 'is-granted' : 'is-sealed'}`}>
-              <div aria-hidden="true">{permission.granted ? 'Open' : 'Sealed'}</div>
+              <div aria-hidden="true">{permission.granted ? 'Відкрито' : 'Закрито'}</div>
               <h3>{permission.label}</h3>
               <p>{permission.description}</p>
-              <DragonBadge tone={permission.granted ? 'success' : 'muted'}>{permission.backendPermissionKey}</DragonBadge>
+              <DragonBadge tone={permission.granted ? 'success' : 'muted'}>{permission.granted ? 'Надано' : 'Немає доступу'}</DragonBadge>
             </DragonCard>
           ))}
         </div>
       </DragonSection>
 
-      <DragonSection eyebrow="ACTIVITY HEATMAP" title="Chamber activity fire">
+      <DragonSection eyebrow="Активність" title="Карта активності">
         <DragonActivityHeatmap days={profile.activity} />
       </DragonSection>
 
       <DragonPanel variant="ceremonial" className="dh-profile-rank-progress">
         <div>
-          <p className="dh-dragon-eyebrow">DRAGON RANK PROGRESS</p>
+          <p className="dh-dragon-eyebrow">Прогрес рангу</p>
           <h2>
-            {profile.progress.currentRank} to {profile.progress.nextRank}
+            {profile.progress.currentRank} → {profile.progress.nextRank}
           </h2>
-          <p>Future XP: {profile.progress.futureXp ?? 'reserved for backend'}</p>
+          <p>{profile.progress.futureXp == null ? 'Даних поки немає' : `XP: ${profile.progress.futureXp}`}</p>
         </div>
         <div>
           <strong>{profile.progress.progress}%</strong>
-          <DragonProgress value={profile.progress.progress} label="Dragon Rank Progress" />
+          <DragonProgress value={profile.progress.progress} label="Прогрес рангу" />
         </div>
         <div className="dh-profile-requirements">
           {profile.progress.requirements.map((requirement) => (
             <DragonCard key={requirement.id} className={requirement.completed ? 'is-complete' : 'is-pending'}>
-              <span>{requirement.completed ? 'Complete' : 'Pending'}</span>
+              <span>{requirement.completed ? 'Виконано' : 'Очікує'}</span>
               <strong>{requirement.label}</strong>
               <p>
                 {requirement.currentValue} / {requirement.requiredValue}
@@ -214,7 +215,7 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
         </div>
       </DragonPanel>
 
-      <DragonSection eyebrow="FUTURE DISCORD" title="Discord integration chamber">
+      <DragonSection eyebrow="Discord" title="Discord-профіль">
         <div className="dh-profile-discord-grid">
           {profile.discord.map((item) => (
             <DragonCard key={item.id} className={`dh-profile-discord-card is-${item.state}`}>
@@ -228,4 +229,24 @@ export function DragonProfile({ user }: { user: FamilyUser }) {
 
     </div>
   );
+}
+
+function toProfileAchievement(achievement: DragonAchievement): DragonProfileAchievement {
+  return {
+    id: achievement.id,
+    backendAchievementId: achievement.backendAchievementId,
+    icon: achievement.icon,
+    title: achievement.title,
+    description: achievement.description,
+    state: achievement.visibility === 'secret' ? 'secret' : achievement.completed ? 'unlocked' : 'locked',
+    rarity: toProfileAchievementRarity(achievement.rarity),
+    unlockedAt: achievement.completedAt ?? null,
+    progress: achievement.progressMax > 0 ? Math.round((achievement.progress / achievement.progressMax) * 100) : achievement.progress
+  };
+}
+
+function toProfileAchievementRarity(rarity: DragonAchievement['rarity']): DragonProfileAchievementRarity {
+  if (rarity === 'legendary' || rarity === 'mythic') return 'legendary';
+  if (rarity === 'rare' || rarity === 'epic') return 'rare';
+  return 'common';
 }

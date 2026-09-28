@@ -174,20 +174,20 @@ export function buildDragonBirthdayCalendarEvents(birthdays: DragonBirthdayData[
     if (!birthday.date) return [];
     const date = getObservedBirthdayInYear(birthday.date, year);
     const age = birthday.showAge ? calculateDragonBirthdayAge(birthday.date, date) : null;
-    const ageText = age === null ? '' : ` Turns ${age}.`;
+    const ageText = age === null ? '' : ` Виповнюється: ${age}.`;
 
     return [
       {
         id: `birthday-${birthday.memberId}-${year}`,
-        title: `Birthday: ${birthday.memberName}`,
-        description: `Dragon House birthday seal for ${birthday.memberName}.${ageText}`,
+        title: `День народження: ${birthday.memberName}`,
+        description: `День народження учасника Dragon House: ${birthday.memberName}.${ageText}`,
         date,
         startTime: '00:00',
         category: 'birthday',
         priority: date === today ? 'high' : 'normal',
-        participants: [{ id: birthday.memberId, name: birthday.memberName, role: 'Birthday Dragon' }],
-        createdBy: 'Birthday Engine',
-        hall: 'Celebration Chamber',
+        participants: [{ id: birthday.memberId, name: birthday.memberName, role: 'Іменинник' }],
+        createdBy: 'Календар днів народження',
+        hall: 'Зала святкувань',
         attachments: [],
         activity: birthday.backendField
       } satisfies DragonCalendarEvent

@@ -42,11 +42,11 @@ import {
 import { formatRewardValue, getRewardSourceLabel, getRewardStatusLabel } from '../../../lib/family-rewards-display';
 
 const CATEGORY_TABS: Array<{ key: DragonAchievementCategory | 'all'; label: string; room?: string }> = [
-  { key: 'all', label: 'All', room: 'Engine' },
+  { key: 'all', label: 'Усі', room: 'Відзнаки' },
   ...Object.entries(DRAGON_ACHIEVEMENT_CATEGORY_LABELS).map(([key, label]) => ({
     key: key as DragonAchievementCategory,
     label,
-    room: 'Seal'
+    room: 'Відзнака'
   }))
 ];
 
@@ -63,7 +63,7 @@ export function DragonAchievementEngineScreen({ repository, currentUser }: { rep
     setLeaderboardError(null);
     getBackendLeaderboard({ period: 'current_month', category: 'overall' })
       .then(setLeaderboard)
-      .catch((error) => setLeaderboardError(error instanceof Error ? error : new Error('Leaderboard backend request failed.')));
+      .catch((error) => setLeaderboardError(error instanceof Error ? error : new Error('Не вдалося завантажити рейтинг.')));
   };
 
   useEffect(refreshLeaderboard, []);
@@ -72,38 +72,38 @@ export function DragonAchievementEngineScreen({ repository, currentUser }: { rep
     <div className="dh-achievement-engine" data-dragon-achievement-engine="frontend">
       <DragonPanel variant="ceremonial" className="dh-achievement-engine-hero">
         <div>
-          <p className="dh-dragon-eyebrow">DRAGON ACHIEVEMENT ENGINE</p>
-          <h1>Family accomplishments become power.</h1>
-          <p>Reusable frontend achievement architecture for Profile, Tower Defense, Quest Board, Calendar, Members and Notifications.</p>
+          <p className="dh-dragon-eyebrow">Відзнаки</p>
+          <h1>Нагороди Dragon House</h1>
+          <p>Досягнення, нагороди, рейтинг і підтвердження виданих відзнак.</p>
         </div>
         <DragonAchievementProgressSummary statistics={engine.statistics} />
       </DragonPanel>
 
-      {engine.loading ? <DragonLoader label="Achievement catalog is loading" /> : null}
-      {engine.error ? <DragonRetry title="Achievements did not load" description={engine.error.message} onRetry={engine.refresh} /> : null}
+      {engine.loading ? <DragonLoader label="Завантажуємо каталог відзнак..." /> : null}
+      {engine.error ? <DragonRetry title="Не вдалося завантажити відзнаки" description={engine.error.message} onRetry={engine.refresh} /> : null}
       <DragonAchievementFilters filters={engine.filters} onChange={engine.setFilters} />
       <DragonAchievementGallery achievements={engine.visibleAchievements} onSelect={setSelectedAchievement} />
 
       {currentUser && canManageRewards(currentUser) ? <DragonRewardApprovalQueue /> : null}
 
-      <DragonSection eyebrow="LEADERBOARD" title="Current month ranking">
-        {leaderboardError ? <DragonRetry title="Leaderboard did not load" description={leaderboardError.message} onRetry={refreshLeaderboard} /> : null}
+      <DragonSection eyebrow="Рейтинг" title="Рейтинг цього місяця">
+        {leaderboardError ? <DragonRetry title="Не вдалося завантажити рейтинг" description={leaderboardError.message} onRetry={refreshLeaderboard} /> : null}
         <div className="dh-achievement-recent-grid" data-leaderboard-source="backend">
           {leaderboard?.items.length ? leaderboard.items.slice(0, 5).map((entry) => (
             <DragonCard key={entry.familyMemberId}>
-              <span className="dh-dragon-eyebrow">Place {entry.place}</span>
+              <span className="dh-dragon-eyebrow">{entry.place} місце</span>
               <strong>{entry.displayName}</strong>
-              <p>{entry.score} authoritative activity points</p>
+              <p>Балів активності: {entry.score}</p>
             </DragonCard>
-          )) : !leaderboardError ? <DragonEmptyState title="No leaderboard activity" description="No authoritative activity is available for this period." /> : null}
+          )) : !leaderboardError ? <DragonEmptyState title="Рейтинг поки порожній" description="За цей період ще немає підтвердженої активності." /> : null}
         </div>
       </DragonSection>
 
-      <DragonSection eyebrow="RECENT UNLOCKS" title="Freshly awakened seals">
+      <DragonSection eyebrow="Останні відзнаки" title="Нещодавно відкриті відзнаки">
         <div className="dh-achievement-recent-grid">
-          {recentUnlocks.map((achievement) => (
+          {recentUnlocks.length ? recentUnlocks.map((achievement) => (
             <DragonAchievementNotification key={achievement.id} achievement={achievement} />
-          ))}
+          )) : <DragonEmptyState title="Нещодавно відкритих відзнак поки немає" />}
         </div>
       </DragonSection>
 
@@ -124,7 +124,7 @@ function DragonRewardApprovalQueue() {
     setError(null);
     listBackendPendingRewards({ status, limit: 50 })
       .then((response) => setItems(response.items))
-      .catch((failure) => setError(failure instanceof Error ? failure : new Error('Reward queue backend request failed.')))
+      .catch((failure) => setError(failure instanceof Error ? failure : new Error('Не вдалося завантажити чергу нагород.')))
       .finally(() => setLoading(false));
   };
 
@@ -136,25 +136,25 @@ function DragonRewardApprovalQueue() {
     const request = action === 'approve' ? approveBackendRewardGrant : action === 'issue' ? issueBackendRewardGrant : cancelBackendRewardGrant;
     request(grantId)
       .then(refresh)
-      .catch((failure) => setError(failure instanceof Error ? failure : new Error('Reward mutation failed.')))
+      .catch((failure) => setError(failure instanceof Error ? failure : new Error('Не вдалося оновити нагороду.')))
       .finally(() => setMutatingId(null));
   };
 
   return (
-    <DragonSection eyebrow="REWARDS" title="Pending reward approvals">
+    <DragonSection eyebrow="Нагороди" title="Очікують підтвердження">
       <div className="dh-achievement-filter-row">
-        <DragonSelect value={status} onChange={(event) => setStatus(event.target.value as typeof status)} aria-label="Filter reward approval queue">
-          <option value="earned">Awaiting approval</option>
-          <option value="approved">Approved</option>
-          <option value="all">All statuses</option>
+        <DragonSelect value={status} onChange={(event) => setStatus(event.target.value as typeof status)} aria-label="Фільтр черги нагород">
+          <option value="earned">Очікують підтвердження</option>
+          <option value="approved">Підтверджені</option>
+          <option value="all">Усі статуси</option>
         </DragonSelect>
         <DragonButton type="button" variant="secondary" onClick={refresh} disabled={loading}>
-          Retry
+          Спробувати ще раз
         </DragonButton>
       </div>
-      {loading ? <DragonLoader label="Reward queue is loading" /> : null}
-      {error ? <DragonRetry title="Reward queue did not load" description={error.message} onRetry={refresh} /> : null}
-      {!loading && !error && !items.length ? <DragonEmptyState title="No pending rewards" description="Backend returned an empty reward queue." /> : null}
+      {loading ? <DragonLoader label="Завантажуємо чергу нагород..." /> : null}
+      {error ? <DragonRetry title="Не вдалося завантажити нагороди" description={error.message} onRetry={refresh} /> : null}
+      {!loading && !error && !items.length ? <DragonEmptyState title="Немає нагород, що очікують підтвердження." /> : null}
       <div className="dh-achievement-recent-grid" data-reward-queue-source="backend">
         {items.map((grant) => (
           <DragonCard key={grant.id}>
@@ -164,13 +164,13 @@ function DragonRewardApprovalQueue() {
             <p>{getRewardStatusLabel(grant)}</p>
             <div className="dh-achievement-filter-row">
               <DragonButton type="button" variant="secondary" disabled={mutatingId === grant.id || grant.status !== 'earned'} onClick={() => mutate(grant.id, 'approve')}>
-                Approve
+                Підтвердити
               </DragonButton>
               <DragonButton type="button" variant="primary" disabled={mutatingId === grant.id || grant.status !== 'approved'} onClick={() => mutate(grant.id, 'issue')}>
-                Issue
+                Видати
               </DragonButton>
               <DragonButton type="button" variant="ghost" disabled={mutatingId === grant.id || grant.status === 'issued' || grant.status === 'cancelled'} onClick={() => mutate(grant.id, 'cancel')}>
-                Cancel
+                Скасувати
               </DragonButton>
             </div>
           </DragonCard>
@@ -188,7 +188,7 @@ export function DragonAchievementGallery({
   onSelect?: (achievement: DragonAchievement) => void;
 }) {
   if (!achievements.length) {
-    return <DragonEmptyState title="No achievement seals found" description="Adjust filters to reveal more Dragon House accomplishments." />;
+    return <DragonEmptyState title="Відзнак не знайдено" description="Зміни фільтри, щоб побачити інші відзнаки Dragon House." />;
   }
 
   return (
@@ -217,24 +217,24 @@ export function DragonAchievementCard({
         type="button"
         className="dh-engine-achievement-open"
         onClick={() => onSelect?.(achievement)}
-        aria-label={`Open achievement ${isSecret ? 'Secret Achievement' : achievement.title}`}
+        aria-label={`Відкрити відзнаку ${isSecret ? 'Таємна відзнака' : achievement.title}`}
       >
         <span className="dh-engine-achievement-icon" aria-hidden="true">
           {isSecret ? '?' : achievement.icon}
         </span>
         <span>
-          <strong>{isSecret ? 'Secret Achievement' : achievement.title}</strong>
-          <small>{isSecret ? 'Hidden until unlocked' : achievement.description}</small>
+          <strong>{isSecret ? 'Таємна відзнака' : achievement.title}</strong>
+          <small>{isSecret ? 'Прихована до відкриття' : achievement.description}</small>
         </span>
       </button>
       <div className="dh-engine-achievement-meta">
         <DragonBadge tone={rarityMeta.tone}>{rarityMeta.label}</DragonBadge>
-        <DragonBadge tone={achievement.completed ? 'success' : 'muted'}>{achievement.completed ? 'Unlocked' : 'Locked'}</DragonBadge>
+        <DragonBadge tone={achievement.completed ? 'success' : 'muted'}>{achievement.completed ? 'Відкрита' : 'Не відкрито'}</DragonBadge>
       </div>
-      <DragonProgress value={progressPercent} label={`${achievement.title} progress`} />
+      <DragonProgress value={progressPercent} label={`Прогрес відзнаки ${achievement.title}`} />
       <footer>
-        <span>{achievement.points} pts</span>
-        <span>{achievement.xp} XP</span>
+        <span>{achievement.points} балів</span>
+        {achievement.xp > 0 ? <span>{achievement.xp} XP</span> : null}
       </footer>
     </DragonCard>
   );
@@ -253,12 +253,12 @@ export function DragonAchievementDetails({ achievement, onClose }: { achievement
           <DragonBadge tone={rarityMeta.tone}>{rarityMeta.label}</DragonBadge>
           <DragonBadge tone="muted">{getDragonAchievementVisibilityLabel(achievement.visibility)}</DragonBadge>
           <p>{achievement.description}</p>
-          <DragonProgress value={getDragonAchievementProgressPercent(achievement)} label={`${achievement.title} detail progress`} />
+          <DragonProgress value={getDragonAchievementProgressPercent(achievement)} label={`Прогрес відзнаки ${achievement.title}`} />
         </div>
         <div className="dh-achievement-details-grid">
           {achievement.requirements.map((requirement) => (
             <DragonCard key={requirement.id}>
-              <span className="dh-dragon-eyebrow">{requirement.backendField}</span>
+              <span className="dh-dragon-eyebrow">Умова</span>
               <strong>{requirement.label}</strong>
               <p>
                 {requirement.current} / {requirement.target}
@@ -298,17 +298,17 @@ export function DragonAchievementFilters({
           type="search"
           value={filters.search}
           onChange={(event) => onChange({ ...filters, search: event.target.value })}
-          aria-label="Search achievements"
-          placeholder="Search seals"
+          aria-label="Пошук відзнак"
+          placeholder="Пошук відзнак"
         />
         <DragonSelect
           value={filters.rarity}
           onChange={(event) => onChange({ ...filters, rarity: event.target.value as DragonAchievementFilters['rarity'] })}
-          aria-label="Filter achievements by rarity"
+          aria-label="Фільтр відзнак за рідкістю"
         >
           {RARITIES.map((rarity) => (
             <option key={rarity} value={rarity}>
-              {rarity === 'all' ? 'All rarities' : DRAGON_ACHIEVEMENT_RARITY_META[rarity].label}
+              {rarity === 'all' ? 'Усі рідкості' : DRAGON_ACHIEVEMENT_RARITY_META[rarity].label}
             </option>
           ))}
         </DragonSelect>
@@ -318,7 +318,7 @@ export function DragonAchievementFilters({
           aria-pressed={filters.completion === 'unlocked'}
           onClick={() => onChange({ ...filters, completion: filters.completion === 'unlocked' ? 'all' : 'unlocked' })}
         >
-          Unlocked
+          Відкриті
         </DragonButton>
         <DragonButton
           type="button"
@@ -326,7 +326,7 @@ export function DragonAchievementFilters({
           aria-pressed={filters.completion === 'locked'}
           onClick={() => onChange({ ...filters, completion: filters.completion === 'locked' ? 'all' : 'locked' })}
         >
-          Locked
+          Не відкриті
         </DragonButton>
       </div>
     </DragonPanel>
@@ -337,14 +337,14 @@ export function DragonAchievementProgressSummary({ statistics }: { statistics: D
   return (
     <div className="dh-achievement-summary" aria-label="Dragon Achievement Progress Summary">
       <div>
-        <span className="dh-dragon-eyebrow">Unlocked</span>
+        <span className="dh-dragon-eyebrow">Відкриті</span>
         <strong>{statistics.unlocked}</strong>
       </div>
       <div>
-        <span className="dh-dragon-eyebrow">Completion</span>
+        <span className="dh-dragon-eyebrow">Прогрес</span>
         <strong>{statistics.completionPercent}%</strong>
       </div>
-      <DragonProgress value={statistics.completionPercent} label="Achievement completion" />
+      <DragonProgress value={statistics.completionPercent} label="Прогрес відзнак" />
       <p>
         {statistics.currentXp} / {statistics.totalXp} XP
       </p>

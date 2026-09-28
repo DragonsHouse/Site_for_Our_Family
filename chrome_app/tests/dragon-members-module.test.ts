@@ -76,7 +76,7 @@ describe('Dragon Members production module source contract', () => {
       'DragonProgress'
     ].forEach((name) => assert.match(membersSource, new RegExp(name)));
 
-    ['Static ID', 'Biography', 'Statistics', 'Achievements', 'Permissions'].forEach((label) => {
+    ['Статичний ID', 'Опис', 'Статистика', 'Досягнення', 'Права'].forEach((label) => {
       assert.match(membersSource, new RegExp(label));
     });
     assert.match(membersSource, /members\.setSelectedMember\(member\)/);
@@ -85,7 +85,7 @@ describe('Dragon Members production module source contract', () => {
 
   it('routes Hub Members through DragonMembers and includes fortress styling hooks', () => {
     assert.match(shellSource, /import \{ DragonMembers \} from '.\/dragon-members'/);
-    assert.match(shellSource, /activeTab === 'members' \? <DragonMembers currentUser=\{currentUser\} \/>/);
+    assert.match(shellSource, /activeTab === 'members' \? <DragonMembers currentUser=\{currentUser\} repository=\{backendMembersRepository\} \/>/);
     ['dh-members-room', 'dh-members-card', 'dh-members-role-volodarka', 'dh-members-status-voice'].forEach((className) => {
       assert.match(styleSource, new RegExp(className));
     });

@@ -321,6 +321,52 @@ describe('DiscordMemberSyncDryRunService', () => {
     expect(result.actions[0]?.additionalRoles.map((role) => role.discordRoleId)).toEqual(['role-moder', 'role-family']);
   });
 
+  it('deactivates linked active members who only have non-family Discord roles', async () => {
+    const { service } = await createService([
+      discordMember({ roleIds: ['role-ignored'] }),
+    ], [familyMember()]);
+
+    const result = await service.run(new Date(now));
+
+    expect(result.summary.deactivate_candidate).toBe(1);
+    expect(result.summary.conflict).toBe(0);
+    expect(result.actions[0]).toMatchObject({
+      action: 'deactivate_candidate',
+      reason: 'linked_active_family_member_missing_primary_hierarchy_role',
+      matchedBy: 'discord_user_id',
+      familyMember: { id: 'family-1', status: 'active' },
+      changes: [{ field: 'status', current: 'active', proposed: 'inactive' }],
+    });
+    expect(result.actions[0]?.matchedIgnoredRoles).toEqual([
+      { discordRoleId: 'role-ignored', discordRoleName: 'Друг Сімїї' },
+    ]);
+  });
+
+  it('blocks automatic access restoration for members archived after leaving Discord', async () => {
+    const archived = familyMember({
+      status: 'inactive',
+      deletedAt: '2026-07-20T09:00:00.000Z',
+      profileMetadata: {
+        discordAccessArchive: {
+          archivedAt: '2026-07-20T09:00:00.000Z',
+          requiresReapproval: true,
+        },
+      },
+    });
+    const { service } = await createService([discordMember({ roleIds: ['role-member'] })], [archived]);
+
+    const result = await service.run(new Date(now));
+
+    expect(result.summary.conflict).toBe(1);
+    expect(result.actions[0]).toMatchObject({
+      action: 'conflict',
+      reason: 'manual_reapproval_required_after_discord_leave',
+    });
+    expect(result.actions[0]?.warnings).toContain(
+      'Member was archived after leaving Discord or losing the family role. Owner/deputy approval is required before site access can be restored.',
+    );
+  });
+
   it('does not create conflicts for ignored roles when a primary role is present', async () => {
     const { service } = await createService([
       discordMember({ roleIds: ['role-egg', 'role-ignored'] }),

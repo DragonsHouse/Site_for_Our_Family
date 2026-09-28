@@ -42,7 +42,7 @@ describe('family reward allocation backend client', () => {
     assert.match(panel, /data-reward-allocation-source="backend"/u);
     assert.match(panel, /data-reward-allocation-mode/u);
     assert.match(panel, /summaryOnly/u);
-    assert.match(panel, /allocations\.length\} planned/u);
+    assert.match(panel, /allocations\.length\} заплановано/u);
     assert.match(panel, /FamilyMemberDirectoryClient/u);
     assert.match(panel, /listBackendRewards/u);
     assert.match(panel, /filter\(\(reward\) => reward\.active\)/u);
@@ -55,12 +55,12 @@ describe('family reward allocation backend client', () => {
     const panel = readFileSync(new URL('../entrypoints/dashboard/family/family-reward-allocation-panel.tsx', import.meta.url), 'utf8');
     const towerUi = readFileSync(new URL('../entrypoints/dashboard/family/dragon-tower-defense.tsx', import.meta.url), 'utf8');
     const eventUi = readFileSync(new URL('../entrypoints/dashboard/family/dragon-events.tsx', import.meta.url), 'utf8');
-    assert.match(panel, /Source is closed\. Planned allocations are read-only/u);
+    assert.match(panel, /Джерело закрите\. Заплановані нагороди доступні тільки для перегляду/u);
     assert.match(panel, /canMutate = canManage && !closed && !summaryOnly/u);
     assert.ok(towerUi.includes('DragonDefenseResultDialog defense={defense} currentUser={currentUser}'));
     assert.match(towerUi, /summaryOnly/u);
     assert.match(eventUi, /data-event-completion-reward-summary="backend"/u);
-    assert.match(eventUi, /Confirm complete/u);
+    assert.match(eventUi, /Завершити/u);
     assert.doesNotMatch(`${panel}\n${towerUi}\n${eventUi}`, /metadata\.rewardGrants|metadata\.rewardAllocations|paid/iu);
   });
 });

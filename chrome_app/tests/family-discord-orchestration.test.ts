@@ -24,7 +24,10 @@ describe('family Discord orchestration frontend', () => {
     assert.match(panelSource, /Не опубліковано/u);
     assert.match(panelSource, /Опубліковано/u);
     assert.match(panelSource, /Синхронізовано/u);
+    assert.match(panelSource, /Очікує синхронізації/u);
     assert.match(panelSource, /Помилка синхронізації/u);
+    assert.match(clientSource, /not_published/u);
+    assert.match(clientSource, /sync_error/u);
     assert.doesNotMatch(panelSource, /messageId|channelId|orchestration state/u);
   });
 

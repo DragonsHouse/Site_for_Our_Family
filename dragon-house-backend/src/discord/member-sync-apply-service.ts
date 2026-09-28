@@ -68,10 +68,12 @@ type MemberRow = {
   role: FamilyRole;
   rank: number;
   status: 'active' | 'inactive';
+  deleted_at?: Date | null;
   permissions: FamilyPermission[];
   permissions_override: FamilyPermission[];
   permissions_denied: FamilyPermission[];
   permissions_discord: FamilyPermission[];
+  profile_metadata?: Record<string, unknown>;
 };
 
 export class DiscordMemberSyncApplyService {
@@ -266,6 +268,11 @@ export class DiscordMemberSyncApplyService {
       result.conflicts.push(`Linked Family Hub member was not found during apply: ${action.familyMember.id}`);
       return;
     }
+    if (requiresManualReapproval(member)) {
+      result.summary.conflicts += 1;
+      result.conflicts.push(`Manual approval is required before restoring site access: ${member.id}`);
+      return;
+    }
 
     const protectedOwner = isProtectedOwner(member.id, action.discordMember.discordUserId, this.config);
     const proposedRole = protectedOwner ? 'owner' : action.primaryRank.familyRole;
@@ -363,10 +370,12 @@ export class DiscordMemberSyncApplyService {
     await client.query(
       `update family_members
        set status = 'inactive',
+           deleted_at = coalesce(deleted_at, $2),
+           profile_metadata = coalesce(profile_metadata, '{}'::jsonb) || $3::jsonb,
            updated_at = now(),
            version = version + 1
        where id = $1`,
-      [member.id],
+      [member.id, generatedAt.toISOString(), JSON.stringify(discordAccessArchiveMetadata(member, action, generatedAt))],
     );
     await client.query(
       `update discord_account_links
@@ -379,6 +388,7 @@ export class DiscordMemberSyncApplyService {
     await client.query(
       `update family_sessions
        set revoked_at = coalesce(revoked_at, $2),
+           revoked_reason = coalesce(revoked_reason, 'discord_membership_lost'),
            updated_at = now()
        where family_member_id = $1
          and revoked_at is null`,
@@ -395,9 +405,9 @@ export class DiscordMemberSyncApplyService {
     result.auditEntries += await auditMemberChange(client, {
       action: 'discord_sync_member_deactivated',
       entityId: member.id,
-      beforeData: { status: member.status },
-      afterData: { status: 'inactive' },
-      metadata: auditMetadata(result.syncRunId, action, 'member_absent_from_discord'),
+      beforeData: { status: member.status, deletedAt: member.deleted_at ?? null },
+      afterData: { status: 'inactive', deletedAt: generatedAt.toISOString(), requiresReapproval: true },
+      metadata: auditMetadata(result.syncRunId, action, 'member_archived_after_discord_membership_lost'),
     });
   }
 
@@ -682,6 +692,39 @@ function isProtectedOwner(memberId: string, discordUserId: string, config: Pick<
       memberId === config.discord.sync.protectedOwnerMemberId &&
       discordUserId === config.discord.sync.protectedOwnerDiscordUserId,
   );
+}
+
+function requiresManualReapproval(member: MemberRow): boolean {
+  const archive = member.profile_metadata?.discordAccessArchive;
+  if (archive && typeof archive === 'object' && 'requiresReapproval' in archive) {
+    return (archive as { requiresReapproval?: unknown }).requiresReapproval === true;
+  }
+  return Boolean(member.deleted_at);
+}
+
+function discordAccessArchiveMetadata(
+  member: MemberRow,
+  action: DiscordMemberSyncDryRunItem,
+  generatedAt: Date,
+): Record<string, unknown> {
+  return {
+    discordAccessArchive: {
+      archivedAt: generatedAt.toISOString(),
+      archivedBy: 'discord_sync',
+      reason: action.reason,
+      requiresReapproval: true,
+      reapprovalPolicy: 'owner_or_deputy_restore_required',
+      previous: {
+        status: member.status,
+        role: member.role,
+        rank: member.rank,
+        permissions: member.permissions,
+        permissionsDiscord: member.permissions_discord,
+      },
+      discordUserId: action.familyMember?.discordUserId ?? action.discordMember?.discordUserId ?? null,
+      matchedIgnoredRoles: action.matchedIgnoredRoles.map((role) => role.discordRoleName),
+    },
+  };
 }
 
 async function saveApplyReport(result: DiscordMemberSyncApplyResult): Promise<void> {

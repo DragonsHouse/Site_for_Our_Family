@@ -1,6 +1,7 @@
 import type { FamilyAuthContext, FamilyMember } from '../types.js';
 
 export type DiscordOrchestrationSourceModule = 'family_quests' | 'tower_defense' | 'family_events';
+export type DiscordProjectionSyncState = 'synced' | 'pending' | 'sync_error' | 'not_published';
 
 export type DiscordMessageIdentity = {
   sourceModule: DiscordOrchestrationSourceModule;
@@ -30,6 +31,10 @@ export type SaveDiscordMessageInput = DiscordMessageIdentity & {
   syncedAt?: string | null;
   externalId: string;
   metadata?: Record<string, unknown>;
+};
+
+export type UpdateDiscordMessageMetadataInput = DiscordMessageIdentity & {
+  metadata: Record<string, unknown>;
 };
 
 export type DiscordActionStatus = 'received' | 'succeeded' | 'failed' | 'ignored';
@@ -118,4 +123,5 @@ export type DiscordMessagePayload = {
 export interface DiscordMessageTransport {
   sendMessage(channelId: string, payload: DiscordMessagePayload): Promise<{ messageId: string }>;
   editMessage(channelId: string, messageId: string, payload: DiscordMessagePayload): Promise<{ messageId: string }>;
+  sendDirectMessageToGuildMembers?(guildId: string, payload: DiscordMessagePayload): Promise<{ attempted: number; sent: number; failed: number }>;
 }

@@ -29,6 +29,8 @@ const PERMISSION_LABELS: Partial<Record<FamilyPermission, string>> = {
 };
 
 const ROLE_OPTIONS = Object.keys(FAMILY_ROLE_LABELS) as FamilyRole[];
+type MemberSortField = 'rank' | 'status';
+type MemberSortDirection = 'asc' | 'desc';
 
 type MemberDraft = {
   nickname: string;
@@ -60,6 +62,15 @@ function MemberAvatar({ user }: { user: FamilyUser }) {
 function getEffectivePermissions(user: Pick<FamilyUser, 'role' | 'permissions'>) {
   if (user.role === 'owner') return ROLE_PERMISSIONS.owner;
   return ALL_FAMILY_PERMISSIONS.filter((permission) => user.permissions.includes(permission));
+}
+
+function statusSortValue(user: FamilyUser) {
+  return (user.accountStatus ?? 'active') === 'inactive' ? 1 : 0;
+}
+
+function getSortDirectionLabel(field: MemberSortField, direction: MemberSortDirection) {
+  if (field === 'rank') return direction === 'asc' ? '1 -> 10' : '10 -> 1';
+  return direction === 'asc' ? 'активні -> неактивні' : 'неактивні -> активні';
 }
 
 function draftFromUser(user: FamilyUser | null): MemberDraft {
@@ -477,10 +488,11 @@ export function FamilyMembers({
   dataSourceMode?: 'local' | 'api';
 }) {
   const [query, setQuery] = useState('');
-  const [onlineOnly, setOnlineOnly] = useState(false);
   const [role, setRole] = useState<FamilyRole | 'all'>('all');
   const [rank, setRank] = useState('all');
-  const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('active');
+  const [sortField, setSortField] = useState<MemberSortField>('rank');
+  const [sortDirection, setSortDirection] = useState<MemberSortDirection>('asc');
+  const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [managedUser, setManagedUser] = useState<FamilyUser | null>(null);
   const [creating, setCreating] = useState(false);
   const canManage = hasFamilyPermission(currentUser, 'manage_users') || hasFamilyPermission(currentUser, 'manage_members');
@@ -491,14 +503,41 @@ export function FamilyMembers({
 
   const filteredUsers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return users.filter((user) => {
-      if (onlineOnly && !user.isOnline) return false;
-      if (role !== 'all' && user.role !== role) return false;
-      if (rank !== 'all' && user.rank !== rank) return false;
-      if (status !== 'all' && (user.accountStatus ?? 'active') !== status) return false;
-      return normalizedQuery ? user.nickname.toLowerCase().includes(normalizedQuery) : true;
-    });
-  }, [onlineOnly, query, rank, role, status, users]);
+    return users
+      .filter((user) => {
+        if (role !== 'all' && user.role !== role) return false;
+        if (rank !== 'all' && user.rank !== rank) return false;
+        if (status !== 'all' && (user.accountStatus ?? 'active') !== status) return false;
+        return normalizedQuery ? user.nickname.toLowerCase().includes(normalizedQuery) : true;
+      })
+      .sort((left, right) => {
+        const valueDelta =
+          sortField === 'rank'
+            ? left.rankLevel - right.rankLevel
+            : statusSortValue(left) - statusSortValue(right);
+        const directionMultiplier = sortDirection === 'asc' ? 1 : -1;
+        return valueDelta !== 0
+          ? valueDelta * directionMultiplier
+          : left.nickname.localeCompare(right.nickname, 'uk');
+      });
+  }, [query, rank, role, sortDirection, sortField, status, users]);
+
+  function toggleSort(field: MemberSortField) {
+    if (field === 'status') {
+      setStatus('all');
+    }
+    if (sortField === field) {
+      setSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortField(field);
+    setSortDirection('asc');
+  }
+
+  const rankAscending = sortField !== 'rank' || sortDirection === 'asc';
+  const statusAscending = sortField !== 'status' || sortDirection === 'asc';
+  const rankSortLabel = getSortDirectionLabel('rank', rankAscending ? 'asc' : 'desc');
+  const statusSortLabel = getSortDirectionLabel('status', statusAscending ? 'asc' : 'desc');
 
   return (
     <section className="rounded-2xl border border-red-950/70 bg-slate-950/75 p-5">
@@ -565,33 +604,59 @@ export function FamilyMembers({
           onChange={(event) => setStatus(event.target.value as 'all' | 'active' | 'inactive')}
           className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
         >
-          <option value="active">active</option>
-          <option value="inactive">inactive</option>
-          <option value="all">усі</option>
+          <option value="active">Активні</option>
+          <option value="inactive">Неактивні</option>
+          <option value="all">Усі статуси</option>
         </select>
-        <label className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-300">
-          <input
-            type="checkbox"
-            checked={onlineOnly}
-            onChange={(event) => setOnlineOnly(event.target.checked)}
-          />
-          online
-        </label>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800">
-        <div className="grid grid-cols-[1.4fr_0.8fr_1.2fr_0.7fr_0.8fr_0.8fr] bg-slate-900 px-3 py-2 text-xs uppercase tracking-wide text-slate-400">
-          <div>Nickname</div>
+      <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-800">
+        <div className="min-w-[840px]">
+        <div className="grid grid-cols-[1.35fr_0.75fr_1.2fr_0.9fr_0.65fr_0.75fr] bg-slate-900 px-3 py-2 text-xs uppercase tracking-wide text-slate-400">
+          <div>Нікнейм</div>
           <div>Static ID</div>
-          <div>Роль / ранг</div>
-          <div>Status</div>
-          <div>Progress</div>
+          <div className="flex items-center gap-2">
+            <span>Роль / ранг</span>
+            <button
+              type="button"
+              onClick={() => toggleSort('rank')}
+              className={
+                sortField === 'rank'
+                  ? 'rounded-lg border border-amber-500/70 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-100 hover:bg-amber-500/20'
+                  : 'rounded-lg border border-amber-500/40 px-2 py-1 text-[11px] font-semibold text-amber-100 hover:bg-amber-500/10'
+              }
+              aria-label={rankAscending ? 'Від меншого рангу до більшого' : 'Від більшого рангу до меншого'}
+              title={rankSortLabel}
+            >
+              {rankSortLabel}
+            </button>
+          </div>
+          <button
+            type="button"
+            className={
+              sortField === 'status'
+                ? 'relative z-10 flex min-h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-500/70 bg-amber-500/10 px-2 py-1 text-amber-100 hover:bg-amber-500/20'
+                : 'relative z-10 flex min-h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-500/40 px-2 py-1 text-amber-100 hover:bg-amber-500/10'
+            }
+            onClick={() => toggleSort('status')}
+            title={statusSortLabel}
+          >
+            <span>Статус</span>
+            <span
+              className="cursor-pointer whitespace-nowrap text-[10px] font-semibold text-amber-100"
+              aria-label={statusAscending ? 'Від активних до неактивних' : 'Від неактивних до активних'}
+              title={statusSortLabel}
+            >
+              {statusSortLabel}
+            </span>
+          </button>
+          <div>Прогрес</div>
           <div>Дії</div>
         </div>
         {filteredUsers.map((user) => (
           <div
             key={user.nickname}
-            className="grid grid-cols-[1.4fr_0.8fr_1.2fr_0.7fr_0.8fr_0.8fr] border-t border-slate-800 px-3 py-3 text-sm"
+            className="grid grid-cols-[1.35fr_0.75fr_1.2fr_0.9fr_0.65fr_0.75fr] border-t border-slate-800 px-3 py-3 text-sm"
           >
             <div className="flex items-center gap-3 font-medium text-white">
               {canViewAvatars ? <MemberAvatar user={user} /> : null}
@@ -602,8 +667,8 @@ export function FamilyMembers({
               <div className="text-amber-100">{FAMILY_ROLE_LABELS[user.role]}</div>
               <div className="text-xs text-slate-500">{user.rank}</div>
             </div>
-            <div className={(user.accountStatus ?? 'active') === 'inactive' ? 'text-rose-300' : user.isOnline ? 'text-emerald-300' : 'text-slate-500'}>
-              {(user.accountStatus ?? 'active') === 'inactive' ? 'inactive' : user.isOnline ? 'online' : 'offline'}
+            <div className={(user.accountStatus ?? 'active') === 'inactive' ? 'text-rose-300' : 'text-emerald-300'}>
+              {(user.accountStatus ?? 'active') === 'inactive' ? 'Неактивний' : 'Активний'}
             </div>
             <div className="text-amber-100">{user.promotionProgress}%</div>
             <div>
@@ -621,6 +686,7 @@ export function FamilyMembers({
             </div>
           </div>
         ))}
+        </div>
       </div>
 
       {creating ? (

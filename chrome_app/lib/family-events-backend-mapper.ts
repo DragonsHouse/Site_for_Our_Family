@@ -51,6 +51,7 @@ export function mapBackendFamilyEvent(event: BackendFamilyEventDto): DragonEvent
     timezone: event.timezone,
     tags: readStringArray(event.metadata.tags),
     xp: 0,
+    questIds: [],
     createdAt: event.createdAt,
     updatedAt: event.updatedAt,
     source: {

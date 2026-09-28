@@ -1,10 +1,11 @@
 import type { AppConfig } from '../config/env.js';
 
 export type TestConfigOverrides = Partial<Omit<AppConfig, 'discord'>> & {
-  discord?: Partial<Omit<AppConfig['discord'], 'channels' | 'sync' | 'oauth'>> & {
+  discord?: Partial<Omit<AppConfig['discord'], 'channels' | 'sync' | 'oauth' | 'towerSync'>> & {
     channels?: Partial<AppConfig['discord']['channels']>;
     sync?: Partial<AppConfig['discord']['sync']>;
     oauth?: Partial<AppConfig['discord']['oauth']>;
+    towerSync?: Partial<AppConfig['discord']['towerSync']>;
   };
 };
 
@@ -49,9 +50,17 @@ export function createTestConfig(overrides: TestConfigOverrides = {}): AppConfig
         dryRunRateLimitPerMinute: overrides.discord?.sync?.dryRunRateLimitPerMinute ?? 1000,
         applyRateLimitPerHour: overrides.discord?.sync?.applyRateLimitPerHour ?? 1000,
         reportRateLimitPerMinute: overrides.discord?.sync?.reportRateLimitPerMinute ?? 1000,
+        autoEnabled: overrides.discord?.sync?.autoEnabled ?? false,
+        autoIntervalSeconds: overrides.discord?.sync?.autoIntervalSeconds ?? 300,
       },
       orchestration: {
         enabled: overrides.discord?.orchestration?.enabled ?? false,
+      },
+      towerSync: {
+        enabled: overrides.discord?.towerSync?.enabled ?? false,
+        intervalSeconds: overrides.discord?.towerSync?.intervalSeconds ?? 60,
+        messageLimit: overrides.discord?.towerSync?.messageLimit ?? 100,
+        actorMemberId: overrides.discord?.towerSync?.actorMemberId ?? null,
       },
       channels: {
         welcome: overrides.discord?.channels?.welcome ?? null,

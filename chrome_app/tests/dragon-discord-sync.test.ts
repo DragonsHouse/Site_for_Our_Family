@@ -134,11 +134,11 @@ describe('Dragon Discord Synchronization Engine frontend', () => {
 
   it('adds administration navigation without replacing Events or Fire Guard', () => {
     assert.match(hubSource, /DRAGON_ROOM_TAB_KEYS/);
-    assert.match(roomNavigationSource, /key: 'resources'[\s\S]*key: 'discord-sync'[\s\S]*key: 'family'/);
+    assert.match(roomNavigationSource, /key: 'family'[\s\S]*key: 'calendar'[\s\S]*key: 'events'[\s\S]*key: 'tower-defense'[\s\S]*key: 'achievements'[\s\S]*key: 'resources'[\s\S]*key: 'map'[\s\S]*key: 'discord-sync'/);
     assert.match(roomNavigationSource, /key: 'events'/);
     assert.match(roomNavigationSource, /key: 'tower-defense'/);
     assert.match(roomNavigationSource, /key: 'discord-sync'/);
-    assert.match(shellSource, /activeTab === 'events' \? <DragonEventEngineScreen \/>/);
+    assert.match(shellSource, /activeTab === 'events' \? \(\s*<DragonEventEngineScreen/);
     assert.match(shellSource, /activeTab === 'tower-defense' \? <DragonTowerDefenseScreen currentUser=\{currentUser\} \/>/);
     assert.match(shellSource, /activeTab === 'discord-sync' \? <DragonDiscordSyncScreen currentUser=\{currentUser\} \/>/);
   });

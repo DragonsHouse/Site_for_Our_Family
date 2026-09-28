@@ -3,14 +3,14 @@ import type { FamilyMemberDirectoryItem } from '../../../lib/family-member-direc
 import { DragonHouseCrest } from './dragon-house-crest';
 
 function formatJoinedDate(value: string | null): string {
-  if (!value) return 'Joined date unavailable';
+  if (!value) return 'Дата вступу недоступна';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Joined date unavailable';
-  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
+  if (Number.isNaN(date.getTime())) return 'Дата вступу недоступна';
+  return new Intl.DateTimeFormat('uk-UA', { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
 }
 
 function avatarLabel(member: FamilyMemberDirectoryItem): string {
-  return `${member.displayName} avatar`;
+  return `Аватар ${member.displayName}`;
 }
 
 export function FamilyMemberCard({
@@ -21,7 +21,7 @@ export function FamilyMemberCard({
   onOpen: (member: FamilyMemberDirectoryItem) => void;
 }) {
   const avatarUrl = member.avatarUrl ?? member.discord.avatarUrl;
-  const statusLabel = member.status === 'inactive' ? 'Inactive' : 'Active';
+  const statusLabel = member.status === 'inactive' ? 'Неактивний' : 'Активний';
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -33,7 +33,7 @@ export function FamilyMemberCard({
     <article
       role="button"
       tabIndex={0}
-      aria-label={`Open public profile for ${member.displayName}`}
+      aria-label={`Відкрити профіль ${member.displayName}`}
       onClick={() => onOpen(member)}
       onKeyDown={handleKeyDown}
       className="dh-card flex h-full min-h-[252px] cursor-pointer flex-col gap-4 rounded-2xl p-4 outline-none transition hover:border-amber-500/40 focus-visible:ring focus-visible:ring-amber-500/40"
@@ -53,7 +53,7 @@ export function FamilyMemberCard({
               {FAMILY_ROLE_LABELS[member.role]}
             </span>
             <span className="rounded-full border border-slate-700 bg-black/25 px-2.5 py-1 text-slate-200">
-              Rank {member.rank.level}
+              Ранг {member.rank.level}
             </span>
           </div>
         </div>
@@ -63,21 +63,21 @@ export function FamilyMemberCard({
         <div className="flex items-center justify-between gap-3">
           <dt className="text-slate-500">Discord</dt>
           <dd className={member.discord.linked ? 'text-emerald-300' : 'text-slate-500'}>
-            {member.discord.linked ? 'Linked' : 'Not linked'}
+            {member.discord.linked ? 'Привʼязано' : 'Не привʼязано'}
           </dd>
         </div>
         <div className="flex items-center justify-between gap-3">
-          <dt className="text-slate-500">Status</dt>
+          <dt className="text-slate-500">Статус</dt>
           <dd className={member.status === 'active' ? 'text-emerald-300' : 'text-amber-300'}>{statusLabel}</dd>
         </div>
         <div className="flex items-center justify-between gap-3">
-          <dt className="text-slate-500">Joined</dt>
+          <dt className="text-slate-500">У сімʼї з</dt>
           <dd className="text-right text-slate-300">{formatJoinedDate(member.joinedAt)}</dd>
         </div>
       </dl>
 
       <div className="mt-auto rounded-xl border border-slate-700 bg-black/20 px-3 py-2 text-center text-sm font-semibold text-slate-200">
-        View profile
+        Профіль
       </div>
     </article>
   );

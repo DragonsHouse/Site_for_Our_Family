@@ -60,7 +60,7 @@ export function FamilyContentEditor({
 
         <div className="mt-4 space-y-4">
           <label className="block">
-            <span className="mb-1 block text-sm text-slate-300">Title</span>
+            <span className="mb-1 block text-sm text-slate-300">Заголовок</span>
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
@@ -69,7 +69,7 @@ export function FamilyContentEditor({
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm text-slate-300">Body</span>
+            <span className="mb-1 block text-sm text-slate-300">Текст</span>
             <textarea
               value={body}
               onChange={(event) => setBody(event.target.value)}
@@ -80,7 +80,7 @@ export function FamilyContentEditor({
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-sm text-slate-300">Contact / author</span>
+              <span className="mb-1 block text-sm text-slate-300">Контакт / автор</span>
               <input
                 value={contact}
                 onChange={(event) => setContact(event.target.value)}
@@ -88,7 +88,7 @@ export function FamilyContentEditor({
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm text-slate-300">Updated at</span>
+              <span className="mb-1 block text-sm text-slate-300">Оновлено</span>
               <input
                 type="datetime-local"
                 value={updatedAt}
@@ -105,7 +105,7 @@ export function FamilyContentEditor({
             onClick={onClose}
             className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-900"
           >
-            Cancel
+            Скасувати
           </button>
           <button
             type="button"
@@ -113,7 +113,7 @@ export function FamilyContentEditor({
             disabled={!title.trim() || !body.trim()}
             className="rounded-xl bg-gradient-to-r from-red-700 to-amber-500 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Save
+            Зберегти
           </button>
         </div>
       </section>

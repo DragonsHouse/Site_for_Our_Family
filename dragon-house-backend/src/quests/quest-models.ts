@@ -172,3 +172,38 @@ export type FamilyQuestListQuery = {
   status?: FamilyQuestStatus | 'all' | null;
   activeOnly?: boolean;
 };
+
+export type FamilyQuestTemplateWriteInput = {
+  id?: string;
+  templateKey?: string;
+  title: string;
+  category: string;
+  description?: string | null;
+  steps?: string[];
+  recommendedTeamSize?: number;
+  totalReward?: number;
+  memberRewardPool?: number;
+  familyReward?: number;
+  rewardMode?: FamilyQuestRewardMode;
+  requiredItems?: string | null;
+  imageAssetId?: string | null;
+  isActive?: boolean;
+  cooldownHours?: number;
+};
+
+export type FamilyQuestWriteInput = {
+  id?: string;
+  templateId?: string | null;
+  title: string;
+  description?: string | null;
+  category: string;
+  status?: FamilyQuestStatus;
+  startsAt?: string | null;
+  scheduledAt?: string | null;
+  totalReward?: number;
+  memberRewardPool?: number;
+  familyReward?: number;
+  rewardMode?: FamilyQuestRewardMode;
+  requiredItems?: string | null;
+  metadata?: Record<string, unknown>;
+};

@@ -20,7 +20,6 @@ import { DragonDiscordSyncScreen } from './dragon-discord-sync';
 import { DragonMembers } from './dragon-members';
 import { DragonTowerDefenseScreen } from './dragon-tower-defense';
 import { FamilyPanel } from './family-panel';
-import { FamilyProfile } from './family-profile';
 import { FamilyTabs } from './family-tabs';
 import { PersonalCabinet } from './personal-cabinet';
 import { ResourcesPanel } from './resources-panel';
@@ -114,7 +113,8 @@ export function FamilyShell({
   onLogout: () => void;
   onAuthenticatedUserRefresh: () => Promise<FamilyUser | null>;
 }) {
-  const activeRoom = getDragonRoomMetadata(activeTab);
+  const normalizedActiveTab = activeTab === 'profile' ? 'cabinet' : activeTab;
+  const activeRoom = getDragonRoomMetadata(normalizedActiveTab);
   const postLoginBackgroundUrl = useFamilyAssetUrl('post_login_background');
   const backendCalendarEventRepository = createBackendDragonEventRepository({ mode: 'unified-calendar' });
   const backendStandaloneEventRepository = createBackendDragonEventRepository({ mode: 'standalone-events' });
@@ -123,13 +123,13 @@ export function FamilyShell({
 
   return (
     <main className="dh-shell px-4 py-6">
-      <DragonBackground variant={DRAGON_ROOM_BACKGROUND_VARIANT[activeTab]} assetUrl={postLoginBackgroundUrl} />
+      <DragonBackground variant={DRAGON_ROOM_BACKGROUND_VARIANT[normalizedActiveTab]} assetUrl={postLoginBackgroundUrl} />
 
       <div className="relative z-10 mx-auto w-full min-w-0 max-w-7xl space-y-4">
         <DragonHero
-          eyebrow="DRAGON HOUSE FORTRESS"
+          eyebrow="DRAGON HOUSE"
           title="Family Hub"
-          description="Внутрішня фортеця сім’ї: зали, хроніки, учасники, ресурси й майбутні модулі Dragon House."
+          description="Внутрішній центр сімʼї: кабінет і профіль, учасники, події, оборона вишок, нагороди, мапа та Discord-синхронізація."
         >
           <div className="flex flex-col items-start gap-2 lg:items-end">
             <div className="flex items-center gap-3">
@@ -142,9 +142,9 @@ export function FamilyShell({
           </div>
         </DragonHero>
 
-        <FamilyTabs activeTab={activeTab} onChange={onTabChange} currentUser={currentUser} />
+        <FamilyTabs activeTab={normalizedActiveTab} onChange={onTabChange} currentUser={currentUser} />
 
-        {activeTab === 'cabinet' ? (
+        {normalizedActiveTab === 'cabinet' ? (
           <DragonRoomShell
             className="dh-dragon-room-shell-cabinet"
             labelledBy="dragon-room-cabinet-title"
@@ -168,9 +168,7 @@ export function FamilyShell({
           </DragonRoomShell>
         ) : null}
 
-        {activeTab === 'profile' ? <FamilyProfile user={currentUser} /> : null}
-
-        {activeTab === 'members' ? <DragonMembers currentUser={currentUser} /> : null}
+        {activeTab === 'members' ? <DragonMembers currentUser={currentUser} repository={backendMembersRepository} /> : null}
 
         {activeTab === 'family' ? (
           <FamilyPanel
@@ -189,13 +187,11 @@ export function FamilyShell({
 
         {activeTab === 'buyers' ? (
           <>
-            <ModuleIntro title="Скупники" description="Buyers module у складі Dragon House." />
+            <ModuleIntro title="Покупці" description="Допоміжний legacy-інструмент. Дані зберігаються локально в розширенні." />
             <DashboardApp familyTab="buyers" />
           </>
         ) : null}
 
-        {/* Future Calendar includes family events, meetings, quests/deadlines, tournaments, celebrations, Dragon House anniversaries and member birthdays. */}
-        {/* Navigation contract marker: <DragonCalendar currentUser={currentUser} /> */}
         {activeTab === 'calendar' ? (
           <DragonCalendar
             currentUser={currentUser}
@@ -207,7 +203,6 @@ export function FamilyShell({
           />
         ) : null}
 
-        {/* Navigation contract marker: activeTab === 'events' ? <DragonEventEngineScreen /> */}
         {activeTab === 'events' ? (
           <DragonEventEngineScreen
             currentUser={currentUser}
@@ -221,14 +216,13 @@ export function FamilyShell({
 
         {activeTab === 'tower-defense' ? <DragonTowerDefenseScreen currentUser={currentUser} /> : null}
 
-        {/* Navigation contract marker: <DragonAchievementEngineScreen /> */}
         {activeTab === 'achievements' ? <DragonAchievementEngineScreen repository={backendAchievementRepository} currentUser={currentUser} /> : null}
 
         {activeTab === 'discord-sync' ? <DragonDiscordSyncScreen currentUser={currentUser} /> : null}
 
         {activeTab === 'map' ? (
           <>
-            <ModuleIntro title="Мапа" description="Території, зони й карта.">
+            <ModuleIntro title="Мапа" description="Території, зони й редактор сімейної карти.">
               <div className="grid gap-3 md:grid-cols-2">
                 {FAMILY_MAP_ZONES.map((zone) => (
                   <div key={zone.id} className="dh-card rounded-xl p-3">
@@ -236,10 +230,8 @@ export function FamilyShell({
                       <span className="h-3 w-3 rounded-full" style={{ backgroundColor: zone.color }} />
                       <span className="font-medium text-white">{zone.name}</span>
                     </div>
-                    <p className="mt-2 text-sm text-slate-400">{zone.description}</p>
-                    <div className="mt-2 text-xs text-slate-500">
-                      {zone.type}
-                    </div>
+                    <p className="mt-2 text-sm text-slate-300">{zone.description}</p>
+                    <div className="mt-2 text-xs text-slate-400">{zone.type}</div>
                   </div>
                 ))}
               </div>
@@ -258,7 +250,7 @@ export function FamilyShell({
                       rel="noreferrer"
                       className="mt-3 inline-flex rounded-lg border border-amber-500/60 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/10"
                     >
-                      Відкрити reference
+                      Відкрити посилання
                     </a>
                   </div>
                 ))}
@@ -266,7 +258,8 @@ export function FamilyShell({
 
               {canManageFamilyMap(currentUser) ? (
                 <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                  Керування зонами буде доступне в наступному оновленні мапи.
+                  Керування зонами активне нижче: створюй і редагуй полігони, маркери, примітки,
+                  іконки та посилання прямо в модулі мапи.
                 </div>
               ) : null}
             </ModuleIntro>

@@ -5,9 +5,11 @@ import type { AchievementService } from '../achievements/achievement-service.js'
 import type { RewardAllocationService } from '../achievements/reward-allocation-service.js';
 import type { FamilyAuthService } from '../auth/auth-service.js';
 import type { AppConfig } from '../config/env.js';
+import type { DiscordOrchestrationService } from '../discord/orchestration-service.js';
 import { FamilyEventError, FAMILY_EVENT_ERROR_MESSAGES } from '../family-events/family-event-errors.js';
 import type { FamilyEventService } from '../family-events/family-event-service.js';
 import { requireFamilyAuthContext } from '../middleware/family-auth-context.js';
+import type { FamilyAuthContext } from '../types.js';
 
 const uuidSchema = z.string().uuid();
 const typeSchema = z.enum(['family_meeting', 'training', 'rp_event', 'family_activity', 'celebration', 'announcement', 'custom']);
@@ -73,6 +75,7 @@ export function createFamilyEventsRouter(
   familyEventService: FamilyEventService | null,
   rewardAllocationService: RewardAllocationService | null = null,
   achievementService: AchievementService | null = null,
+  discordOrchestrationService: DiscordOrchestrationService | null = null,
 ): Router {
   const router = Router();
   const requireAuth = requireFamilyAuthContext(config, authService);
@@ -164,7 +167,9 @@ export function createFamilyEventsRouter(
     const body = createEventSchema.safeParse(request.body);
     if (!body.success) return respondValidation(response, 'Invalid create event payload.');
     try {
-      response.status(201).json(await familyEventService.createEvent(body.data, request.familyAuth));
+      const created = await familyEventService.createEvent(body.data, request.familyAuth);
+      await syncEventDiscordProjection(discordOrchestrationService, created.id, request.familyAuth);
+      response.status(201).json(created);
     } catch (error) {
       respondFamilyEventError(response, error);
     }
@@ -176,7 +181,9 @@ export function createFamilyEventsRouter(
     const body = updateEventSchema.safeParse(request.body);
     if (!eventId.success || !body.success) return respondValidation(response, 'Invalid update event request.');
     try {
-      response.json(await familyEventService.updateEvent(eventId.data, body.data, request.familyAuth));
+      const updated = await familyEventService.updateEvent(eventId.data, body.data, request.familyAuth);
+      await syncEventDiscordProjection(discordOrchestrationService, eventId.data, request.familyAuth);
+      response.json(updated);
     } catch (error) {
       respondFamilyEventError(response, error);
     }
@@ -188,7 +195,9 @@ export function createFamilyEventsRouter(
     const body = respondSchema.safeParse(request.body);
     if (!eventId.success || !body.success) return respondValidation(response, 'Invalid response request.');
     try {
-      response.json(await familyEventService.respond(eventId.data, body.data, request.familyAuth));
+      const recorded = await familyEventService.respond(eventId.data, body.data, request.familyAuth);
+      await syncEventDiscordProjection(discordOrchestrationService, eventId.data, request.familyAuth);
+      response.json(recorded);
     } catch (error) {
       respondFamilyEventError(response, error);
     }
@@ -199,7 +208,9 @@ export function createFamilyEventsRouter(
     const eventId = uuidSchema.safeParse(request.params.eventId);
     if (!eventId.success) return respondValidation(response, 'Invalid event id.');
     try {
-      response.json(await familyEventService.withdrawResponse(eventId.data, request.familyAuth));
+      const withdrawn = await familyEventService.withdrawResponse(eventId.data, request.familyAuth);
+      await syncEventDiscordProjection(discordOrchestrationService, eventId.data, request.familyAuth);
+      response.json(withdrawn);
     } catch (error) {
       respondFamilyEventError(response, error);
     }
@@ -211,7 +222,9 @@ export function createFamilyEventsRouter(
     const body = attendanceBodySchema.safeParse(request.body);
     if (!eventId.success || !body.success) return respondValidation(response, 'Invalid attendance request.');
     try {
-      response.json(await familyEventService.confirmAttendance(eventId.data, body.data, request.familyAuth));
+      const attendance = await familyEventService.confirmAttendance(eventId.data, body.data, request.familyAuth);
+      await syncEventDiscordProjection(discordOrchestrationService, eventId.data, request.familyAuth);
+      response.json(attendance);
     } catch (error) {
       respondFamilyEventError(response, error);
     }
@@ -222,7 +235,9 @@ export function createFamilyEventsRouter(
     const eventId = uuidSchema.safeParse(request.params.eventId);
     if (!eventId.success) return respondValidation(response, 'Invalid event id.');
     try {
-      response.json(await familyEventService.startEvent(eventId.data, request.familyAuth));
+      const started = await familyEventService.startEvent(eventId.data, request.familyAuth);
+      await syncEventDiscordProjection(discordOrchestrationService, eventId.data, request.familyAuth);
+      response.json(started);
     } catch (error) {
       respondFamilyEventError(response, error);
     }
@@ -237,6 +252,7 @@ export function createFamilyEventsRouter(
       const rewardReconciliation = achievementService
         ? await achievementService.reconcileFamilyEventRewards(eventId.data, request.familyAuth)
         : null;
+      await syncEventDiscordProjection(discordOrchestrationService, eventId.data, request.familyAuth);
       response.json({ ...completed, rewardReconciliation });
     } catch (error) {
       if (error instanceof AchievementError) respondRewardAllocationError(response, error);
@@ -250,13 +266,27 @@ export function createFamilyEventsRouter(
     const body = cancelSchema.safeParse(request.body);
     if (!eventId.success || !body.success) return respondValidation(response, 'Invalid cancel event request.');
     try {
-      response.json(await familyEventService.cancelEvent(eventId.data, body.data, request.familyAuth));
+      const cancelled = await familyEventService.cancelEvent(eventId.data, body.data, request.familyAuth);
+      await syncEventDiscordProjection(discordOrchestrationService, eventId.data, request.familyAuth);
+      response.json(cancelled);
     } catch (error) {
       respondFamilyEventError(response, error);
     }
   });
 
   return router;
+}
+
+async function syncEventDiscordProjection(
+  orchestration: DiscordOrchestrationService | null,
+  eventId: string,
+  auth: FamilyAuthContext,
+) {
+  try {
+    await orchestration?.requestProjectionUpdate('family_events', eventId, auth);
+  } catch {
+    // Discord projection failures are recoverable through the orchestration retry/sync state.
+  }
 }
 
 function stringQuery(value: unknown): string | null {

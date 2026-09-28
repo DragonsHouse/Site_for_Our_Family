@@ -151,14 +151,6 @@ export class DiscordMemberSyncDryRunService {
       );
       for (const roleId of unknownRoles) missingRoleMappings.add(roleId);
 
-      if (!resolution.primaryRank) {
-        addAction(result, conflictAction(discordMember, 'missing_primary_hierarchy_role', [
-          ...identityWarnings,
-          'No active primary hierarchy Discord role matched this member.',
-        ], resolution));
-        continue;
-      }
-
       const linkedFamilyMember = linkedMembersByDiscordId.get(discordMember.discordUserId) ?? null;
       const staticIdMatch = findStaticIdFamilyMember(discordMember, familyMembers, result);
       if (linkedFamilyMember && staticIdMatch.member && linkedFamilyMember.id !== staticIdMatch.member.id) {
@@ -169,6 +161,43 @@ export class DiscordMemberSyncDryRunService {
         continue;
       }
       const familyMember = linkedFamilyMember ?? staticIdMatch.member;
+
+      if (familyMember && requiresManualReapproval(familyMember)) {
+        addAction(result, conflictAction(discordMember, 'manual_reapproval_required_after_discord_leave', [
+          ...identityWarnings,
+          'Member was archived after leaving Discord or losing the family role. Owner/deputy approval is required before site access can be restored.',
+        ], resolution));
+        matchedFamilyMemberIds.add(familyMember.id);
+        continue;
+      }
+
+      if (!resolution.primaryRank) {
+        if (familyMember && familyMember.status === 'active' && !familyMember.deletedAt) {
+          addAction(result, {
+            action: 'deactivate_candidate',
+            reason: 'linked_active_family_member_missing_primary_hierarchy_role',
+            discordMember,
+            familyMember: toFamilyMemberRef(familyMember),
+            matchedBy: linkedFamilyMember ? 'discord_user_id' : 'static_id',
+            ...resolutionItemFields(resolution),
+            changes: [{ field: 'status', current: familyMember.status, proposed: 'inactive' }],
+            warnings: [
+              ...identityWarnings,
+              'Member no longer has an active Family Hub primary Discord role and will lose site access.',
+              ...ownerDeputyWarnings(familyMember),
+            ],
+            possibleManualLinkFamilyMemberIds: [],
+          });
+          matchedFamilyMemberIds.add(familyMember.id);
+          continue;
+        }
+        addAction(result, conflictAction(discordMember, 'missing_primary_hierarchy_role', [
+          ...identityWarnings,
+          'No active primary hierarchy Discord role matched this member.',
+        ], resolution));
+        continue;
+      }
+
       const resolutionWithPrimary = protectOwnerResolution(familyMember, discordMember, protectedOwner, {
         ...resolution,
         primaryRank: resolution.primaryRank,
@@ -622,6 +651,14 @@ function ownerDeputyWarnings(familyMember: FamilyMember): string[] {
   return familyMember.role === 'owner' || familyMember.role === 'deputy'
     ? ['Owner/deputy account requires manual safety review before applying sync changes.']
     : [];
+}
+
+function requiresManualReapproval(familyMember: FamilyMember): boolean {
+  const archive = familyMember.profileMetadata.discordAccessArchive;
+  if (archive && typeof archive === 'object' && 'requiresReapproval' in archive) {
+    return (archive as { requiresReapproval?: unknown }).requiresReapproval === true;
+  }
+  return familyMember.deletedAt !== null;
 }
 
 function toFamilyMemberRef(familyMember: FamilyMember): DiscordMemberSyncDryRunItem['familyMember'] {

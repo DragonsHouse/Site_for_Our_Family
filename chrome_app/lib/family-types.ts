@@ -578,6 +578,7 @@ export type FamilyQuest = FamilyDiscordQuestFields & FamilySyncMetadata & {
   backendTemplateId?: string | null;
   backendCategory?: string | null;
   bestParticipantFamilyMemberId?: string | null;
+  bestParticipantReason?: string | null;
   templateId: string | null;
   title: string;
   description: string;

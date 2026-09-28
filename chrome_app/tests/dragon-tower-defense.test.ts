@@ -308,7 +308,7 @@ describe('Dragon Tower Defense and Fire Guard', () => {
     assert.match(serviceSource, /statisticsEligible/);
   });
 
-  it('renders Fire Guard roster from members and keeps manual mock availability explicit', () => {
+  it('renders Fire Guard roster from members while production UI avoids mock wording', () => {
     const roster = buildDragonFireGuardRoster(activeDefense, [
       {
         id: 'anastasia',
@@ -324,6 +324,7 @@ describe('Dragon Tower Defense and Fire Guard', () => {
     ]);
     assert.equal(roster[0].currentResponse, 'confirmed');
     assert.match(roster[0].onlineStatus?.label ?? '', /Manual\/mock/u);
+    assert.doesNotMatch(screenSource, /Manual\/mock|manual\/mock/u);
   });
 
   it('maps backend towers, defenses, details, roster and preserves backend ids', () => {
@@ -448,7 +449,7 @@ describe('Dragon Tower Defense and Fire Guard', () => {
     assert.match(screenSource, /backendDependencyMode/);
     assert.match(screenSource, /\(backendDependencyMode \? '' : 'anastasia'\)/);
     assert.match(screenSource, /requireCurrentFamilyMemberId/);
-    assert.match(screenSource, /Tower Defense backend requires an authenticated family member/);
+    assert.match(screenSource, /Увійди в Hub, щоб виконати дію з обороною вишки/);
     assert.match(screenSource, /activeBackendTowers/);
     assert.match(screenSource, /backendSubmitBlocked/);
     assert.match(screenSource, /currentFamilyMemberId/);
@@ -462,8 +463,8 @@ describe('Dragon Tower Defense and Fire Guard', () => {
     assert.match(roomNavigationSource, /key: 'events'[\s\S]*key: 'tower-defense'[\s\S]*key: 'achievements'/);
     assert.match(roomNavigationSource, /key: 'events'/);
     assert.match(roomNavigationSource, /key: 'tower-defense'/);
-    assert.match(roomNavigationSource, /War Chamber/);
-    assert.match(shellSource, /activeTab === 'events' \? <DragonEventEngineScreen \/>/);
+    assert.match(roomNavigationSource, /Військова зала/);
+    assert.match(shellSource, /activeTab === 'events' \? \(\s*<DragonEventEngineScreen/);
     assert.match(shellSource, /activeTab === 'tower-defense' \? <DragonTowerDefenseScreen currentUser=\{currentUser\} \/>/);
     assert.match(screenSource, /DragonDialog/);
     assert.doesNotMatch(screenSource, /window\.(prompt|alert|confirm)/);

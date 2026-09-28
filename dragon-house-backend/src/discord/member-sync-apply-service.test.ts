@@ -71,10 +71,12 @@ function memberRow(input: Partial<{
   role: FamilyRole;
   rank: number;
   status: 'active' | 'inactive';
+  deleted_at: Date | null;
   permissions: FamilyPermission[];
   permissions_override: FamilyPermission[];
   permissions_denied: FamilyPermission[];
   permissions_discord: FamilyPermission[];
+  profile_metadata: Record<string, unknown>;
 }> = {}) {
   return {
     id: input.id ?? 'family-1',
@@ -82,10 +84,12 @@ function memberRow(input: Partial<{
     role: input.role ?? 'member',
     rank: input.rank ?? 1,
     status: input.status ?? 'active',
+    deleted_at: input.deleted_at ?? null,
     permissions: input.permissions ?? ['view_members'],
     permissions_override: input.permissions_override ?? [],
     permissions_denied: input.permissions_denied ?? [],
     permissions_discord: input.permissions_discord ?? ['view_members'],
+    profile_metadata: input.profile_metadata ?? {},
   };
 }
 
@@ -235,7 +239,7 @@ describe('DiscordMemberSyncApplyService', () => {
     expect(JSON.stringify(client.calls)).toContain('manage_family_map');
   });
 
-  it('deactivates absent linked members without deleting rows', async () => {
+  it('archives absent linked members, revokes sessions and keeps the row for history', async () => {
     const client = new FakeClient();
     const action = syncAction({
       action: 'deactivate_candidate',
@@ -262,8 +266,46 @@ describe('DiscordMemberSyncApplyService', () => {
 
     expect(result.summary.inactive).toBe(1);
     expect(client.calls.some((call) => call.sql.includes("set status = 'inactive'"))).toBe(true);
+    expect(client.calls.some((call) => call.sql.includes('deleted_at = coalesce'))).toBe(true);
+    expect(JSON.stringify(client.calls)).toContain('requiresReapproval');
+    expect(JSON.stringify(client.calls)).toContain('discord_membership_lost');
     expect(client.calls.some((call) => call.sql.includes('update family_sessions'))).toBe(true);
     expect(client.calls.some((call) => call.sql.toLowerCase().includes('delete from family_members'))).toBe(false);
+  });
+
+  it('does not automatically reactivate archived members without manual approval', async () => {
+    const client = new FakeClient();
+    client.lockedMember = memberRow({
+      status: 'inactive',
+      deleted_at: new Date(now),
+      profile_metadata: {
+        discordAccessArchive: {
+          requiresReapproval: true,
+        },
+      },
+    });
+    const action = syncAction({
+      action: 'update',
+      familyMember: {
+        id: 'family-1',
+        nickname: 'Dragon Member',
+        staticId: null,
+        role: 'member',
+        rank: 1,
+        status: 'inactive',
+        permissions: ['view_members'],
+        deletedAt: now,
+        discordUserId: 'discord-1',
+      },
+      matchedBy: 'discord_user_id',
+    });
+    const service = applyService(client, action);
+
+    const result = await service.apply(applyRequest(), new Date(now));
+
+    expect(result.summary.conflicts).toBe(1);
+    expect(result.conflicts[0]).toContain('Manual approval is required');
+    expect(result.summary.reactivated).toBe(0);
   });
 
   it('treats unchanged members as no-op skips', async () => {

@@ -73,7 +73,7 @@ export function FamilyBackupPanel({ currentUser }: { currentUser: FamilyUser }) 
         filename: file.name,
         schemaVersion: nextPreview.backup.schemaVersion,
         result: nextPreview.errors.length ? 'failed' : 'success',
-        summary: nextPreview.errors[0] ?? 'Dry-run preview completed'
+        summary: nextPreview.errors[0] ?? 'Попередня перевірка completed'
       });
       setPreview(nextPreview);
       setAudit(readBackupAudit());
@@ -133,7 +133,7 @@ export function FamilyBackupPanel({ currentUser }: { currentUser: FamilyUser }) 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
         <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
           <h4 className="font-semibold text-white">Імпорт</h4>
-          <p className="mt-1 text-sm text-slate-400">Спочатку виконується dry-run preview. Нічого не записується до підтвердження.</p>
+          <p className="mt-1 text-sm text-slate-400">Спочатку виконується попередня перевірка. Нічого не записується до підтвердження.</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -153,12 +153,12 @@ export function FamilyBackupPanel({ currentUser }: { currentUser: FamilyUser }) 
               <input type="radio" disabled />
               Об’єднати з поточними даними
             </label>
-            <p className="mt-1 text-xs text-slate-500">Безпечне об’єднання буде доступне після завершення server migration.</p>
+            <p className="mt-1 text-xs text-slate-500">Безпечний режим зараз працює через повну заміну після попередньої перевірки й автоматичної аварійної копії.</p>
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-          <h4 className="font-semibold text-white">Dry-run preview</h4>
+          <h4 className="font-semibold text-white">Попередня перевірка</h4>
           {preview ? (
             <div className="mt-3 space-y-2 text-sm text-slate-300">
               <div>Файл: <span className="text-white">{preview.filename}</span></div>
@@ -167,7 +167,7 @@ export function FamilyBackupPanel({ currentUser }: { currentUser: FamilyUser }) 
               <div>Schema: <span className="text-white">{preview.backup.schemaVersion}</span></div>
               <div>Application: <span className="text-white">{preview.backup.applicationVersion ?? '-'}</span></div>
               <div>Автор: <span className="text-white">{preview.backup.exportedBy.nickname} / {preview.backup.exportedBy.familyMemberId}</span></div>
-              <div>Checksum: <span className={preview.checksumValid ? 'text-emerald-300' : 'text-red-300'}>{preview.checksumValid ? 'valid' : 'invalid'}</span></div>
+              <div>Checksum: <span className={preview.checksumValid ? 'text-emerald-300' : 'text-red-300'}>{preview.checksumValid ? 'валідна' : 'невалідна'}</span></div>
               <div>Compatibility: <span className="text-white">{preview.compatibilityStatus}</span></div>
               <div>Members: <span className="text-white">{preview.counts.members}</span></div>
               <div>Quests: <span className="text-white">{preview.counts.quests}</span></div>

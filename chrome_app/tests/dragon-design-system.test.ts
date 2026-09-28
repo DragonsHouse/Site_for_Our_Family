@@ -79,15 +79,15 @@ describe('Dragon House design system source contract', () => {
   });
 
   it('routes Family Hub shell and navigation through Dragon UI instead of generic dashboard tabs', () => {
-    assert.match(shellSource, /<DragonBackground variant=\{DRAGON_ROOM_BACKGROUND_VARIANT\[activeTab\]\}/);
+    assert.match(shellSource, /<DragonBackground variant=\{DRAGON_ROOM_BACKGROUND_VARIANT\[normalizedActiveTab\]\}/);
     assert.match(shellSource, /<DragonHero/);
-    assert.match(shellSource, /<DragonCalendar currentUser=\{currentUser\}/);
-    assert.match(shellSource, /<DragonEventEngineScreen \/>/);
-    assert.match(shellSource, /<DragonAchievementEngineScreen \/>/);
+    assert.match(shellSource, /activeTab === 'calendar'[\s\S]*<DragonCalendar[\s\S]*currentUser=\{currentUser\}/);
+    assert.match(shellSource, /<DragonEventEngineScreen/);
+    assert.match(shellSource, /<DragonAchievementEngineScreen/);
     assert.match(tabsSource, /<DragonRoomRail/);
-    assert.match(roomNavigationSource, /Hall of Chronicles/);
-    assert.match(roomNavigationSource, /Event Watch/);
-    assert.match(roomNavigationSource, /Seal Engine/);
+    assert.match(roomNavigationSource, /Зала хронік/u);
+    assert.match(roomNavigationSource, /Варта подій/u);
+    assert.match(roomNavigationSource, /Зала відзнак/u);
     assert.doesNotMatch(shellSource, /DashboardApp familyTab="events"/);
     assert.doesNotMatch(tabsSource, /dh-panel flex flex-wrap/);
   });
@@ -107,9 +107,9 @@ describe('Dragon House design system source contract', () => {
       'DragonEmptyState'
     ].forEach((name) => assert.match(calendarSource, new RegExp(name)));
 
-    assert.match(calendarSource, /HALL OF CHRONICLES/);
-    assert.match(calendarSource, /Dragon Calendar/);
-    assert.match(calendarSource, /Family Calendar/);
+    assert.match(calendarSource, /Хроніки Dragon House/u);
+    assert.match(calendarSource, /Календар/u);
+    assert.match(calendarSource, /Сімейний календар/u);
   });
 
   it('includes the Dragon design system contract in the frontend test suite', () => {

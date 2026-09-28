@@ -108,7 +108,7 @@ export function DragonTowerDefenseScreen({
   const requireCurrentFamilyMemberId = () => {
     if (state.readSource !== 'backend') return currentFamilyMemberId;
     if (currentFamilyMemberId) return currentFamilyMemberId;
-    state.setDomainError('Tower Defense backend requires an authenticated family member.');
+    state.setDomainError('Увійди в Hub, щоб виконати дію з обороною вишки.');
     return null;
   };
 
@@ -135,6 +135,10 @@ export function DragonTowerDefenseScreen({
 
       {state.domainError ? <div className="dh-tower-alert" role="alert">{state.domainError}</div> : null}
 
+      <DragonSection title="Актуальні вишки з Discord" description="Живі сигнали з Discord, максимум 3 вишки одночасно.">
+        <DragonCurrentDiscordTowers defenses={state.currentTowerSignals} onDetails={(defense) => openDialog('details', defense)} />
+      </DragonSection>
+
       <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
         <DragonSection title="Активний захист" description="Операційна панель командира Вогняної варти.">
           {state.activeDefense ? (
@@ -159,7 +163,7 @@ export function DragonTowerDefenseScreen({
         <DragonDefenseStatistics statistics={state.statistics} />
       </div>
 
-      <DragonSection title="Вогняна варта" description="Доступність у цьому phase є manual/mock статусом, не live Discord presence.">
+      <DragonSection title="Вогняна варта" description="Поточна готовність учасників до оборони вишок.">
         <DragonFireGuardRoster
           roster={state.filteredRoster}
           rosterFilter={state.rosterFilter}
@@ -255,12 +259,12 @@ export function DragonDefenseHero({
         <DragonCard className="dh-tower-command-card">
           <p>Статус</p>
           {defense ? <DragonDefenseStatusBadge status={defense.status} /> : <DragonBadge tone="muted">Тиша</DragonBadge>}
-          <small>{defense ? `Wave ${defense.wave} / ${defense.phase}` : 'Варта у резерві'}</small>
+          <small>{defense ? `Хвиля ${defense.wave} / ${defense.phase}` : 'Варта у резерві'}</small>
         </DragonCard>
         <DragonCard className="dh-tower-command-card">
           <p>Готовність</p>
           {readiness ? <DragonReadinessIndicator readiness={readiness} /> : <DragonBadge tone="muted">Без даних</DragonBadge>}
-          <small>{defense ? `${defense.confirmedCount}/${defense.recommendedGuardCount} підтверджено` : 'Очікує roster'}</small>
+          <small>{defense ? `${defense.confirmedCount}/${defense.recommendedGuardCount} підтверджено` : 'Очікує склад варти'}</small>
         </DragonCard>
       </div>
     </DragonSection>
@@ -348,10 +352,45 @@ export function DragonDefenseCard({
         <span>{formatDragonDefenseDateTime(defense.startsAt)}</span>
         <span>{defense.tower.location.label}</span>
         <span>{defense.priority}</span>
+        <span>{formatDiscordCooldown(defense)}</span>
       </div>
       <DragonButton type="button" variant="secondary" onClick={onDetails}>Відкрити</DragonButton>
     </DragonCard>
   );
+}
+
+export function DragonCurrentDiscordTowers({
+  defenses,
+  onDetails
+}: {
+  defenses: DragonTowerDefense[];
+  onDetails: (defense: DragonTowerDefense) => void;
+}) {
+  if (defenses.length === 0) {
+    return <DragonEmptyState title="Немає актуальних вишок" description="Discord зараз не показує активних вишок для варти." />;
+  }
+
+  return (
+    <div className="dh-tower-card-list">
+      {defenses.map((defense) => (
+        <DragonDefenseCard key={defense.id} defense={defense} onDetails={() => onDetails(defense)} />
+      ))}
+    </div>
+  );
+}
+
+function formatDiscordCooldown(defense: DragonTowerDefense): string {
+  const cooldownAt = typeof defense.backendMetadata?.cooldownAt === 'string' ? defense.backendMetadata.cooldownAt : null;
+  if (!cooldownAt) return 'КД: не вказано в Discord';
+  const cooldownTime = new Date(cooldownAt).getTime();
+  if (!Number.isFinite(cooldownTime)) return 'КД: не вказано в Discord';
+  const diffMs = cooldownTime - Date.now();
+  if (diffMs <= 0) return `КД спало: ${formatDragonDefenseDateTime(cooldownAt)}`;
+  const totalMinutes = Math.ceil(diffMs / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const relative = hours > 0 ? `${hours} год ${minutes} хв` : `${minutes} хв`;
+  return `КД через ${relative} (${formatDragonDefenseDateTime(cooldownAt)})`;
 }
 
 export function DragonFireGuardRoster({
@@ -415,7 +454,7 @@ export function DragonGuardMemberRow({
       <div className="dh-fire-guard-main">
         <strong>{member.displayName}</strong>
         <span>{member.familyRank} / {member.fireGuardRole}</span>
-        <small>{member.onlineStatus?.label ?? 'Manual/mock status'}</small>
+        <small>{member.onlineStatus?.label ?? 'Даних поки немає'}</small>
       </div>
       <DragonBadge tone={member.currentResponse === 'confirmed' ? 'success' : member.currentResponse === 'unavailable' ? 'danger' : 'gold'}>
         {RESPONSE_LABELS[member.currentResponse]}
@@ -501,7 +540,7 @@ export function DragonDefenseHistory({
 
 export function DragonDefenseTimeline({ defenses }: { defenses: DragonTowerDefense[] }) {
   return (
-    <DragonSection title="Операційна хроніка" description="Timeline формується з Defense records і linked Dragon Events.">
+    <DragonSection title="Операційна хроніка" description="Хроніка формується з реальних захистів і пов’язаних подій Dragon House.">
       <div className="dh-defense-timeline">
         {defenses.map((defense) => (
           <DragonCard key={defense.id} className="dh-defense-timeline-entry">
@@ -520,7 +559,7 @@ export function DragonDefenseTimeline({ defenses }: { defenses: DragonTowerDefen
 
 export function DragonDefenseStatistics({ statistics }: { statistics: DragonTowerDefenseStatistics }) {
   return (
-    <DragonSection title="Статистика варти" description="Початковий production summary без reward logic.">
+    <DragonSection title="Статистика варти" description="Підсумок захистів без автоматичних нагород.">
       <div className="dh-tower-stat-grid">
         <DragonStat label="Усього" value={statistics.totalDefenses} />
         <DragonStat label="Захищено" value={statistics.defended} />
@@ -568,17 +607,18 @@ export function DragonDefenseForm({
   const defaultTower = defense
     ? towers.find((tower) => tower.id === defense.tower.towerId || tower.backendTowerId === defense.tower.towerId)
     : activeBackendTowers[0] ?? towers[0];
-  const [title, setTitle] = useState(defense?.title ?? 'Захист вишки: New Signal');
+  const [title, setTitle] = useState(defense?.title ?? 'Захист вишки: Новий сигнал');
   const [selectedTowerId, setSelectedTowerId] = useState(defaultTower?.id ?? defense?.tower.towerId ?? '');
   const selectedTower = towers.find((tower) => tower.id === selectedTowerId) ?? defaultTower;
   const backendSubmitBlocked = backendMode && (!selectedTower || activeBackendTowers.length === 0 || !currentFamilyMemberId);
-  const [towerName, setTowerName] = useState(defense?.tower.towerName ?? selectedTower?.towerName ?? 'New Signal Tower');
+  const [towerName, setTowerName] = useState(defense?.tower.towerName ?? selectedTower?.towerName ?? 'Нова сигнальна вишка');
   const [towerCode, setTowerCode] = useState(defense?.tower.towerCode ?? selectedTower?.towerCode ?? 'NEW-01');
-  const [location, setLocation] = useState(defense?.tower.location.label ?? selectedTower?.location.label ?? 'GTA map sector');
+  const [location, setLocation] = useState(defense?.tower.location.label ?? selectedTower?.location.label ?? 'Сектор мапи');
   const [startsAt, setStartsAt] = useState(toLocalInputValue(defense?.startsAt ?? new Date(Date.now() + 60 * 60 * 1000).toISOString()));
   const [minimumGuardCount, setMinimumGuardCount] = useState(String(defense?.minimumGuardCount ?? 3));
   const [recommendedGuardCount, setRecommendedGuardCount] = useState(String(defense?.recommendedGuardCount ?? 5));
-  const [description, setDescription] = useState(defense?.description ?? 'Операція Вогняної варти. Manual/mock availability for this phase.');
+  const [announcementMessage, setAnnouncementMessage] = useState(typeof defense?.backendMetadata?.announcementMessage === 'string' ? defense.backendMetadata.announcementMessage : '');
+  const [description, setDescription] = useState(defense?.description ?? 'Операція Вогняної варти.');
 
   return (
     <form
@@ -614,7 +654,13 @@ export function DragonDefenseForm({
           maximumGuardCount: Math.max(recommended, defense?.maximumGuardCount ?? 8),
           xp: defense?.xp ?? 100,
           rewardIds: defense?.rewardIds ?? ['reward_fire_guard_xp'],
-          achievementIds: defense?.achievementIds ?? ['ach_guardian']
+          achievementIds: defense?.achievementIds ?? ['ach_guardian'],
+          metadata: {
+            ...(defense?.backendMetadata ?? {}),
+            plannedTowerCapture: true,
+            initiatorFamilyMemberId: currentFamilyMemberId ?? defense?.createdByMemberId ?? null,
+            announcementMessage: announcementMessage.trim() || null
+          }
         });
       }}
     >
@@ -627,8 +673,8 @@ export function DragonDefenseForm({
       <label>Рекомендовано<DragonInput type="number" min={1} value={recommendedGuardCount} onChange={(event) => setRecommendedGuardCount(event.target.value)} required /></label>
       <label className="dh-tower-form-wide">Опис<DragonTextarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
       <DragonButton type="submit">Зберегти захист</DragonButton>
-      {backendMode && activeBackendTowers.length === 0 ? <DragonEmptyState title="No active backend towers" description="Backend returned an empty family_towers list." /> : null}
-      {backendMode && !currentFamilyMemberId ? <DragonEmptyState title="Authenticated member required" description="Tower Defense writes require a real familyMemberId." /> : null}
+      {backendMode && activeBackendTowers.length === 0 ? <DragonEmptyState title="Даних поки немає" description="Активні вишки ще не налаштовані." /> : null}
+      {backendMode && !currentFamilyMemberId ? <DragonEmptyState title="Потрібен вхід" description="Увійди в Hub, щоб зберегти оборону вишки." /> : null}
       {backendMode && towers.length > 0 ? (
         <label>Вишка
           <DragonSelect value={selectedTowerId} onChange={(event) => setSelectedTowerId(event.target.value)} required>
@@ -638,6 +684,7 @@ export function DragonDefenseForm({
           </DragonSelect>
         </label>
       ) : null}
+      <label className="dh-tower-form-wide">Повідомлення в Discord<DragonTextarea value={announcementMessage} onChange={(event) => setAnnouncementMessage(event.target.value)} placeholder="Текст для головного залу і особистих повідомлень від бота." /></label>
     </form>
   );
 }

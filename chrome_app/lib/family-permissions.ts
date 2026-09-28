@@ -44,7 +44,7 @@ export function canManageFamilyNews(user: FamilyUser) {
 }
 
 export function canManageFamilyContent(user: FamilyUser) {
-  return hasFamilyPermission(user, 'manage_news') || hasFamilyPermission(user, 'manage_family_posts');
+  return user.role === 'owner';
 }
 
 export function canViewFamilyHistory(user: FamilyUser) {

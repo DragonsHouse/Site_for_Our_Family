@@ -7,8 +7,8 @@ export function mapBackendAchievement(definition: BackendAchievementDefinitionDt
   return {
     id: `achievement:${definition.id}`,
     backendAchievementId: definition.id,
-    title: definition.name,
-    description: definition.description,
+    title: localizeAchievementTitle(definition.name, definition.achievementKey),
+    description: localizeAchievementDescription(definition.description, definition.achievementKey),
     category: mapCategory(definition.category),
     rarity: definition.rarity,
     visibility: definition.hidden ? 'hidden' : 'visible',
@@ -21,7 +21,7 @@ export function mapBackendAchievement(definition: BackendAchievementDefinitionDt
     completedAt: award?.awardedAt ?? null,
     requirements: [{
       id: `requirement:${definition.achievementKey}`,
-      label: definition.name,
+      label: localizeAchievementRequirement(definition.achievementKey, definition.name),
       target: 1,
       current: completed ? 1 : 0,
       backendField: String(definition.ruleMetadata.rule ?? definition.achievementKey),
@@ -29,7 +29,7 @@ export function mapBackendAchievement(definition: BackendAchievementDefinitionDt
     rewards: rewards.map((grant) => ({
       id: grant.id,
       type: mapRewardType(grant.reward.rewardType),
-      label: grant.reward.name,
+      label: localizeRewardName(grant.reward.name),
       value: grant.reward.value ?? grant.reward.amount ?? grant.status,
       backendRewardId: grant.reward.id,
     })),
@@ -66,4 +66,65 @@ function mapRewardType(type: BackendMemberRewardGrantDto['reward']['rewardType']
 
 function rarityPoints(rarity: BackendAchievementDefinitionDto['rarity']): number {
   return { common: 10, uncommon: 20, rare: 40, epic: 80, legendary: 150, mythic: 300 }[rarity];
+}
+
+function localizeAchievementTitle(name: string, key: string): string {
+  const byKey: Record<string, string> = {
+    quest_best_participant: 'Кращий учасник',
+    event_organizer: 'Організатор подій',
+    tower_commander: 'Командир вишки',
+    watchtower_guardian: 'Вартовий вишки',
+    tower_first_attended: 'Перший захист вишки',
+    council_voice: 'Голос ради',
+    first_flight: 'Перший політ',
+    watchtower_initiate: 'Новачок вишки',
+  };
+  const byName: Record<string, string> = {
+    'Best Participant': 'Кращий учасник',
+    'Event Organizer': 'Організатор подій',
+    'Tower Commander': 'Командир вишки',
+    'Watchtower Guardian': 'Вартовий вишки',
+    'Council Voice': 'Голос ради',
+    'First Flight': 'Перший політ',
+    'Watchtower Initiate': 'Новачок вишки',
+  };
+  return byKey[key] ?? byName[name] ?? name;
+}
+
+function localizeAchievementDescription(description: string, key: string): string {
+  const descriptions: Record<string, string> = {
+    quest_best_participant: 'Стати кращим учасником сімейного квесту.',
+    event_organizer: 'Організувати сімейну подію.',
+    tower_commander: 'Командувати обороною вишки.',
+    watchtower_guardian: 'Брати участь в обороні вишок.',
+    tower_first_attended: 'Узяти участь у першому захисті вишки.',
+    council_voice: 'Брати участь у сімейних зустрічах.',
+    first_flight: 'Узяти участь у першому сімейному квесті.',
+    watchtower_initiate: 'Вперше відповісти на оборону вишки.',
+  };
+  return descriptions[key] ?? description;
+}
+
+function localizeAchievementRequirement(key: string, fallback: string): string {
+  const requirements: Record<string, string> = {
+    quest_best_participant: 'Стати кращим учасником квесту',
+    event_organizer: 'Організувати подію',
+    tower_commander: 'Командувати обороною',
+    watchtower_guardian: 'Узяти участь в обороні вишки',
+    tower_first_attended: 'Бути присутнім на захисті вишки',
+    council_voice: 'Відвідати сімейну зустріч',
+    first_flight: 'Узяти участь у першому сімейному квесті',
+    watchtower_initiate: 'Відповісти на першу оборону вишки',
+  };
+  return requirements[key] ?? fallback;
+}
+
+function localizeRewardName(name: string): string {
+  const names: Record<string, string> = {
+    XP: 'XP',
+    Badge: 'Відзнака',
+    Money: 'Грошова нагорода',
+    'Family bonus': 'Сімейна премія',
+  };
+  return names[name] ?? name;
 }

@@ -150,7 +150,11 @@ export class MemoryFamilyMemberRepository implements FamilyMemberRepository {
   async restore(id: string, expectedVersion: number, actorId: string): Promise<FamilyMember | null> {
     const member = await this.update(id, { status: 'active' }, expectedVersion, actorId);
     if (!member) return null;
-    const restored = { ...member, deletedAt: null };
+    const restored = {
+      ...member,
+      deletedAt: null,
+      profileMetadata: markDiscordArchiveApproved(member.profileMetadata, actorId),
+    };
     this.members.set(id, restored);
     return restored;
   }
@@ -183,4 +187,18 @@ function valueForSort(member: FamilyMember, sortBy: FamilyMemberListQuery['sortB
 function compareSortValues(left: string | number | null, right: string | number | null): number {
   if (typeof left === 'number' && typeof right === 'number') return left - right;
   return String(left ?? '').localeCompare(String(right ?? ''));
+}
+
+function markDiscordArchiveApproved(metadata: Record<string, unknown>, actorId: string): Record<string, unknown> {
+  const archive = metadata.discordAccessArchive;
+  if (!archive || typeof archive !== 'object') return metadata;
+  return {
+    ...metadata,
+    discordAccessArchive: {
+      ...(archive as Record<string, unknown>),
+      requiresReapproval: false,
+      approvedByFamilyMemberId: actorId,
+      approvedAt: new Date().toISOString(),
+    },
+  };
 }

@@ -11,6 +11,7 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
+  height: auto;
   min-height: 100%;
   background:
     radial-gradient(ellipse at 50% 14%, rgba(94, 34, 18, 0.24), transparent 36rem),
@@ -18,6 +19,7 @@ body {
     linear-gradient(180deg, #080706 0%, #110a07 42%, #070605 100%);
   font-family: ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .dh-discord-sync {
@@ -62,7 +64,7 @@ body {
 .dh-discord-sync-plan {
   display: grid;
   gap: 0.85rem;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
 }
 
 .dh-discord-sync-status-card,
@@ -70,6 +72,8 @@ body {
 .dh-discord-sync-loading {
   display: grid;
   gap: 0.55rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dh-discord-sync-summary-card strong {
@@ -191,6 +195,7 @@ body {
 
 #root {
   width: 100%;
+  height: auto;
   min-height: 100vh;
 }
 
@@ -482,6 +487,7 @@ body {
   font-weight: 900;
   letter-spacing: 0.22em;
   text-transform: uppercase;
+  overflow-wrap: anywhere;
 }
 
 .dh-dragon-button,
@@ -3362,7 +3368,12 @@ body {
 }
 
 .dh-shell :is(.text-slate-500, .text-slate-600) {
-  color: var(--dh-text-muted) !important;
+  color: color-mix(in srgb, var(--dh-text-soft) 82%, #ffffff 18%) !important;
+}
+
+.dh-shell :is(input, textarea, select)::placeholder {
+  color: color-mix(in srgb, var(--dh-text-soft) 72%, #ffffff 28%) !important;
+  opacity: 1;
 }
 
 .dh-shell :is(.text-blue-100, .text-blue-200, .text-blue-300, .text-cyan-100, .text-cyan-200, .text-purple-100) {
@@ -4164,7 +4175,7 @@ body {
 .dh-event-engine-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.38fr);
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.34fr);
   gap: 1rem;
   overflow: hidden;
 }
@@ -4184,8 +4195,9 @@ body {
 .dh-event-engine-hero h1 {
   margin: 0.25rem 0 0.55rem;
   color: #fff6df;
-  font-size: clamp(2rem, 4vw, 4.4rem);
-  line-height: 0.95;
+  font-size: clamp(2rem, 3.2vw, 3.5rem);
+  line-height: 1.04;
+  overflow-wrap: anywhere;
 }
 
 .dh-event-engine-hero p {
@@ -4219,7 +4231,7 @@ body {
 
 .dh-event-filters {
   display: grid;
-  grid-template-columns: minmax(12rem, 1.5fr) repeat(4, minmax(8rem, 1fr)) repeat(2, minmax(8rem, 0.8fr)) minmax(8rem, 0.8fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
   gap: 0.7rem;
   align-items: end;
 }
@@ -4239,6 +4251,7 @@ body {
 .dh-event-card,
 .dh-event-mini-card {
   position: relative;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -4268,6 +4281,14 @@ body {
   grid-template-columns: 3.2rem 1fr;
   gap: 0.85rem;
   align-items: start;
+  min-width: 0;
+}
+
+.dh-event-card-open > span:last-child,
+.dh-event-mini-card button,
+.dh-event-timeline-item {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dh-event-card-open strong,
@@ -4323,6 +4344,7 @@ body {
 .dh-event-details dd {
   margin: 0.2rem 0 0;
   color: #f3dfbb;
+  overflow-wrap: anywhere;
 }
 
 .dh-event-mini-list {
@@ -4437,14 +4459,16 @@ body {
 .dh-tower-command-grid,
 .dh-tower-stat-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: 0.9rem;
 }
 
 .dh-tower-command-card,
 .dh-tower-stat,
 .dh-tower-most {
+  min-width: 0;
   min-height: 7rem;
+  overflow-wrap: anywhere;
   background: linear-gradient(145deg, rgba(28, 15, 12, 0.92), rgba(6, 8, 12, 0.88));
   border-color: rgba(255, 156, 70, 0.22);
 }
@@ -4465,7 +4489,8 @@ body {
   display: block;
   margin-top: 0.35rem;
   color: #fff3d6;
-  font-size: clamp(1.25rem, 2vw, 1.85rem);
+  font-size: clamp(1.15rem, 1.8vw, 1.65rem);
+  line-height: 1.1;
 }
 
 .dh-tower-command-card small,
@@ -4684,6 +4709,131 @@ body {
   }
 }
 
+.dh-accounting-profile {
+  display: grid;
+  gap: 1rem;
+}
+
+.dh-accounting-profile-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.dh-accounting-profile-card h3,
+.dh-accounting-profile-card p {
+  margin: 0;
+}
+
+.dh-accounting-profile-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dh-accounting-profile-heading h3,
+.dh-accounting-profile-card > h3 {
+  color: #fff4df;
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.dh-accounting-profile-progress,
+.dh-accounting-profile-breakdown,
+.dh-accounting-profile-totals,
+.dh-accounting-profile-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dh-accounting-profile-progress {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.dh-accounting-profile-progress-row,
+.dh-accounting-profile-breakdown > div,
+.dh-accounting-profile-totals .dh-dragon-card,
+.dh-accounting-profile-list-item {
+  display: grid;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dh-accounting-profile-progress-row,
+.dh-accounting-profile-breakdown > div,
+.dh-accounting-profile-totals .dh-dragon-card {
+  grid-template-columns: minmax(0, 1fr) max-content;
+}
+
+.dh-accounting-profile-breakdown {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.dh-accounting-profile-breakdown > div {
+  min-height: 2.5rem;
+  border-bottom: 1px solid rgba(255, 157, 74, 0.14);
+  padding: 0.45rem 0;
+}
+
+.dh-accounting-profile-totals {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.dh-accounting-profile-list-item {
+  grid-template-columns: minmax(0, 1fr) max-content auto;
+}
+
+.dh-accounting-profile-list-item p,
+.dh-accounting-profile-empty,
+.dh-accounting-profile-message p {
+  color: #e9d4b5;
+  line-height: 1.45;
+}
+
+.dh-accounting-profile-list-item span,
+.dh-accounting-profile-progress-row span,
+.dh-accounting-profile-breakdown span,
+.dh-accounting-profile-totals span {
+  color: #f1d5ad;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.dh-accounting-profile-list-item strong,
+.dh-accounting-profile-progress-row strong,
+.dh-accounting-profile-breakdown strong,
+.dh-accounting-profile-totals strong {
+  color: #fff7ed;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dh-accounting-profile-message {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid rgba(255, 157, 74, 0.18);
+  border-radius: 8px;
+  padding: 0.85rem;
+}
+
+.dh-accounting-profile-message strong {
+  color: #fff7ed;
+}
+
+.dh-accounting-profile-message.is-success {
+  border-color: rgba(143, 166, 106, 0.32);
+  background: rgba(50, 76, 39, 0.18);
+}
+
+.dh-accounting-profile-message.is-warning {
+  border-color: rgba(255, 177, 95, 0.34);
+  background: rgba(92, 53, 14, 0.2);
+}
+
 .dh-accounting-profile-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -4712,6 +4862,18 @@ body {
 .dh-accounting-profile-tabs button:focus-visible {
   outline: 2px solid rgba(255, 90, 0, 0.82);
   outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .dh-accounting-profile-heading,
+  .dh-accounting-profile-list-item {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .dh-accounting-profile-list-item strong {
+    text-align: left;
+  }
 }
 
 @keyframes dh-final-flare {

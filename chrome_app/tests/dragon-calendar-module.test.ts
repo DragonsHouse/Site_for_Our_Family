@@ -92,11 +92,11 @@ describe('Dragon Calendar production module source contract', () => {
     assert.match(calendarSource, /dh-calendar-overflow/);
   });
 
-  it('opens DragonDialog event details with future integration placeholders', () => {
+  it('opens DragonDialog event details with production Ukrainian detail sections', () => {
     assert.match(calendarSource, /calendar\.selectedEvent/);
     assert.match(calendarSource, /DragonDialog title=\{calendar\.selectedEvent\.title\}/);
-    assert.match(calendarSource, /Attachments/);
-    assert.match(calendarSource, /Comments/);
+    assert.match(calendarSource, /Файли та посилання/u);
+    assert.match(calendarSource, /Коментарі/u);
     assert.match(calendarSource, /participants\.map/);
     assert.match(calendarSource, /calendar\.setSelectedEvent\(null\)/);
   });
