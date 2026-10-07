@@ -70,7 +70,7 @@ jobs:
       - run: npm run build:chrome
       - run: npm test
 
-  e2e:
+  real_backend_e2e:
     name: Real backend browser E2E
     runs-on: ubuntu-latest
     needs:
@@ -132,7 +132,7 @@ jobs:
       - run: npm run e2e:start > ../backend-e2e.out.log 2> ../backend-e2e.err.log &
         working-directory: dragon-house-backend
       - run: |
-          for i in {1..60}; do
+          for _ in {1..60}; do
             if curl -fsS http://127.0.0.1:8788/health/ready >/dev/null; then
               exit 0
             fi
