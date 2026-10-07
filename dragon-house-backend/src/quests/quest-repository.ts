@@ -64,6 +64,7 @@ export class MemoryFamilyQuestRepository implements FamilyQuestRepository {
       cooldownHours: input.cooldownHours ?? 24,
       cooldownUntil: null,
       metadata: {},
+      version: 1,
       createdAt: now,
       updatedAt: now,
     };
@@ -90,6 +91,7 @@ export class MemoryFamilyQuestRepository implements FamilyQuestRepository {
       imageAssetId: input.imageAssetId !== undefined ? input.imageAssetId : current.imageAssetId,
       isActive: input.isActive ?? current.isActive,
       cooldownHours: input.cooldownHours ?? current.cooldownHours,
+      version: current.version + 1,
       updatedAt: now,
     };
     this.templates[index] = next;
@@ -131,6 +133,7 @@ export class MemoryFamilyQuestRepository implements FamilyQuestRepository {
       paidAt: null,
       paidByFamilyMemberId: null,
       metadata: input.metadata ?? {},
+      version: 1,
       createdAt: now,
       updatedAt: now,
       people: [],
@@ -171,6 +174,7 @@ export class MemoryFamilyQuestRepository implements FamilyQuestRepository {
     quest.rewardMode = input.rewardMode ?? quest.rewardMode;
     quest.requiredItems = input.requiredItems !== undefined ? input.requiredItems : quest.requiredItems;
     quest.metadata = { ...quest.metadata, ...(input.metadata ?? {}) };
+    quest.version += 1;
     quest.updatedAt = now;
     quest.auditTrail.unshift({
       id: `quest-audit-${Date.now()}`,

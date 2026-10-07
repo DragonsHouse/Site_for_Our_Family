@@ -1,6 +1,7 @@
 import {
   useId,
   useRef,
+  type HTMLAttributes,
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
@@ -57,13 +58,14 @@ export type { DragonBackgroundVariant };
 export function DragonCard({
   children,
   className,
-  interactive = false
-}: {
+  interactive = false,
+  ...props
+}: HTMLAttributes<HTMLElement> & {
   children: ReactNode;
   className?: string;
   interactive?: boolean;
 }) {
-  return <article className={cx('dh-dragon-card', interactive && 'is-interactive', className)}>{children}</article>;
+  return <article {...props} className={cx('dh-dragon-card', interactive && 'is-interactive', className)}>{children}</article>;
 }
 
 export function DragonSection({

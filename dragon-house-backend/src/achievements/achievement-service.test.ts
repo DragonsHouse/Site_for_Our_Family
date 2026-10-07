@@ -544,6 +544,7 @@ function quest(overrides: Partial<FamilyQuestRecord> = {}): FamilyQuestRecord {
     paidAt: null,
     paidByFamilyMemberId: null,
     metadata: {},
+    version: 1,
     createdAt: '2026-08-10T09:00:00.000Z',
     updatedAt: '2026-08-10T11:00:00.000Z',
     people: [{
@@ -652,6 +653,7 @@ function event(overrides: Partial<FamilyEventRecord> = {}): FamilyEventRecord {
     cancelledByFamilyMemberId: null,
     cancelledAt: null,
     metadata: {},
+    version: 1,
     createdAt: '2026-08-12T09:00:00.000Z',
     updatedAt: '2026-08-12T11:00:00.000Z',
     responses: [{ id: 'event-response-1', eventId: 'event-1', familyMemberId: memberId, displayName: 'Member', response: 'confirmed', respondedAt: '2026-08-12T09:30:00.000Z', note: null, metadata: {}, createdAt: '2026-08-12T09:30:00.000Z', updatedAt: '2026-08-12T09:30:00.000Z' }],

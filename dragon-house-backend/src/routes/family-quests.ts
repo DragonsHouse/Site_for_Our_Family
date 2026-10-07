@@ -51,11 +51,13 @@ const QuestTemplateWriteSchema = z
     imageAssetId: z.string().trim().max(120).nullable().optional(),
     isActive: z.boolean().optional(),
     cooldownHours: z.number().int().min(1).max(24 * 365).optional(),
+    expectedVersion: z.number().int().positive().optional(),
   })
   .strict();
 const QuestTemplatePatchSchema = QuestTemplateWriteSchema.partial().refine((value) => Object.keys(value).length > 0, {
   message: 'At least one field is required.',
 });
+const QuestTemplateArchiveSchema = z.object({ expectedVersion: z.number().int().positive() }).strict();
 const QuestWriteSchema = z
   .object({
     templateId: z.string().uuid().nullable().optional(),
@@ -71,6 +73,7 @@ const QuestWriteSchema = z
     rewardMode: rewardModeSchema.optional(),
     requiredItems: z.string().trim().max(1000).nullable().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
+    expectedVersion: z.number().int().positive().optional(),
   })
   .strict();
 const QuestPatchSchema = QuestWriteSchema.partial().refine((value) => Object.keys(value).length > 0, {
@@ -145,9 +148,10 @@ export function createFamilyQuestsRouter(
   router.delete('/family/quest-templates/:templateId', async (request, response) => {
     if (!questService || !request.familyAuth) return respondServiceUnavailable(response);
     const templateId = templateIdSchema.safeParse(request.params.templateId);
-    if (!templateId.success) return respondValidation(response, 'Invalid quest template id');
+    const body = QuestTemplateArchiveSchema.safeParse(request.body);
+    if (!templateId.success || !body.success) return respondValidation(response, 'Invalid quest template archive request.');
     try {
-      response.json(await questService.updateTemplate(templateId.data, { isActive: false }, request.familyAuth));
+      response.json(await questService.updateTemplate(templateId.data, { isActive: false, expectedVersion: body.data.expectedVersion }, request.familyAuth));
     } catch (error) {
       respondQuestError(response, error);
     }

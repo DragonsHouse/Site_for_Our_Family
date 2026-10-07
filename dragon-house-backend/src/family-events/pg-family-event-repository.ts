@@ -34,6 +34,7 @@ type EventRow = {
   cancelled_by_family_member_id: string | null;
   cancelled_at: Date | null;
   metadata: Record<string, unknown>;
+  version: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -104,7 +105,7 @@ export class PgFamilyEventRepository implements FamilyEventRepository {
         input.priority ?? 'normal',
         input.startsAt,
         input.endsAt ?? null,
-        input.timezone ?? 'Europe/Kiev',
+        input.timezone ?? 'Europe/Kyiv',
         input.allDay ?? false,
         input.locationLabel ?? null,
         input.createdByFamilyMemberId,
@@ -156,9 +157,16 @@ export class PgFamilyEventRepository implements FamilyEventRepository {
     if (input.cancelledAt !== undefined) add('cancelled_at', input.cancelledAt);
     if (input.metadata !== undefined) add('metadata', JSON.stringify(input.metadata));
     add('updated_at', input.now);
+    updates.push('version = version + 1');
     values.push(id);
+    const idIndex = values.length;
+    values.push(input.expectedVersion ?? null);
+    const versionIndex = values.length;
     const result = await this.pool.query<{ id: string }>(
-      `update family_events set ${updates.join(', ')} where id = $${values.length} returning id`,
+      `update family_events
+       set ${updates.join(', ')}
+       where id = $${idIndex} and ($${versionIndex}::integer is null or version = $${versionIndex})
+       returning id`,
       values,
     );
     if (!result.rows[0]) return null;
@@ -298,6 +306,7 @@ function mapEvent(row: EventRow): FamilyEventRecord {
     cancelledByFamilyMemberId: row.cancelled_by_family_member_id,
     cancelledAt: iso(row.cancelled_at),
     metadata: row.metadata ?? {},
+    version: row.version,
     createdAt: iso(row.created_at)!,
     updatedAt: iso(row.updated_at)!,
     responses: [],

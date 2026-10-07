@@ -41,6 +41,7 @@ import type {
   DragonTowerDefenseStatistics
 } from './tower-defense-models';
 import type { FamilyUser } from '../../../lib/family-types';
+import { FamilyTowerDefenseApiError } from '../../../lib/family-tower-defense-backend-response';
 import { canManageDiscordIntegration } from '../../../lib/family-permissions';
 import { FamilyRewardAllocationPanel } from './family-reward-allocation-panel';
 import { DiscordPublishPanel } from './discord-publish-panel';
@@ -69,6 +70,7 @@ const READINESS_LABELS: Record<DragonDefenseReadiness, string> = {
   ready: 'Готові',
   reinforced: 'Посилено'
 };
+const TOWER_COOLDOWN_CONFLICT_MESSAGE = 'КД вишки вже оновили в іншому вікні. Натисни «Оновити дані», щоб побачити актуальний стан.';
 
 const ROSTER_FILTERS: Array<{ key: DragonTowerDefenseRosterFilter; label: string }> = [
   { key: 'all', label: 'Усі' },
@@ -95,6 +97,7 @@ export function DragonTowerDefenseScreen({
   const state = useDragonTowerDefenseState(stateDependencies);
   const [dialog, setDialog] = useState<TowerDefenseDialog>(null);
   const [dialogDefense, setDialogDefense] = useState<DragonTowerDefense | null>(null);
+  const [cooldownConflict, setCooldownConflict] = useState<string | null>(null);
 
   const openDialog = (nextDialog: TowerDefenseDialog, defense = state.activeDefense) => {
     setDialogDefense(defense);
@@ -134,9 +137,43 @@ export function DragonTowerDefenseScreen({
       />
 
       {state.domainError ? <div className="dh-tower-alert" role="alert">{state.domainError}</div> : null}
+      {cooldownConflict ? (
+        <div className="dh-tower-alert" role="alert" data-testid="tower-conflict-message">
+          <span>{cooldownConflict}</span>
+          <DragonButton
+            type="button"
+            variant="secondary"
+            data-testid="tower-conflict-refresh"
+            onClick={() => {
+              setCooldownConflict(null);
+              state.setDomainError(null);
+              state.refresh();
+            }}
+          >
+            Оновити дані
+          </DragonButton>
+        </div>
+      ) : null}
 
       <DragonSection title="Актуальні вишки з Discord" description="Живі сигнали з Discord, максимум 3 вишки одночасно.">
         <DragonCurrentDiscordTowers defenses={state.currentTowerSignals} onDetails={(defense) => openDialog('details', defense)} />
+      </DragonSection>
+
+      <DragonSection title="КД вишок" description="Актуальність cooldown для каптьорів та менеджерів оборони.">
+        <DragonTowerCooldownPanel
+          towers={state.towerDefinitions}
+          canManage={canManageTowerOperations(currentUser)}
+          mutating={state.mutating}
+          onUpdate={(tower, payload) => void state.updateTowerCooldown(tower, payload).catch((error: Error) => {
+            if (error instanceof FamilyTowerDefenseApiError && error.status === 409) {
+              setCooldownConflict(TOWER_COOLDOWN_CONFLICT_MESSAGE);
+              state.setDomainError(null);
+              return;
+            }
+            setCooldownConflict(null);
+            state.setDomainError(error.message);
+          })}
+        />
       </DragonSection>
 
       <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
@@ -645,7 +682,7 @@ export function DragonDefenseForm({
           priority: defense?.priority ?? 'high',
           scheduledAt: defense?.scheduledAt,
           startsAt: fromLocalInputValue(startsAt),
-          timezone: defense?.timezone ?? 'Europe/Kiev',
+          timezone: defense?.timezone ?? 'Europe/Kyiv',
           wave: defense?.wave ?? 1,
           commanderMemberId: defense?.commanderMemberId ?? currentFamilyMemberId ?? '',
           createdByMemberId: defense?.createdByMemberId ?? currentFamilyMemberId ?? '',
@@ -711,6 +748,92 @@ export function DragonAttendanceEditor({
       ))}
     </div>
   );
+}
+
+function DragonTowerCooldownPanel({
+  towers,
+  canManage,
+  mutating,
+  onUpdate
+}: {
+  towers: DragonTowerDefinition[];
+  canManage: boolean;
+  mutating: boolean;
+  onUpdate: (tower: DragonTowerDefinition, payload: { cooldownAt?: string | null; clear?: boolean; expectedUpdatedAt?: string | null }) => void;
+}) {
+  const visibleTowers = towers.filter((tower) => tower.active).slice(0, 12);
+  if (!visibleTowers.length) {
+    return <DragonEmptyState title="КД ще не синхронізовано" description="Після першого імпорту або ручного оновлення стан КД зʼявиться тут." />;
+  }
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {visibleTowers.map((tower) => (
+        <DragonTowerCooldownCard key={tower.id} tower={tower} canManage={canManage} mutating={mutating} onUpdate={onUpdate} />
+      ))}
+    </div>
+  );
+}
+
+function DragonTowerCooldownCard({
+  tower,
+  canManage,
+  mutating,
+  onUpdate
+}: {
+  tower: DragonTowerDefinition;
+  canManage: boolean;
+  mutating: boolean;
+  onUpdate: (tower: DragonTowerDefinition, payload: { cooldownAt?: string | null; clear?: boolean; expectedUpdatedAt?: string | null }) => void;
+}) {
+  const state = tower.cooldownState ?? null;
+  const [draft, setDraft] = useState(toDatetimeLocalValue(state?.cooldownAt ?? null));
+  const statusLabel = state?.status === 'current' ? 'актуальне' : state?.status === 'stale' ? 'прострочене' : 'відсутнє';
+  const sourceLabel = state?.source === 'hub' ? 'Hub/manual' : state?.source === 'system' ? 'Система' : state?.source === 'discord' ? 'Discord' : 'Немає';
+  const reminderResult = state?.lastReminderResult === 'sent'
+    ? 'надіслано каптьорам'
+    : state?.lastReminderResult === 'failed'
+      ? 'помилка відправки'
+      : state?.lastReminderResult === 'skipped'
+        ? 'пропущено'
+        : 'не надсилалось';
+  return (
+    <DragonCard className="space-y-3" data-testid="tower-cooldown-card" data-tower-id={tower.id}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-base font-semibold text-white">{tower.towerName}</h3>
+          <p className="text-sm text-slate-300">{tower.location.label}</p>
+        </div>
+        <DragonBadge tone={state?.status === 'current' ? 'success' : state?.status === 'stale' ? 'warning' : 'danger'}>{statusLabel}</DragonBadge>
+      </div>
+      <dl className="grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
+        <div><dt className="text-slate-400">Діє до</dt><dd>{state?.cooldownAt ? formatDragonDefenseDateTime(state.cooldownAt) : 'КД немає'}</dd></div>
+        <div><dt className="text-slate-400">Джерело</dt><dd>{sourceLabel}</dd></div>
+        <div><dt className="text-slate-400">Оновлено</dt><dd>{state?.lastUpdatedAt ? formatDragonDefenseDateTime(state.lastUpdatedAt) : 'ще ні'}</dd></div>
+        <div><dt className="text-slate-400">Reminder</dt><dd>{reminderResult}</dd></div>
+        <div><dt className="text-slate-400">Останнє нагадування</dt><dd>{state?.lastReminderAt ? formatDragonDefenseDateTime(state.lastReminderAt) : 'не було'}</dd></div>
+        <div><dt className="text-slate-400">Кому</dt><dd>{state?.reminderTarget ?? 'роль каптьорів'}</dd></div>
+      </dl>
+      {state?.lastReminderError ? <p className="text-sm text-red-200">Помилка sync: {state.lastReminderError}</p> : null}
+      {canManage ? (
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <DragonInput data-testid="tower-cooldown-input" type="datetime-local" value={draft} onChange={(event) => setDraft(event.target.value)} aria-label={`КД для ${tower.towerName}`} />
+          <DragonButton type="button" data-testid="tower-cooldown-update" disabled={mutating || !draft} onClick={() => onUpdate(tower, { cooldownAt: fromDatetimeLocalValue(draft), expectedUpdatedAt: state?.expectedUpdatedAt ?? null })}>Оновити КД</DragonButton>
+          <DragonButton type="button" data-testid="tower-cooldown-clear" variant="secondary" disabled={mutating} onClick={() => onUpdate(tower, { clear: true, expectedUpdatedAt: state?.expectedUpdatedAt ?? null })}>Очистити</DragonButton>
+        </div>
+      ) : null}
+    </DragonCard>
+  );
+}
+
+function toDatetimeLocalValue(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 16);
+}
+
+function fromDatetimeLocalValue(value: string): string {
+  return new Date(value).toISOString();
 }
 
 export function DragonDefenseResultDialog({
@@ -891,6 +1014,14 @@ function canManageTowerRewardAllocations(user: FamilyUser | null | undefined, de
     user.permissions.includes('manage_rewards') ||
     user.permissions.includes('manage_events') ||
     defense.commanderMemberId === user.id
+  ));
+}
+
+function canManageTowerOperations(user: FamilyUser | null | undefined): boolean {
+  return Boolean(user && (
+    user.role === 'owner' ||
+    user.permissions.includes('manage_events') ||
+    user.permissions.includes('manage_family_quests')
   ));
 }
 

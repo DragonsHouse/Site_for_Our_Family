@@ -3,6 +3,7 @@ import { canManageFamilyEconomy } from '../../../lib/family-permissions';
 import {
   archiveFamilyTreasuryEntry,
   createFamilyTreasuryEntry,
+  FamilyTreasuryApiError,
   listFamilyTreasuryEntries,
   updateFamilyTreasuryEntry
 } from '../../../lib/family-treasury-backend-client';
@@ -19,6 +20,7 @@ const CATEGORY_LABELS: Record<FamilyEconomyCategory | 'all', string> = {
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as Array<FamilyEconomyCategory | 'all'>;
 const SAVE_ERROR = 'Не вдалося зберегти дані.';
+const TREASURY_CONFLICT_MESSAGE = 'Дані Скарбниці вже змінилися в іншому вікні. Натисни «Оновити дані», щоб побачити актуальну версію.';
 
 export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
   const [entries, setEntries] = useState<FamilyEconomyEntry[]>([]);
@@ -29,12 +31,14 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorAction, setErrorAction] = useState<'reload' | 'retry'>('retry');
   const canManage = canManageFamilyEconomy(currentUser);
 
   useEffect(() => {
     const controller = new AbortController();
     setIsLoading(true);
     setError(null);
+    setErrorAction('retry');
     listFamilyTreasuryEntries(controller.signal)
       .then((result) => setEntries(result.items))
       .catch((loadError) => {
@@ -53,7 +57,7 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
       if (!entry.isActive) return false;
       if (category !== 'all' && entry.category !== category) return false;
       if (!normalizedQuery) return true;
-      return [entry.title, entry.description, entry.note, entry.price, entry.locationNumber, entry.locationReference]
+      return [entry.title, entry.description, entry.note, entry.priceNote, entry.price, entry.priceAmount, entry.locationNumber, entry.locationReference]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedQuery));
     });
@@ -62,6 +66,7 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
   async function reload() {
     setIsLoading(true);
     setError(null);
+    setErrorAction('retry');
     try {
       const result = await listFamilyTreasuryEntries();
       setEntries(result.items);
@@ -77,6 +82,7 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
     if (!title || isSaving) return;
     setIsSaving(true);
     setError(null);
+    setErrorAction('retry');
     try {
       const created = await createFamilyTreasuryEntry({
         category: draftCategory,
@@ -94,13 +100,16 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
 
   async function deactivateEntry(entryId: string) {
     if (isSaving) return;
+    const entry = entries.find((item) => item.id === entryId);
+    if (!entry) return;
     setIsSaving(true);
     setError(null);
+    setErrorAction('retry');
     try {
-      const archived = await archiveFamilyTreasuryEntry(entryId);
+      const archived = await archiveFamilyTreasuryEntry(entryId, entry.version ?? 1);
       setEntries((current) => current.map((entry) => (entry.id === entryId ? archived : entry)));
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : SAVE_ERROR);
+      showSaveError(saveError);
     } finally {
       setIsSaving(false);
     }
@@ -108,21 +117,34 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
 
   async function updateEntry(
     entryId: string,
-    updates: Partial<Pick<FamilyEconomyEntry, 'category' | 'title' | 'locationNumber' | 'locationReference' | 'description' | 'price' | 'note'>>
+    updates: Partial<Pick<FamilyEconomyEntry, 'category' | 'title' | 'locationNumber' | 'locationReference' | 'description' | 'price' | 'priceAmount' | 'priceNote' | 'note'>>
   ) {
+    const currentEntry = entries.find((entry) => entry.id === entryId);
+    if (!currentEntry) return;
     const previous = entries;
     const optimistic = entries.map((entry) =>
       entry.id === entryId ? { ...entry, ...updates, updatedAt: new Date().toISOString() } : entry
     );
     setEntries(optimistic);
     setError(null);
+    setErrorAction('retry');
     try {
-      const updated = await updateFamilyTreasuryEntry(entryId, updates);
+      const updated = await updateFamilyTreasuryEntry(entryId, { ...updates, expectedVersion: currentEntry.version ?? 1 });
       setEntries((current) => current.map((entry) => (entry.id === entryId ? updated : entry)));
     } catch (saveError) {
       setEntries(previous);
-      setError(saveError instanceof Error ? saveError.message : SAVE_ERROR);
+      showSaveError(saveError);
     }
+  }
+
+  function showSaveError(saveError: unknown) {
+    if (saveError instanceof FamilyTreasuryApiError && saveError.status === 409) {
+      setError(TREASURY_CONFLICT_MESSAGE);
+      setErrorAction('reload');
+      return;
+    }
+    setError(saveError instanceof Error ? saveError.message : SAVE_ERROR);
+    setErrorAction('retry');
   }
 
   return (
@@ -142,10 +164,10 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
       </div>
 
       {error ? (
-        <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+        <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100" role="alert" data-testid="treasury-error">
           {error}
-          <button type="button" onClick={() => void reload()} className="ml-3 underline">
-            Спробувати ще раз
+          <button type="button" data-testid="treasury-conflict-refresh" onClick={() => void reload()} className="ml-3 underline">
+            {errorAction === 'reload' ? 'Оновити дані' : 'Спробувати ще раз'}
           </button>
         </div>
       ) : null}
@@ -205,12 +227,13 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredEntries.map((entry) => (
-          <article key={entry.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+          <article key={entry.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4" data-testid="treasury-entry-card" data-entry-id={entry.id}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1 space-y-2">
                 {canManage ? (
                   <>
                     <select
+                      data-testid="treasury-entry-category"
                       value={entry.category}
                       onChange={(event) => void updateEntry(entry.id, { category: event.target.value as FamilyEconomyCategory })}
                       className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs uppercase tracking-[0.14em] text-amber-200"
@@ -223,6 +246,7 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
                       ))}
                     </select>
                     <input
+                      data-testid="treasury-entry-title"
                       value={entry.title}
                       onChange={(event) => void updateEntry(entry.id, { title: event.target.value })}
                       className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-base font-semibold text-white"
@@ -245,6 +269,7 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
             {canManage ? (
               <div className="mt-3 grid gap-2">
                 <input
+                  data-testid="treasury-entry-location"
                   value={entry.locationNumber ?? ''}
                   onChange={(event) => void updateEntry(entry.id, { locationNumber: event.target.value.trim() || null })}
                   className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
@@ -252,6 +277,7 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
                   aria-label="Номер або локація"
                 />
                 <textarea
+                  data-testid="treasury-entry-description"
                   value={entry.description}
                   onChange={(event) => void updateEntry(entry.id, { description: event.target.value })}
                   rows={3}
@@ -259,6 +285,25 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
                   aria-label="Опис запису"
                 />
                 <div className="grid gap-2 sm:grid-cols-2">
+                  <input
+                    data-testid="treasury-entry-price-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={entry.priceAmount ?? ''}
+                    onChange={(event) => void updateEntry(entry.id, { priceAmount: event.target.value.trim() ? Number(event.target.value) : null })}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                    placeholder="Ціна"
+                    aria-label="Ціна"
+                  />
+                  <input
+                    data-testid="treasury-entry-price-note"
+                    value={entry.priceNote ?? entry.price ?? ''}
+                    onChange={(event) => void updateEntry(entry.id, { priceNote: event.target.value.trim() || null })}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                    placeholder="Примітка до ціни"
+                    aria-label="Примітка до ціни"
+                  />
                   <input
                     value={entry.price ?? ''}
                     onChange={(event) => void updateEntry(entry.id, { price: event.target.value.trim() || null })}
@@ -286,6 +331,7 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
             {canManage ? (
               <button
                 type="button"
+                data-testid="treasury-entry-archive"
                 onClick={() => void deactivateEntry(entry.id)}
                 disabled={isSaving}
                 className="mt-3 rounded-lg border border-red-500/50 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"

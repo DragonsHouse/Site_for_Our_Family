@@ -39,7 +39,26 @@ const createEventSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 }).strict();
 
-const updateEventSchema = createEventSchema.partial();
+const updateEventSchema = createEventSchema.extend({
+  expectedVersion: z.number().int().positive(),
+}).partial({
+  title: true,
+  description: true,
+  eventType: true,
+  category: true,
+  status: true,
+  priority: true,
+  startsAt: true,
+  endsAt: true,
+  timezone: true,
+  allDay: true,
+  locationLabel: true,
+  organizerFamilyMemberId: true,
+  maxParticipants: true,
+  visibility: true,
+  notes: true,
+  metadata: true,
+});
 
 const respondSchema = z.object({
   familyMemberId: z.string().trim().min(1).optional(),

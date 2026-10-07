@@ -6,6 +6,7 @@ export type FamilyEventErrorCode =
   | 'FAMILY_EVENT_INVALID_TIME_RANGE'
   | 'FAMILY_EVENT_INVALID_TRANSITION'
   | 'FAMILY_EVENT_INVALID_ATTENDANCE_MEMBER'
+  | 'FAMILY_EVENT_VERSION_CONFLICT'
   | 'VALIDATION_ERROR';
 
 export const FAMILY_EVENT_ERROR_MESSAGES: Record<FamilyEventErrorCode, string> = {
@@ -16,6 +17,7 @@ export const FAMILY_EVENT_ERROR_MESSAGES: Record<FamilyEventErrorCode, string> =
   FAMILY_EVENT_INVALID_TIME_RANGE: 'Invalid event time range.',
   FAMILY_EVENT_INVALID_TRANSITION: 'Invalid event status transition.',
   FAMILY_EVENT_INVALID_ATTENDANCE_MEMBER: 'Attendance member must have an active event response.',
+  FAMILY_EVENT_VERSION_CONFLICT: 'Family event was already changed. Refresh and try again.',
   VALIDATION_ERROR: 'Invalid request.',
 };
 

@@ -1,7 +1,7 @@
 import { ChannelType, PermissionFlagsBits, TextChannel } from 'discord.js';
 import { describe, expect, it } from 'vitest';
 import { createTestConfig } from '../test/test-config.js';
-import { DiscordService } from './discord-service.js';
+import { DiscordService, isTrustedDiscordSource } from './discord-service.js';
 
 const channelId = 'configured-channel';
 
@@ -17,7 +17,7 @@ describe('DiscordService channel access validation', () => {
   });
 
   it('rejects a configured channel when SendMessages is missing', async () => {
-    const service = serviceWithChannel(['ViewChannel', 'ReadMessageHistory', 'EmbedLinks', 'AttachFiles']);
+    const service = serviceWithChannel(['ViewChannel', 'ReadMessageHistory', 'EmbedLinks']);
 
     await expect(service.validateChannelAccess(channelId)).resolves.toMatchObject({
       ok: false,
@@ -27,7 +27,7 @@ describe('DiscordService channel access validation', () => {
   });
 
   it('rejects a configured channel when ReadMessageHistory is missing', async () => {
-    const service = serviceWithChannel(['ViewChannel', 'SendMessages', 'EmbedLinks', 'AttachFiles']);
+    const service = serviceWithChannel(['ViewChannel', 'SendMessages', 'EmbedLinks']);
 
     await expect(service.validateChannelAccess(channelId)).resolves.toMatchObject({
       ok: false,
@@ -37,7 +37,7 @@ describe('DiscordService channel access validation', () => {
   });
 
   it('rejects a configured channel when EmbedLinks is missing', async () => {
-    const service = serviceWithChannel(['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'AttachFiles']);
+    const service = serviceWithChannel(['ViewChannel', 'SendMessages', 'ReadMessageHistory']);
 
     await expect(service.validateChannelAccess(channelId)).resolves.toMatchObject({
       ok: false,
@@ -46,34 +46,47 @@ describe('DiscordService channel access validation', () => {
     });
   });
 
-  it('rejects a configured channel when AttachFiles is missing', async () => {
-    const service = serviceWithChannel(['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks']);
-
-    await expect(service.validateChannelAccess(channelId)).resolves.toMatchObject({
-      ok: false,
-      code: 'DISCORD_CHANNEL_PERMISSION_MISSING',
-      missingPermissions: ['AttachFiles'],
-    });
-  });
-
   it('allows a configured text channel when all required permissions are present', async () => {
-    const service = serviceWithChannel(['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks', 'AttachFiles']);
+    const service = serviceWithChannel(['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks']);
 
     await expect(service.validateChannelAccess(channelId)).resolves.toEqual({
       ok: true,
       channelId,
-      requiredPermissions: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks', 'AttachFiles'],
+      requiredPermissions: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks'],
       missingPermissions: [],
     });
   });
 
   it('does not allow an arbitrary unconfigured channel even when fetchable', async () => {
-    const service = serviceWithChannel(['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks', 'AttachFiles']);
+    const service = serviceWithChannel(['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'EmbedLinks']);
 
     await expect(service.validateChannelAccess('random-channel')).resolves.toMatchObject({
       ok: false,
       code: 'DISCORD_CHANNEL_NOT_ALLOWED',
     });
+  });
+});
+
+describe('isTrustedDiscordSource', () => {
+  it('accepts a configured trusted bot author', () => {
+    const config = createTestConfig({ discord: { trustedBotUserId: 'bot-1' } });
+
+    expect(isTrustedDiscordSource(config, messageSource({ authorId: 'bot-1' }))).toBe(true);
+  });
+
+  it('rejects random members and unconfigured trust', () => {
+    const trusted = createTestConfig({ discord: { trustedBotUserId: 'bot-1' } });
+    const unconfigured = createTestConfig();
+
+    expect(isTrustedDiscordSource(trusted, messageSource({ authorId: 'member-1' }))).toBe(false);
+    expect(isTrustedDiscordSource(unconfigured, messageSource({ authorId: 'bot-1' }))).toBe(false);
+  });
+
+  it('accepts configured application or webhook identities', () => {
+    const config = createTestConfig({ discord: { trustedApplicationId: 'app-1', trustedWebhookId: 'webhook-1' } });
+
+    expect(isTrustedDiscordSource(config, messageSource({ authorId: 'other', applicationId: 'app-1' }))).toBe(true);
+    expect(isTrustedDiscordSource(config, messageSource({ authorId: 'other', webhookId: 'webhook-1' }))).toBe(true);
   });
 });
 
@@ -110,6 +123,14 @@ function serviceWithChannel(permissionNames: RequiredPermissionName[]) {
     },
   };
   return service;
+}
+
+function messageSource(input: { authorId: string; applicationId?: string | null; webhookId?: string | null }) {
+  return {
+    author: { id: input.authorId },
+    applicationId: input.applicationId ?? null,
+    webhookId: input.webhookId ?? null,
+  };
 }
 
 function permissionFlag(name: RequiredPermissionName): bigint {

@@ -34,6 +34,7 @@ export type FamilyQuestTemplateRecord = {
   cooldownHours: number;
   cooldownUntil: string | null;
   metadata: Record<string, unknown>;
+  version: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -159,6 +160,7 @@ export type FamilyQuestRecord = {
   paidAt: string | null;
   paidByFamilyMemberId: string | null;
   metadata: Record<string, unknown>;
+  version: number;
   createdAt: string;
   updatedAt: string;
   people: FamilyQuestPersonRecord[];
@@ -189,6 +191,7 @@ export type FamilyQuestTemplateWriteInput = {
   imageAssetId?: string | null;
   isActive?: boolean;
   cooldownHours?: number;
+  expectedVersion?: number;
 };
 
 export type FamilyQuestWriteInput = {
@@ -206,4 +209,5 @@ export type FamilyQuestWriteInput = {
   rewardMode?: FamilyQuestRewardMode;
   requiredItems?: string | null;
   metadata?: Record<string, unknown>;
+  expectedVersion?: number;
 };

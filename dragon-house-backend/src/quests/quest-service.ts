@@ -29,6 +29,7 @@ export type FamilyQuestTemplateDto = {
   isActive: boolean;
   cooldownHours: number;
   cooldownUntil: string | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -55,6 +56,7 @@ export type FamilyQuestDto = {
   reportSentToAccountingAt: string | null;
   paidAt: string | null;
   paidByFamilyMemberId: string | null;
+  version: number;
   participants: FamilyQuestPersonDto[];
   helpers: FamilyQuestPersonDto[];
   rewards: FamilyQuestRewardDto[];
@@ -165,9 +167,13 @@ export class FamilyQuestService {
 
   async updateTemplate(id: string, input: Partial<FamilyQuestTemplateWriteInput>, auth: FamilyAuthContext, now = new Date()): Promise<FamilyQuestTemplateDto> {
     this.assertCanManage(auth);
+    if (!input.expectedVersion) throw new FamilyQuestError('VALIDATION_ERROR', 'expectedVersion is required.', 400);
+    const current = (await this.repository.listTemplates()).find((template) => template.id === id);
+    if (!current) throw new FamilyQuestError('QUEST_NOT_FOUND', 'Quest template not found', 404);
+    if (current.version !== input.expectedVersion) throw new FamilyQuestError('QUEST_VERSION_CONFLICT', 'Quest template was already changed.', 409);
     const normalized = normalizeTemplateInput(input, true);
     const updated = await this.repository.updateTemplate(id, normalized, auth.familyMemberId, now.toISOString());
-    if (!updated) throw new FamilyQuestError('QUEST_NOT_FOUND', 'Quest template not found', 404);
+    if (!updated) throw new FamilyQuestError('QUEST_VERSION_CONFLICT', 'Quest template was already changed.', 409);
     return toTemplateDto(updated);
   }
 
@@ -193,12 +199,14 @@ export class FamilyQuestService {
   async updateQuest(id: string, input: Partial<FamilyQuestWriteInput>, auth: FamilyAuthContext, now = new Date()): Promise<FamilyQuestDto> {
     this.assertCanManage(auth);
     const current = await this.requireQuest(id);
+    if (!input.expectedVersion) throw new FamilyQuestError('VALIDATION_ERROR', 'expectedVersion is required.', 400);
+    if (current.version !== input.expectedVersion) throw new FamilyQuestError('QUEST_VERSION_CONFLICT', 'Quest was already changed.', 409);
     if (['sent_to_accounting', 'paid'].includes(current.status)) {
       throw new FamilyQuestError('QUEST_INVALID_TRANSITION', 'Quest cannot be edited after accounting handoff.', 409, { status: current.status });
     }
     const normalized = normalizeQuestInput(input, true);
     const updated = await this.repository.updateQuest(id, normalized, auth.familyMemberId, now.toISOString());
-    if (!updated) throw new FamilyQuestError('QUEST_NOT_FOUND', 'Quest not found', 404);
+    if (!updated) throw new FamilyQuestError('QUEST_VERSION_CONFLICT', 'Quest was already changed.', 409);
     return toQuestDto(updated);
   }
 
@@ -417,6 +425,7 @@ function toTemplateDto(template: FamilyQuestTemplateRecord): FamilyQuestTemplate
     isActive: template.isActive,
     cooldownHours: template.cooldownHours,
     cooldownUntil: template.cooldownUntil,
+    version: template.version,
     createdAt: template.createdAt,
     updatedAt: template.updatedAt,
   };
@@ -445,6 +454,7 @@ function toQuestDto(quest: FamilyQuestRecord): FamilyQuestDto {
     reportSentToAccountingAt: quest.reportSentToAccountingAt,
     paidAt: quest.paidAt,
     paidByFamilyMemberId: quest.paidByFamilyMemberId,
+    version: quest.version,
     participants: quest.people.filter((person) => person.role === 'participant').map(toPersonDto),
     helpers: quest.people.filter((person) => person.role === 'helper').map(toPersonDto),
     rewards: quest.rewards.map(toRewardDto),

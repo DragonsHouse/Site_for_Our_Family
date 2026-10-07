@@ -240,6 +240,7 @@ function event(overrides: Partial<FamilyEventRecord> = {}): FamilyEventRecord {
     cancelledByFamilyMemberId: null,
     cancelledAt: null,
     metadata: {},
+    version: 1,
     createdAt: '2026-08-12T09:00:00.000Z',
     updatedAt: '2026-08-12T09:00:00.000Z',
     responses: [],

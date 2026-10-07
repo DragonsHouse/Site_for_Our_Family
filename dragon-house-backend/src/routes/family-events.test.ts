@@ -42,12 +42,12 @@ describe('family event routes', { timeout: 20_000 }, () => {
       }),
     });
     expect(created.status).toBe(201);
-    const event = await created.json() as { id: string };
+    const event = await created.json() as { id: string; version: number };
 
     const blockedPatch = await fetch(`${baseUrl}/api/family/events/${event.id}`, {
       method: 'PATCH',
       headers: memberHeaders,
-      body: JSON.stringify({ title: 'Nope' }),
+      body: JSON.stringify({ title: 'Nope', expectedVersion: event.version }),
     });
     expect(blockedPatch.status).toBe(403);
 

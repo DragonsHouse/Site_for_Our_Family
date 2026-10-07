@@ -34,6 +34,7 @@ type QuestTemplateRow = {
   cooldown_hours: number;
   cooldown_until: Date | null;
   metadata: Record<string, unknown>;
+  version: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -61,6 +62,7 @@ type QuestRow = {
   paid_at: Date | null;
   paid_by_family_member_id: string | null;
   metadata: Record<string, unknown>;
+  version: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -226,8 +228,9 @@ export class PgFamilyQuestRepository implements FamilyQuestRepository {
            is_active = $13,
            cooldown_hours = $14,
            updated_by_family_member_id = $15,
-           updated_at = $16
-       where id = $1
+           updated_at = $16,
+           version = version + 1
+       where id = $1 and version = $17
        returning *`,
       [
         id,
@@ -246,9 +249,10 @@ export class PgFamilyQuestRepository implements FamilyQuestRepository {
         input.cooldownHours ?? row.cooldown_hours,
         actorFamilyMemberId,
         now,
+        input.expectedVersion ?? row.version,
       ],
     );
-    return mapTemplate(result.rows[0]);
+    return result.rows[0] ? mapTemplate(result.rows[0]) : null;
   }
 
   async listQuests(query: FamilyQuestListQuery = {}): Promise<FamilyQuestRecord[]> {
@@ -333,8 +337,9 @@ export class PgFamilyQuestRepository implements FamilyQuestRepository {
            reward_mode = $12,
            required_items = $13,
            metadata = metadata || $14::jsonb,
-           updated_at = $15
-       where id = $1
+           updated_at = $15,
+           version = version + 1
+       where id = $1 and version = $16
        returning *`,
       [
         id,
@@ -352,8 +357,10 @@ export class PgFamilyQuestRepository implements FamilyQuestRepository {
         input.requiredItems !== undefined ? input.requiredItems : current.requiredItems,
         JSON.stringify(input.metadata ?? {}),
         now,
+        input.expectedVersion ?? current.version,
       ],
     );
+    if (!result.rows[0]) return null;
     await this.pool.query(
       `insert into family_quest_audit
         (quest_id, actor_family_member_id, action, previous_status, new_status, metadata, created_at)
@@ -659,6 +666,7 @@ function mapTemplate(row: QuestTemplateRow): FamilyQuestTemplateRecord {
     cooldownHours: row.cooldown_hours,
     cooldownUntil: iso(row.cooldown_until),
     metadata: row.metadata ?? {},
+    version: row.version,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -688,6 +696,7 @@ function mapQuestBase(row: QuestRow): Omit<FamilyQuestRecord, 'people' | 'reward
     paidAt: iso(row.paid_at),
     paidByFamilyMemberId: row.paid_by_family_member_id,
     metadata: row.metadata ?? {},
+    version: row.version,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };

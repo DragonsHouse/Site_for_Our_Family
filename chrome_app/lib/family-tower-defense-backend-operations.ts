@@ -2,6 +2,7 @@ import type {
   DragonDefenseAttendanceStatus,
   DragonDefenseResult,
   DragonGuardResponseStatus,
+  DragonTowerDefinition,
   DragonTowerDefense,
   DragonTowerDefenseCreateInput
 } from '../entrypoints/dashboard/family/tower-defense-models.ts';
@@ -14,11 +15,12 @@ import {
   respondBackendTowerDefense,
   startBackendTowerDefense,
   updateBackendTowerDefense,
+  updateBackendTowerCooldown,
   withdrawBackendTowerDefenseResponse,
   type CreateBackendTowerDefensePayload,
   type UpdateBackendTowerDefensePayload
 } from './family-tower-defense-backend-client.ts';
-import { mapBackendTowerDefense } from './family-tower-defense-backend-mapper.ts';
+import { mapBackendTower, mapBackendTowerDefense } from './family-tower-defense-backend-mapper.ts';
 
 export type DragonTowerDefenseBackendOperations = {
   createDefense(input: DragonTowerDefenseCreateInput): Promise<DragonTowerDefense>;
@@ -29,6 +31,7 @@ export type DragonTowerDefenseBackendOperations = {
   startDefense(defense: DragonTowerDefense): Promise<DragonTowerDefense>;
   completeDefense(defense: DragonTowerDefense, result: Exclude<DragonDefenseResult, 'pending' | 'cancelled'>, notes?: string, failureReason?: string): Promise<DragonTowerDefense>;
   cancelDefense(defense: DragonTowerDefense, reason?: string): Promise<DragonTowerDefense>;
+  updateTowerCooldown(tower: DragonTowerDefinition, payload: { cooldownAt?: string | null; clear?: boolean; expectedUpdatedAt?: string | null }): Promise<DragonTowerDefinition>;
 };
 
 export const dragonTowerDefenseBackendOperations: DragonTowerDefenseBackendOperations = {
@@ -63,6 +66,9 @@ export const dragonTowerDefenseBackendOperations: DragonTowerDefenseBackendOpera
   },
   async cancelDefense(defense, reason) {
     return mapBackendTowerDefense(await cancelBackendTowerDefense(defense.backendDefenseId, { reason: reason ?? null }));
+  },
+  async updateTowerCooldown(tower, payload) {
+    return mapBackendTower(await updateBackendTowerCooldown(tower.backendTowerId ?? tower.id, payload));
   }
 };
 

@@ -29,6 +29,7 @@ import {
   type FamilyEventResponseChoice
 } from '../../../lib/family-events-backend-operations';
 import type { CreateBackendFamilyEventPayload } from '../../../lib/family-events-backend-client';
+import { FamilyEventsApiError } from '../../../lib/family-events-backend-response';
 import {
   DRAGON_EVENT_TYPE_META,
   type DragonEvent,
@@ -66,6 +67,7 @@ const STANDALONE_EVENT_TYPES: DragonEventType[] = ['family_meeting', 'celebratio
 const STANDALONE_EVENT_CATEGORIES = ['meeting', 'training', 'celebration', 'announcement', 'custom'] as const;
 const RESPONSE_CHOICES: FamilyEventResponseChoice[] = ['interested', 'joining', 'confirmed', 'declined'];
 const ATTENDANCE_CHOICES: FamilyEventAttendanceChoice[] = ['present', 'late', 'absent', 'excused'];
+const EVENT_CONFLICT_MESSAGE = 'Цю подію вже змінив інший користувач. Оновіть дані й повторіть зміни.';
 
 const EVENT_STATUS_LABELS: Record<DragonEventStatus, string> = {
   draft: 'Чернетка',
@@ -129,6 +131,7 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
   const [createOpen, setCreateOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<DragonEvent | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationErrorAction, setMutationErrorAction] = useState<(() => void) | null>(null);
   const [mutatingKey, setMutatingKey] = useState<string | null>(null);
   const canCreate = currentUser ? canManageFamilyEvents(currentUser) : false;
 
@@ -136,6 +139,7 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
     if (mutatingKey) return;
     setMutatingKey(key);
     setMutationError(null);
+    setMutationErrorAction(null);
     try {
       const updated = await action();
       if (updated) setDetailsEvent(updated);
@@ -144,6 +148,15 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
       if (updated && editEvent?.id === updated.id) setEditEvent(null);
       if (key === 'create') setCreateOpen(false);
     } catch (error) {
+      if (error instanceof FamilyEventsApiError && error.status === 409) {
+        setMutationError(EVENT_CONFLICT_MESSAGE);
+        setMutationErrorAction(() => () => {
+          setEditEvent(null);
+          setDetailsEvent(null);
+          engine.refresh();
+        });
+        return;
+      }
       setMutationError(error instanceof Error ? error.message : 'Не вдалося виконати дію з подією.');
     } finally {
       setMutatingKey(null);
@@ -190,6 +203,7 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
           currentUser={currentUser}
           mutating={mutatingKey === 'create'}
           error={mutationError}
+          errorAction={mutationErrorAction}
           onClose={() => setCreateOpen(false)}
           onSubmit={(payload) => runMutation('create', () => createFamilyEventFromBackend(payload))}
         />
@@ -202,6 +216,7 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
           event={editEvent}
           mutating={mutatingKey === `edit:${editEvent.id}`}
           error={mutationError}
+          errorAction={mutationErrorAction}
           onClose={() => setEditEvent(null)}
           onSubmit={(payload) => runMutation(`edit:${editEvent.id}`, () => updateFamilyEventFromBackend(editEvent, payload))}
         />
@@ -213,8 +228,12 @@ export function DragonEventEngineScreen({ currentUser, dependencies }: { current
           currentUser={currentUser}
           mutatingKey={mutatingKey}
           error={mutationError}
+          errorAction={mutationErrorAction}
           onClose={() => setDetailsEvent(null)}
-          onEdit={setEditEvent}
+          onEdit={(event) => {
+            setDetailsEvent(null);
+            setEditEvent(event);
+          }}
           onRespond={(choice) => currentUser ? runMutation(`respond:${detailsEvent.id}:${choice}`, () => respondFamilyEventFromBackend(detailsEvent, currentUser.id, choice)) : undefined}
           onWithdraw={() => runMutation(`withdraw:${detailsEvent.id}`, () => withdrawFamilyEventResponseFromBackend(detailsEvent))}
           onAttendance={(memberId, status) => runMutation(`attendance:${detailsEvent.id}:${memberId}:${status}`, () => confirmFamilyEventAttendanceFromBackend(detailsEvent, memberId, status))}
@@ -246,8 +265,8 @@ export function DragonEventCard({ event, onSelect }: { event: DragonEvent; onSel
   const capacity = event.maxParticipants ? Math.round((event.participantCount / event.maxParticipants) * 100) : Math.min(event.participantCount * 20, 100);
 
   return (
-    <DragonCard interactive className={`dh-event-card ${meta.className} is-${event.status}`}>
-      <button type="button" className="dh-event-card-open" onClick={() => onSelect?.(event)} aria-label={`Відкрити подію ${event.title}`}>
+    <DragonCard interactive className={`dh-event-card ${meta.className} is-${event.status}`} data-testid="event-card" data-event-id={event.backendEventId ?? event.id}>
+      <button type="button" data-testid="event-card-open" className="dh-event-card-open" onClick={() => onSelect?.(event)} aria-label={`Відкрити подію ${event.title}`}>
         <span className="dh-event-card-glyph" aria-hidden="true">
           {meta.glyph}
         </span>
@@ -285,6 +304,7 @@ export function DragonEventDetails({
   currentUser,
   mutatingKey,
   error,
+  errorAction,
   onClose,
   onEdit,
   onRespond,
@@ -298,6 +318,7 @@ export function DragonEventDetails({
   currentUser?: FamilyUser;
   mutatingKey?: string | null;
   error?: string | null;
+  errorAction?: (() => void) | null;
   onClose: () => void;
   onEdit?: (event: DragonEvent) => void;
   onRespond?: (choice: FamilyEventResponseChoice) => void;
@@ -348,7 +369,12 @@ export function DragonEventDetails({
         {isStandalone ? (
           <DragonCard className="dh-event-details-actions">
             <span className="dh-dragon-eyebrow">Дії</span>
-            {error ? <p role="alert">{error}</p> : null}
+            {error ? <p role="alert" data-testid="event-conflict-message">{error}</p> : null}
+            {errorAction ? (
+              <DragonButton type="button" variant="secondary" data-testid="event-conflict-refresh" onClick={errorAction}>
+                Оновити дані
+              </DragonButton>
+            ) : null}
             {currentUser ? (
               <div className="flex flex-wrap gap-2">
                 {RESPONSE_CHOICES.map((choice) => (
@@ -371,7 +397,7 @@ export function DragonEventDetails({
               <div className="mt-3 space-y-3">
                 <div className="flex flex-wrap gap-2">
                   {!closed ? (
-                    <DragonButton type="button" variant="secondary" disabled={Boolean(mutatingKey)} onClick={() => onEdit?.(event)}>
+                    <DragonButton type="button" variant="secondary" data-testid="event-edit" disabled={Boolean(mutatingKey)} onClick={() => onEdit?.(event)}>
                       Редагувати
                     </DragonButton>
                   ) : null}
@@ -656,6 +682,7 @@ function DragonEventFormDialog({
   event,
   mutating,
   error,
+  errorAction,
   onClose,
   onSubmit
 }: {
@@ -664,6 +691,7 @@ function DragonEventFormDialog({
   event?: DragonEvent;
   mutating: boolean;
   error: string | null;
+  errorAction?: (() => void) | null;
   onClose: () => void;
   onSubmit: (payload: CreateBackendFamilyEventPayload) => void;
 }) {
@@ -674,7 +702,7 @@ function DragonEventFormDialog({
     category: event?.category === 'meeting' || event?.category === 'training' || event?.category === 'celebration' || event?.category === 'announcement' ? event.category : 'custom',
     startsAt: toDateTimeLocal(event?.startsAt) || '',
     endsAt: toDateTimeLocal(event?.endsAt ?? null) || '',
-    timezone: event?.timezone ?? 'Europe/Kiev',
+    timezone: event?.timezone ?? 'Europe/Kyiv',
     allDay: event?.allDay ?? false,
     locationLabel: event?.location.kind === 'none' ? '' : event?.location.label ?? '',
     organizerFamilyMemberId: event?.owner.backendMemberId ?? currentUser.id,
@@ -694,7 +722,7 @@ function DragonEventFormDialog({
       category: form.category,
       startsAt: fromDateTimeLocal(form.startsAt),
       endsAt: form.endsAt ? fromDateTimeLocal(form.endsAt) : null,
-      timezone: form.timezone || 'Europe/Kiev',
+      timezone: form.timezone || 'Europe/Kyiv',
       allDay: form.allDay,
       locationLabel: form.locationLabel || null,
       organizerFamilyMemberId: form.organizerFamilyMemberId || currentUser.id,
@@ -707,9 +735,14 @@ function DragonEventFormDialog({
   return (
     <DragonDialog title={title} onClose={onClose}>
       <form className="dh-event-form space-y-3" onSubmit={submit}>
-        {error ? <p role="alert">{error}</p> : null}
-        <DragonInput value={form.title} onChange={(input) => update({ title: input.currentTarget.value })} placeholder="Назва події" aria-label="Назва події" required />
-        <DragonTextarea value={form.description} onChange={(input) => update({ description: input.currentTarget.value })} placeholder="Опис події" aria-label="Опис події" />
+        {error ? <p role="alert" data-testid="event-conflict-message">{error}</p> : null}
+        {errorAction ? (
+          <DragonButton type="button" variant="secondary" data-testid="event-conflict-refresh" onClick={errorAction}>
+            Оновити дані
+          </DragonButton>
+        ) : null}
+        <DragonInput data-testid="event-form-title" value={form.title} onChange={(input) => update({ title: input.currentTarget.value })} placeholder="Назва події" aria-label="Назва події" required />
+        <DragonTextarea data-testid="event-form-description" value={form.description} onChange={(input) => update({ description: input.currentTarget.value })} placeholder="Опис події" aria-label="Опис події" />
         <div className="grid gap-3 md:grid-cols-2">
           <DragonSelect value={form.eventType} onChange={(input) => update({ eventType: input.currentTarget.value as DragonEventType })} aria-label="Тип події">
             {STANDALONE_EVENT_TYPES.map((type) => (
@@ -723,7 +756,7 @@ function DragonEventFormDialog({
           </DragonSelect>
           <DragonInput type="datetime-local" value={form.startsAt} onChange={(input) => update({ startsAt: input.currentTarget.value })} aria-label="Початок події" required />
           <DragonInput type="datetime-local" value={form.endsAt} onChange={(input) => update({ endsAt: input.currentTarget.value })} aria-label="Завершення події" />
-          <DragonInput value={form.timezone} onChange={(input) => update({ timezone: input.currentTarget.value })} placeholder="Europe/Kiev" aria-label="Часовий пояс" />
+          <DragonInput value={form.timezone} onChange={(input) => update({ timezone: input.currentTarget.value })} placeholder="Europe/Kyiv" aria-label="Часовий пояс" />
           <DragonInput value={form.locationLabel} onChange={(input) => update({ locationLabel: input.currentTarget.value })} placeholder="Локація" aria-label="Локація" />
           <DragonInput value={form.organizerFamilyMemberId} onChange={(input) => update({ organizerFamilyMemberId: input.currentTarget.value })} aria-label="ID організатора в сімʼї" />
           <DragonInput type="number" min="1" value={form.maxParticipants} onChange={(input) => update({ maxParticipants: input.currentTarget.value })} placeholder="Максимум учасників" aria-label="Максимум учасників" />
@@ -740,7 +773,7 @@ function DragonEventFormDialog({
         <DragonTextarea value={form.notes} onChange={(input) => update({ notes: input.currentTarget.value })} placeholder="Нотатки" aria-label="Нотатки події" />
         <div className="flex flex-wrap justify-end gap-2">
           <DragonButton type="button" variant="ghost" onClick={onClose} disabled={mutating}>Закрити</DragonButton>
-          <DragonButton type="submit" disabled={mutating || !form.title.trim() || !form.startsAt}>{mutating ? 'Зберігаємо...' : 'Зберегти'}</DragonButton>
+          <DragonButton type="submit" data-testid="event-form-save" disabled={mutating || !form.title.trim() || !form.startsAt}>{mutating ? 'Зберігаємо...' : 'Зберегти'}</DragonButton>
         </div>
       </form>
       {event?.backendEventId ? (

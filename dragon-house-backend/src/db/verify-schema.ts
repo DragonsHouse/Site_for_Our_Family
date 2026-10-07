@@ -40,6 +40,7 @@ const requiredTables = [
   'family_tower_defense_responses',
   'family_tower_defense_attendance',
   'family_fire_guard_roster',
+  'family_tower_cooldown_states',
   'family_events',
   'family_event_responses',
   'family_event_attendance',
@@ -214,6 +215,7 @@ async function runChecks() {
       name: 'family_audit_log.actor_family_member_id -> family_members.id',
       ok: await foreignKeyTargets(pool, 'family_audit_log', 'actor_family_member_id', 'family_members', 'id'),
     });
+    checks.push({ name: 'family_audit_log.actor_type column', ok: await columnExists(pool, 'family_audit_log', 'actor_type') });
     checks.push({ name: 'discord_sync_reports.id primary key', ok: await constraintExists(pool, 'discord_sync_reports', 'p', 'id') });
     checks.push({ name: 'discord_sync_reports.created_at index', ok: await indexExists(pool, 'idx_discord_sync_reports_created_at') });
     checks.push({ name: 'discord_sync_reports.idempotency_key column', ok: await columnExists(pool, 'discord_sync_reports', 'idempotency_key') });
@@ -237,6 +239,13 @@ async function runChecks() {
     checks.push({ name: 'family_quest_templates.id primary key', ok: await constraintExists(pool, 'family_quest_templates', 'p', 'id') });
     checks.push({ name: 'family_quest_templates.template_key unique', ok: await constraintExists(pool, 'family_quest_templates', 'u', 'template_key') });
     checks.push({ name: 'family_quests.id primary key', ok: await constraintExists(pool, 'family_quests', 'p', 'id') });
+    for (const [table, indexName] of [
+      ['family_quest_templates', 'idx_family_quest_templates_version'],
+      ['family_quests', 'idx_family_quests_version'],
+    ] as const) {
+      checks.push({ name: `${table}.version column`, ok: await columnExists(pool, table, 'version') });
+      checks.push({ name: `${indexName} exists`, ok: await indexExists(pool, indexName) });
+    }
     checks.push({
       name: 'family_quests.template_id -> family_quest_templates.id',
       ok: await foreignKeyTargets(pool, 'family_quests', 'template_id', 'family_quest_templates', 'id'),
@@ -416,7 +425,11 @@ async function runChecks() {
       name: 'family_treasury_entries.updated_by_family_member_id -> family_members.id',
       ok: await foreignKeyTargets(pool, 'family_treasury_entries', 'updated_by_family_member_id', 'family_members', 'id'),
     });
+    for (const column of ['price_amount', 'price_note', 'version']) {
+      checks.push({ name: `family_treasury_entries.${column} column`, ok: await columnExists(pool, 'family_treasury_entries', column) });
+    }
     checks.push({ name: 'idx_family_treasury_entries_active_category exists', ok: await indexExists(pool, 'idx_family_treasury_entries_active_category') });
+    checks.push({ name: 'idx_family_treasury_entries_version exists', ok: await indexExists(pool, 'idx_family_treasury_entries_version') });
     checks.push({ name: 'family_towers.id primary key', ok: await constraintExists(pool, 'family_towers', 'p', 'id') });
     checks.push({ name: 'family_towers.tower_code unique', ok: await constraintExists(pool, 'family_towers', 'u', 'tower_code') });
     checks.push({ name: 'family_tower_defenses.id primary key', ok: await constraintExists(pool, 'family_tower_defenses', 'p', 'id') });
@@ -452,6 +465,14 @@ async function runChecks() {
       name: 'family_fire_guard_roster.family_member_id -> family_members.id',
       ok: await foreignKeyTargets(pool, 'family_fire_guard_roster', 'family_member_id', 'family_members', 'id'),
     });
+    checks.push({ name: 'family_tower_cooldown_states.tower_id primary key', ok: await constraintExists(pool, 'family_tower_cooldown_states', 'p', 'tower_id') });
+    checks.push({
+      name: 'family_tower_cooldown_states.tower_id -> family_towers.id',
+      ok: await foreignKeyTargets(pool, 'family_tower_cooldown_states', 'tower_id', 'family_towers', 'id'),
+    });
+    for (const column of ['cooldown_at', 'cooldown_status', 'last_kd_reminder_at', 'last_kd_reminder_result', 'missing_condition_key']) {
+      checks.push({ name: `family_tower_cooldown_states.${column} column`, ok: await columnExists(pool, 'family_tower_cooldown_states', column) });
+    }
     for (const column of ['guild_id', 'channel_id', 'message_id', 'voice_channel_id', 'synced_at', 'external_source', 'external_id', 'sync_idempotency_key']) {
       checks.push({ name: `family_tower_defenses.${column} column`, ok: await columnExists(pool, 'family_tower_defenses', column) });
     }
@@ -465,6 +486,8 @@ async function runChecks() {
       'idx_family_tower_defense_responses_active_member',
       'idx_family_tower_defense_attendance_member',
       'idx_family_fire_guard_roster_member',
+      'idx_family_tower_cooldown_states_status',
+      'idx_family_tower_cooldown_states_reminder',
     ]) {
       checks.push({ name: `${indexName} exists`, ok: await indexExists(pool, indexName) });
     }
@@ -493,7 +516,7 @@ async function runChecks() {
       name: 'family_event_attendance.family_member_id -> family_members.id',
       ok: await foreignKeyTargets(pool, 'family_event_attendance', 'family_member_id', 'family_members', 'id'),
     });
-    for (const column of ['event_type', 'category', 'status', 'starts_at', 'ends_at', 'visibility', 'metadata']) {
+    for (const column of ['event_type', 'category', 'status', 'starts_at', 'ends_at', 'visibility', 'metadata', 'version']) {
       checks.push({ name: `family_events.${column} column`, ok: await columnExists(pool, 'family_events', column) });
     }
     for (const indexName of [
@@ -501,6 +524,7 @@ async function runChecks() {
       'idx_family_events_category_starts',
       'idx_family_events_type_starts',
       'idx_family_events_organizer_starts',
+      'idx_family_events_version',
       'idx_family_event_responses_event_member',
       'idx_family_event_responses_member',
       'idx_family_event_attendance_event_member',

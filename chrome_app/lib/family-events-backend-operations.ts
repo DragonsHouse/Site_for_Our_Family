@@ -28,7 +28,7 @@ export async function createFamilyEventFromBackend(payload: CreateBackendFamilyE
 }
 
 export async function updateFamilyEventFromBackend(event: DragonEvent, payload: UpdateBackendFamilyEventPayload): Promise<DragonEvent> {
-  return mapBackendFamilyEvent(await updateBackendFamilyEvent(requireBackendFamilyEventId(event), payload));
+  return mapBackendFamilyEvent(await updateBackendFamilyEvent(requireBackendFamilyEventId(event), { ...payload, expectedVersion: event.version ?? 1 }));
 }
 
 export async function respondFamilyEventFromBackend(event: DragonEvent, familyMemberId: string, response: FamilyEventResponseChoice): Promise<void> {

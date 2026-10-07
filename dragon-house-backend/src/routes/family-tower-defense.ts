@@ -92,6 +92,12 @@ const cancelSchema = z.object({
   reason: z.string().max(4000).nullable().optional(),
 }).strict();
 
+const updateCooldownSchema = z.object({
+  cooldownAt: z.string().datetime().nullable().optional(),
+  clear: z.boolean().optional(),
+  expectedUpdatedAt: z.string().datetime().nullable().optional(),
+}).strict();
+
 const allocationCreateSchema = z.object({
   familyMemberId: z.string().trim().min(1).max(160),
   rewardDefinitionId: uuidSchema,
@@ -118,6 +124,18 @@ export function createFamilyTowerDefenseRouter(
     if (!towerDefenseService || !request.familyAuth) return respondServiceUnavailable(response);
     try {
       response.json(await towerDefenseService.listTowers(request.familyAuth));
+    } catch (error) {
+      respondTowerDefenseError(response, error);
+    }
+  });
+
+  router.patch('/family/towers/:towerId/cooldown', async (request, response) => {
+    if (!towerDefenseService || !request.familyAuth) return respondServiceUnavailable(response);
+    const towerId = uuidSchema.safeParse(request.params.towerId);
+    const body = updateCooldownSchema.safeParse(request.body);
+    if (!towerId.success || !body.success) return respondValidation(response, 'Invalid tower KD update request.');
+    try {
+      response.json(await towerDefenseService.updateTowerCooldown(towerId.data, body.data, request.familyAuth));
     } catch (error) {
       respondTowerDefenseError(response, error);
     }

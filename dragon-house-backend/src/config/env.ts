@@ -18,11 +18,16 @@ const EnvSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error', 'silent']).default('info'),
   LOG_FORMAT: z.enum(['json', 'pretty']).optional(),
   TRUST_PROXY: EnvBoolean.default(false),
+  E2E_TEST_MODE: EnvBoolean.default(false),
+  E2E_DATABASE_NAME: z.string().trim().optional().default('dragon_house_e2e'),
   FRONTEND_EXTENSION_ID: z.string().trim().optional().default(''),
   FRONTEND_ALLOWED_ORIGINS: z.string().trim().optional().default(''),
   DISCORD_CLIENT_ID: z.string().trim().optional().default(''),
   DISCORD_CLIENT_SECRET: z.string().trim().optional().default(''),
   DISCORD_BOT_TOKEN: z.string().trim().optional().default(''),
+  DISCORD_TRUSTED_BOT_USER_ID: z.string().trim().optional().default(''),
+  DISCORD_TRUSTED_APPLICATION_ID: z.string().trim().optional().default(''),
+  DISCORD_TRUSTED_WEBHOOK_ID: z.string().trim().optional().default(''),
   DISCORD_REDIRECT_URI: z.string().trim().optional().default(''),
   DISCORD_OAUTH_REDIRECT_URI: z.string().trim().optional().default(''),
   DISCORD_OAUTH_SCOPES: z.string().trim().optional().default('identify'),
@@ -57,13 +62,15 @@ const EnvSchema = z.object({
   DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(6),
   DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(2),
   DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
-  DISCORD_SYNC_AUTO_ENABLED: EnvBoolean.default(true),
+  DISCORD_SYNC_AUTO_ENABLED: EnvBoolean.default(false),
   DISCORD_SYNC_AUTO_INTERVAL_SECONDS: z.coerce.number().int().min(60).max(86400).default(300),
   DISCORD_ORCHESTRATION_ENABLED: EnvBoolean.default(false),
   DISCORD_TOWER_SYNC_ENABLED: EnvBoolean.default(false),
   DISCORD_TOWER_SYNC_INTERVAL_SECONDS: z.coerce.number().int().min(30).max(86400).default(60),
   DISCORD_TOWER_SYNC_MESSAGE_LIMIT: z.coerce.number().int().min(1).max(500).default(100),
   DISCORD_TOWER_SYNC_ACTOR_MEMBER_ID: z.string().trim().optional().default(''),
+  DISCORD_TOWER_CAPTER_ROLE_ID: z.string().trim().optional().default(''),
+  DISCORD_TOWER_KD_REMINDER_INTERVAL_SECONDS: z.coerce.number().int().min(300).max(86400).default(3600),
 });
 
 export type AppEnv = z.infer<typeof EnvSchema>;
@@ -94,12 +101,17 @@ export type AppConfig = {
   logLevel: AppEnv['LOG_LEVEL'];
   logFormat: 'json' | 'pretty';
   trustProxy: boolean;
+  e2eTestMode: boolean;
+  e2eDatabaseName: string;
   frontendExtensionId: string | null;
   frontendAllowedOrigins: string[];
   discord: {
     clientId: string | null;
     clientSecret: string | null;
     botToken: string | null;
+    trustedBotUserId: string | null;
+    trustedApplicationId: string | null;
+    trustedWebhookId: string | null;
     redirectUri: string | null;
     oauthRedirectUri: string | null;
     oauthSuccessRedirectUri: string | null;
@@ -135,6 +147,8 @@ export type AppConfig = {
       intervalSeconds: number;
       messageLimit: number;
       actorMemberId: string | null;
+      capterRoleId: string | null;
+      kdReminderIntervalSeconds: number;
     };
     channels: DiscordChannelConfig;
   };
@@ -163,11 +177,16 @@ export function maskConfigForDiagnostics(env: AppEnv): Record<string, string | n
     LOG_LEVEL: env.LOG_LEVEL,
     LOG_FORMAT: env.LOG_FORMAT ?? null,
     TRUST_PROXY: String(env.TRUST_PROXY),
+    E2E_TEST_MODE: String(env.E2E_TEST_MODE),
+    E2E_DATABASE_NAME: nullable(env.E2E_DATABASE_NAME),
     FRONTEND_EXTENSION_ID: nullable(env.FRONTEND_EXTENSION_ID),
     FRONTEND_ALLOWED_ORIGINS: nullable(env.FRONTEND_ALLOWED_ORIGINS),
     DISCORD_CLIENT_ID: nullable(env.DISCORD_CLIENT_ID),
     DISCORD_CLIENT_SECRET: maskSensitiveValue(env.DISCORD_CLIENT_SECRET),
     DISCORD_BOT_TOKEN: maskSensitiveValue(env.DISCORD_BOT_TOKEN),
+    DISCORD_TRUSTED_BOT_USER_ID: nullable(env.DISCORD_TRUSTED_BOT_USER_ID),
+    DISCORD_TRUSTED_APPLICATION_ID: nullable(env.DISCORD_TRUSTED_APPLICATION_ID),
+    DISCORD_TRUSTED_WEBHOOK_ID: nullable(env.DISCORD_TRUSTED_WEBHOOK_ID),
     DISCORD_REDIRECT_URI: nullable(env.DISCORD_REDIRECT_URI),
     DISCORD_OAUTH_REDIRECT_URI: nullable(env.DISCORD_OAUTH_REDIRECT_URI),
     DISCORD_OAUTH_SCOPES: nullable(env.DISCORD_OAUTH_SCOPES),
@@ -209,6 +228,8 @@ export function maskConfigForDiagnostics(env: AppEnv): Record<string, string | n
     DISCORD_TOWER_SYNC_INTERVAL_SECONDS: env.DISCORD_TOWER_SYNC_INTERVAL_SECONDS,
     DISCORD_TOWER_SYNC_MESSAGE_LIMIT: env.DISCORD_TOWER_SYNC_MESSAGE_LIMIT,
     DISCORD_TOWER_SYNC_ACTOR_MEMBER_ID: nullable(env.DISCORD_TOWER_SYNC_ACTOR_MEMBER_ID),
+    DISCORD_TOWER_CAPTER_ROLE_ID: nullable(env.DISCORD_TOWER_CAPTER_ROLE_ID),
+    DISCORD_TOWER_KD_REMINDER_INTERVAL_SECONDS: env.DISCORD_TOWER_KD_REMINDER_INTERVAL_SECONDS,
   };
 }
 
@@ -236,12 +257,17 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     logLevel: env.LOG_LEVEL,
     logFormat: env.LOG_FORMAT ?? (env.NODE_ENV === 'production' ? 'json' : 'pretty'),
     trustProxy: env.TRUST_PROXY,
+    e2eTestMode: env.E2E_TEST_MODE,
+    e2eDatabaseName: env.E2E_DATABASE_NAME,
     frontendExtensionId: nullable(env.FRONTEND_EXTENSION_ID),
     frontendAllowedOrigins: csvList(env.FRONTEND_ALLOWED_ORIGINS),
     discord: {
       clientId: nullable(env.DISCORD_CLIENT_ID),
       clientSecret: nullable(env.DISCORD_CLIENT_SECRET),
       botToken: nullable(env.DISCORD_BOT_TOKEN),
+      trustedBotUserId: nullable(env.DISCORD_TRUSTED_BOT_USER_ID),
+      trustedApplicationId: nullable(env.DISCORD_TRUSTED_APPLICATION_ID),
+      trustedWebhookId: nullable(env.DISCORD_TRUSTED_WEBHOOK_ID),
       redirectUri: nullable(env.DISCORD_REDIRECT_URI),
       oauthRedirectUri: nullable(env.DISCORD_OAUTH_REDIRECT_URI) ?? nullable(env.DISCORD_REDIRECT_URI),
       oauthSuccessRedirectUri: nullable(env.DISCORD_OAUTH_SUCCESS_REDIRECT_URI),
@@ -277,6 +303,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
         intervalSeconds: env.DISCORD_TOWER_SYNC_INTERVAL_SECONDS,
         messageLimit: env.DISCORD_TOWER_SYNC_MESSAGE_LIMIT,
         actorMemberId: nullable(env.DISCORD_TOWER_SYNC_ACTOR_MEMBER_ID),
+        capterRoleId: nullable(env.DISCORD_TOWER_CAPTER_ROLE_ID),
+        kdReminderIntervalSeconds: env.DISCORD_TOWER_KD_REMINDER_INTERVAL_SECONDS,
       },
       channels: {
         welcome: nullable(env.DISCORD_WELCOME_CHANNEL_ID),

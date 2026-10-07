@@ -27,6 +27,7 @@ export type BackendFamilyEventAttendanceDto = {
 
 export type BackendFamilyEventDto = {
   id: string;
+  version: number;
   title: string;
   description: string;
   eventType: string;
@@ -125,6 +126,7 @@ export function assertBackendCalendarResponse(value: unknown): BackendFamilyCale
 function isBackendEventDto(value: unknown): value is BackendFamilyEventDto {
   return isRecord(value) &&
     isString(value.id) &&
+    isNumber(value.version) &&
     isString(value.title) &&
     isString(value.description) &&
     isString(value.eventType) &&

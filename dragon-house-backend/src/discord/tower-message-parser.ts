@@ -48,10 +48,10 @@ export function parseDiscordTowerGuardMessage(message: DiscordTowerMessageLike):
     messageEditedAt: message.editedAt,
     towerNumber,
     towerCode,
-    towerName: `Vishka No${towerNumber}`,
+    towerName: `Вишка №${towerNumber}`,
     protectionDown,
     cooldownNeedsUpdate,
-    cooldownAt: parseDiscordTimestamp(text),
+    cooldownAt: parseCooldownTimestamp(text),
     statusText: summarizeStatus(text, protectionDown, cooldownNeedsUpdate),
     rawText: text,
   };
@@ -80,7 +80,7 @@ function hasProtectionDown(text: string): boolean {
 }
 
 function hasCooldownUpdateHint(text: string): boolean {
-  return /(\u043e\u043d\u043e\u0432\u0438\u0442\u0438\s+cd|update\s+cd|update\s+cooldown|cooldown\s+update)/iu.test(text);
+  return /(\u043e\u043d\u043e\u0432\u0438\u0442\u0438\s+(?:cd|\u043a\u0434)|update\s+cd|update\s+cooldown|cooldown\s+update)/iu.test(text);
 }
 
 function looksLikeTowerGuardCard(text: string): boolean {
@@ -91,15 +91,15 @@ function looksLikeTowerOnlyCard(text: string): boolean {
   return /(?:\u0412\u0438\u0448\u043a\u0430|Vyshka|Vishka|Tower)\s*(?:No\.?|N[o0]?\.?|#|\u2116)\s*\d{1,4}/iu.test(text);
 }
 
-function parseDiscordTimestamp(text: string): string | null {
-  const match = text.match(/<t:(\d+):[a-z]>/iu);
+function parseCooldownTimestamp(text: string): string | null {
+  const match = text.match(/(?:кд|kd|cd|cooldown|відкат|перезарядка)[^\n\r<]{0,80}<t:(\d+):[a-z]>/iu);
   if (!match) return null;
   return new Date(Number(match[1]) * 1000).toISOString();
 }
 
 function summarizeStatus(text: string, protectionDown: boolean, cooldownNeedsUpdate: boolean): string {
-  if (protectionDown && cooldownNeedsUpdate) return 'Protection down; cooldown needs update after battle.';
-  if (protectionDown) return 'Protection down.';
-  if (cooldownNeedsUpdate) return 'Cooldown needs update.';
-  return text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? 'Tower guard update.';
+  if (protectionDown && cooldownNeedsUpdate) return 'Захист впав. Потрібно оновити КД.';
+  if (protectionDown) return 'Захист впав.';
+  if (cooldownNeedsUpdate) return 'Потрібно оновити КД.';
+  return text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? 'Оновлення стану вишки.';
 }

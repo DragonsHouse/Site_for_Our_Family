@@ -53,6 +53,7 @@ export type BackendQuestTemplateWriteInput = {
   imageAssetId?: string | null;
   isActive?: boolean;
   cooldownHours?: number;
+  expectedVersion?: number;
 };
 
 export type BackendQuestWriteInput = {
@@ -68,6 +69,7 @@ export type BackendQuestWriteInput = {
   familyReward?: number;
   rewardMode?: string;
   requiredItems?: string | null;
+  expectedVersion?: number;
 };
 
 export async function listBackendFamilyQuestTemplates(signal?: AbortSignal): Promise<{ items: BackendFamilyQuestTemplateDto[] }> {
@@ -100,9 +102,10 @@ export async function updateBackendFamilyQuestTemplate(templateId: string, input
   }));
 }
 
-export async function archiveBackendFamilyQuestTemplate(templateId: string): Promise<BackendFamilyQuestTemplateDto> {
+export async function archiveBackendFamilyQuestTemplate(templateId: string, expectedVersion: number): Promise<BackendFamilyQuestTemplateDto> {
   return parseBackendQuestTemplateResponse(await authenticatedFetch(`/api/family/quest-templates/${encodeURIComponent(templateId)}`, {
     method: 'DELETE',
+    body: JSON.stringify({ expectedVersion }),
   }));
 }
 

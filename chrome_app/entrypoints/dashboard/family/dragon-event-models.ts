@@ -128,6 +128,7 @@ export type DragonEventFutureMetadata = {
 };
 
 export type DragonEvent = DragonEntity & {
+  version?: number;
   backendEventId: string;
   title: string;
   description: string;

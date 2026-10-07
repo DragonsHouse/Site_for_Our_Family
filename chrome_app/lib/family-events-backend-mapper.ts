@@ -11,6 +11,7 @@ const EVENT_VISIBILITIES: DragonEventVisibility[] = ['public', 'members', 'leade
 export function mapBackendFamilyEvent(event: BackendFamilyEventDto): DragonEvent {
   return baseDragonEvent({
     id: event.id,
+    version: event.version,
     backendEventId: event.id,
     title: event.title,
     description: event.description,
@@ -97,7 +98,7 @@ export function mapBackendCalendarItem(item: BackendFamilyCalendarItemDto): Drag
     startsAt: item.startsAt,
     endsAt: item.endsAt,
     allDay: Boolean(item.metadata.allDay),
-    timezone: 'Europe/Kiev',
+    timezone: 'Europe/Kyiv',
     tags: [],
     xp: 0,
     createdAt: item.startsAt,

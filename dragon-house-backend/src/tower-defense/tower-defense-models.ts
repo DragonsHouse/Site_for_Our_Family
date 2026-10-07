@@ -19,8 +19,81 @@ export type TowerRecord = {
   externalSource: string | null;
   externalId: string | null;
   metadata: Record<string, unknown>;
+  cooldownState?: TowerCooldownStateRecord | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type TowerGuardImportSignal = {
+  externalId: string;
+  channelId: string;
+  authorId: string;
+  authorName: string;
+  messageCreatedAt: string;
+  messageEditedAt: string | null;
+  towerNumber: number;
+  towerCode: string;
+  towerName: string;
+  protectionDown: boolean;
+  cooldownNeedsUpdate: boolean;
+  cooldownAt: string | null;
+  statusText: string;
+  rawText?: string;
+};
+
+export type TowerGuardReconciliationConfidence = 'complete' | 'degraded';
+
+export type TowerGuardReconciliationResult = {
+  state: 'applied' | 'degraded';
+  processedCount: number;
+  closedStaleCount: number;
+  kdReminderCandidates: TowerKdReminderCandidate[];
+  warnings: string[];
+};
+
+export type TowerCooldownStatus = 'current' | 'stale' | 'missing';
+
+export type TowerCooldownStateRecord = {
+  towerId: string;
+  cooldownAt: string | null;
+  cooldownStatus: TowerCooldownStatus;
+  source: 'discord' | 'hub' | 'system';
+  sourceChannelId: string | null;
+  sourceMessageId: string | null;
+  sourceAuthorId: string | null;
+  missingConditionKey: string | null;
+  lastKdReminderAt: string | null;
+  lastKdReminderReason: string | null;
+  lastKdReminderResult: 'sent' | 'failed' | 'skipped' | null;
+  lastKdReminderError: string | null;
+  reminderCycleResolvedAt: string | null;
+  metadata: Record<string, unknown>;
+  updatedAt: string;
+};
+
+export type TowerKdReminderCandidate = {
+  towerId: string;
+  towerName: string;
+  towerCode: string;
+  reason: 'missing' | 'stale';
+  missingConditionKey: string;
+};
+
+export type TowerKdReminderDeliveryInput = {
+  towerId: string;
+  result: 'sent' | 'failed' | 'skipped';
+  reason: string;
+  error?: string | null;
+  now: string;
+};
+
+export type UpdateTowerCooldownInput = {
+  towerId: string;
+  cooldownAt: string | null;
+  clear: boolean;
+  expectedUpdatedAt: string | null;
+  actorFamilyMemberId: string;
+  now: string;
 };
 
 export type FireGuardRosterRecord = {
@@ -93,7 +166,7 @@ export type TowerDefenseRecord = {
   timezone: string;
   phase: string;
   wave: number;
-  commanderFamilyMemberId: string;
+  commanderFamilyMemberId: string | null;
   commanderDisplayName: string | null;
   createdByFamilyMemberId: string;
   minimumGuardCount: number;
@@ -148,7 +221,7 @@ export type CreateTowerDefenseInput = {
   timezone?: string;
   phase?: string;
   wave?: number;
-  commanderFamilyMemberId: string;
+  commanderFamilyMemberId?: string | null;
   minimumGuardCount: number;
   recommendedGuardCount: number;
   maximumGuardCount: number;
@@ -175,7 +248,7 @@ export type TowerDefenseCompletionOutput = {
   defenseId: string;
   eventProjectionKey: string;
   participantIds: string[];
-  commanderFamilyMemberId: string;
+  commanderFamilyMemberId: string | null;
   attendance: TowerDefenseAttendanceRecord[];
   result: TowerDefenseResult;
   xp: number;

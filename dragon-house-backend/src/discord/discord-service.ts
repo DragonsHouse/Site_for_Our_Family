@@ -25,7 +25,6 @@ const requiredChannelPermissions = [
   { name: 'SendMessages', flag: PermissionFlagsBits.SendMessages },
   { name: 'ReadMessageHistory', flag: PermissionFlagsBits.ReadMessageHistory },
   { name: 'EmbedLinks', flag: PermissionFlagsBits.EmbedLinks },
-  { name: 'AttachFiles', flag: PermissionFlagsBits.AttachFiles },
 ] as const;
 
 export type DiscordChannelAccessResult =
@@ -71,7 +70,7 @@ export class DiscordService implements DiscordMessageTransport {
       lastError: null,
     };
     this.client = new Client({
-      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMembers],
+      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMembers, GatewayIntentBits.MessageContent],
     });
   }
 
@@ -313,6 +312,7 @@ export class DiscordService implements DiscordMessageTransport {
     const messages = await fetchMessages(channel, Math.min(Math.max(limit, 1), 500));
     const byTower = new Map<number, ExternalTowerGuardSignal>();
     for (const message of messages.sort((left, right) => right.createdTimestamp - left.createdTimestamp)) {
+      if (!isTrustedDiscordSource(this.config, message)) continue;
       const parsed = parseDiscordTowerGuardMessage({
         id: message.id,
         channelId,
@@ -337,6 +337,7 @@ export class DiscordService implements DiscordMessageTransport {
     const messages = await fetchMessages(channel, limit);
     return messages
       .sort((left, right) => right.createdTimestamp - left.createdTimestamp)
+      .filter((message) => isTrustedDiscordSource(this.config, message))
       .map((message) => parseDiscordQuestMessage({
         id: message.id,
         channelId,
@@ -357,7 +358,7 @@ export class DiscordService implements DiscordMessageTransport {
   private async fetchParsedQuestAuditLog(channelId: string, limit: number): Promise<ExternalFamilyQuest[]> {
     const channel = await this.requireTextChannel(channelId);
     const messages = await fetchMessages(channel, limit);
-    return aggregateDiscordQuestAuditMessages(messages.map((message) => ({
+    return aggregateDiscordQuestAuditMessages(messages.filter((message) => isTrustedDiscordSource(this.config, message)).map((message) => ({
       id: message.id,
       channelId,
       authorId: message.author.id,
@@ -466,6 +467,21 @@ export class DiscordService implements DiscordMessageTransport {
   }
 }
 
+export function isTrustedDiscordSource(
+  config: Pick<AppConfig, 'discord'>,
+  message: { author: { id: string }; applicationId: string | null; webhookId: string | null },
+): boolean {
+  const trustedBotUserId = config.discord.trustedBotUserId;
+  const trustedApplicationId = config.discord.trustedApplicationId;
+  const trustedWebhookId = config.discord.trustedWebhookId;
+  if (!trustedBotUserId && !trustedApplicationId && !trustedWebhookId) return false;
+  return Boolean(
+    (trustedBotUserId && message.author.id === trustedBotUserId) ||
+      (trustedApplicationId && message.applicationId === trustedApplicationId) ||
+      (trustedWebhookId && message.webhookId === trustedWebhookId),
+  );
+}
+
 function waitForClientReady(client: Client): Promise<void> {
   if (client.isReady()) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -505,6 +521,7 @@ function toDiscordPayload(payload: DiscordMessagePayload) {
     content: payload.content,
     components: payload.components as never,
     embeds: payload.embeds as never,
+    allowedMentions: payload.allowedMentions,
   };
 }
 

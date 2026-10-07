@@ -413,6 +413,7 @@ function familyEvent(): FamilyEventRecord {
     cancelledByFamilyMemberId: null,
     cancelledAt: null,
     metadata: {},
+    version: 1,
     createdAt: '2026-08-08T12:00:00.000Z',
     updatedAt: '2026-08-11T12:00:00.000Z',
     responses: [{
@@ -467,6 +468,7 @@ function quest(): FamilyQuestRecord {
     paidAt: '2026-08-12T12:00:00.000Z',
     paidByFamilyMemberId: ownerId,
     metadata: {},
+    version: 1,
     createdAt: '2026-08-09T09:00:00.000Z',
     updatedAt: '2026-08-09T13:00:00.000Z',
     people: [

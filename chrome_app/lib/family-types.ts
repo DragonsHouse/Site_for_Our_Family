@@ -285,6 +285,7 @@ export type FamilyQuestTemplate = {
   backendTemplateId?: string | null;
   backendQuestId?: string | null;
   backendCategory?: string | null;
+  version?: number;
   title: string;
   category: FamilyQuestCategory;
   recommendedTeamSize: number;
@@ -577,6 +578,7 @@ export type FamilyQuest = FamilyDiscordQuestFields & FamilySyncMetadata & {
   backendQuestId?: string | null;
   backendTemplateId?: string | null;
   backendCategory?: string | null;
+  version?: number;
   bestParticipantFamilyMemberId?: string | null;
   bestParticipantReason?: string | null;
   templateId: string | null;
@@ -797,11 +799,14 @@ export type FamilyEconomyEntry = {
   locationReference?: string | null;
   description: string;
   price: string | null;
+  priceAmount?: number | null;
+  priceNote?: string | null;
   note: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
+  version?: number;
 };
 
 export type RecruitmentSettings = {

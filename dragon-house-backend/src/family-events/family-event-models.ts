@@ -76,6 +76,7 @@ export type FamilyEventRecord = {
   cancelledByFamilyMemberId: string | null;
   cancelledAt: string | null;
   metadata: Record<string, unknown>;
+  version: number;
   createdAt: string;
   updatedAt: string;
   responses: FamilyEventResponseRecord[];
@@ -114,6 +115,7 @@ export type CreateFamilyEventInput = {
 
 export type UpdateFamilyEventInput = Partial<Omit<CreateFamilyEventInput, 'status'>> & {
   status?: FamilyEventStatus;
+  expectedVersion?: number;
 };
 
 export type FamilyEventCompletionOutput = {

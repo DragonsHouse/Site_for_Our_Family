@@ -247,10 +247,16 @@ function parseRewardLines(text: string): ParsedRewardLine[] {
       discordUserId: mention.discordUserId,
       amount,
       rewardPercent: parsePercent(line),
-      status: /видано|виплачено|paid/i.test(line) ? 'paid' : /не\s*видано|unpaid/i.test(line) ? 'unpaid' : 'pending',
+      status: parseRewardPayoutStatus(line),
     });
   }
   return rewards;
+}
+
+function parseRewardPayoutStatus(value: string): ParsedRewardLine['status'] {
+  if (/(?:не|РЅРµ)\s*(?:видано|виплачено|РІРёРґР°РЅРѕ|РІРёРїР»Р°С‡РµРЅРѕ)|unpaid|not\s+paid/i.test(value)) return 'unpaid';
+  if (/(?:^|[\s·.,;:])(?:видано|виплачено|РІРёРґР°РЅРѕ|РІРёРїР»Р°С‡РµРЅРѕ|paid)(?:$|[\s·.,;:])/i.test(value)) return 'paid';
+  return 'pending';
 }
 
 function parseBank(text: string): { totalReward: number | null; paidReward: number | null; remainingReward: number | null } {
@@ -265,14 +271,23 @@ function parseBank(text: string): { totalReward: number | null; paidReward: numb
 
 function activeUsers(events: QuestAuditEvent[], role: 'participant' | 'helper'): Array<{ displayName: string; discordUserId: string | null }> {
   const users = new Set<string>();
+  const removedUsers = new Set<string>();
   for (const event of events) {
     if (!event.userDiscordId) continue;
-    if (event.action === `quest.${role}.add`) users.add(event.userDiscordId);
-    if (event.action === `quest.${role}.remove`) users.delete(event.userDiscordId);
+    if (event.action === `quest.${role}.add`) {
+      users.add(event.userDiscordId);
+      removedUsers.delete(event.userDiscordId);
+    }
+    if (event.action === `quest.${role}.remove`) {
+      users.delete(event.userDiscordId);
+      removedUsers.add(event.userDiscordId);
+    }
   }
   if (role === 'participant') {
     for (const event of events) {
-      if (event.action === 'quest.reward.add' && event.recipientDiscordUserId && !users.size) users.add(event.recipientDiscordUserId);
+      if (event.action === 'quest.reward.add' && event.recipientDiscordUserId && !removedUsers.has(event.recipientDiscordUserId)) {
+        users.add(event.recipientDiscordUserId);
+      }
     }
   }
   return [...users].map((discordUserId) => ({ displayName: mentionDisplayName(discordUserId), discordUserId }));
@@ -324,10 +339,56 @@ function parseUkrainianDateTime(value: string): string | null {
   if (!match) return null;
   const month = ukrainianMonths[match[2].toLowerCase()];
   if (!month) return null;
-  const day = match[1].padStart(2, '0');
-  const hour = (match[4] ?? '00').padStart(2, '0');
-  const minute = (match[5] ?? '00').padStart(2, '0');
-  return `${match[3]}-${month}-${day}T${hour}:${minute}:00+03:00`;
+  return zonedLocalDateTimeToIso(
+    Number(match[3]),
+    Number(month),
+    Number(match[1]),
+    Number(match[4] ?? '00'),
+    Number(match[5] ?? '00'),
+    'Europe/Kyiv',
+  );
+}
+
+function zonedLocalDateTimeToIso(year: number, month: number, day: number, hour: number, minute: number, timeZone: string): string | null {
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const firstOffset = timeZoneOffsetMinutes(new Date(utcGuess), timeZone);
+  const firstPass = new Date(utcGuess - firstOffset * 60_000);
+  const offset = timeZoneOffsetMinutes(firstPass, timeZone);
+  const instant = new Date(utcGuess - offset * 60_000);
+  const wall = formatZonedParts(instant, timeZone);
+  if (wall.year !== year || wall.month !== month || wall.day !== day || wall.hour !== hour || wall.minute !== minute) return null;
+  const sign = offset >= 0 ? '+' : '-';
+  const absolute = Math.abs(offset);
+  const offsetText = `${sign}${String(Math.trunc(absolute / 60)).padStart(2, '0')}:${String(absolute % 60).padStart(2, '0')}`;
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00${offsetText}`;
+}
+
+function timeZoneOffsetMinutes(date: Date, timeZone: string): number {
+  const parts = formatZonedParts(date, timeZone);
+  const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return Math.round((asUtc - date.getTime()) / 60_000);
+}
+
+function formatZonedParts(date: Date, timeZone: string): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
 }
 
 function sectionAfterLabel(text: string, label: string): string | null {

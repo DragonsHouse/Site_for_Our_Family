@@ -110,6 +110,17 @@ describe('DiscordOrchestrationService', () => {
     expect(transport.edited[0]).toMatchObject({ messageId: 'message-1' });
   });
 
+  it('publishes Tower Defense without a mass DM blast', async () => {
+    const transport = fakeTransport();
+    const { service } = await buildService({ transport });
+    const auth = { familyMemberId: memberId, role: 'member' as const, rank: 4, status: 'active' as const, permissions: [] };
+
+    await service.publishTowerDefense('00000000-0000-4000-8000-000000000002', channelId, auth);
+
+    expect(transport.sent).toHaveLength(1);
+    expect(transport.sendDirectMessageToGuildMembers).not.toHaveBeenCalled();
+  });
+
   it('keeps a successful domain mutation when automatic Discord sync fails and exposes retry state', async () => {
     const { service, repository, towerDefenseService } = await buildService({ transport: null });
     const defenseId = '00000000-0000-4000-8000-000000000002';
@@ -228,7 +239,7 @@ describe('DiscordOrchestrationService', () => {
 
     expect(me.ok).toBe(true);
     expect(me.content).toContain('Aten Rhoads');
-    expect(me.content).toContain('Discord привʼязано');
+    expect(me.content).toContain('Акаунт: привʼязано');
   });
 
   it('routes Quest slash command actions through the Quest domain service', async () => {
@@ -349,7 +360,12 @@ function fakeQuestService() {
       startsAt: '2026-08-13T10:00:00.000Z',
       participants: [],
       helpers: [],
+      totalReward: 700000,
       memberRewardPool: 700000,
+      familyReward: 0,
+      requiredItems: null,
+      paidAt: null,
+      payouts: [],
     })),
   };
 }
@@ -373,6 +389,8 @@ function fakeTowerDefenseService() {
       confirmedCount: 0,
       presentCount: 0,
       minimumGuardCount: 2,
+      responses: [],
+      metadata: {},
     })),
   };
 }
@@ -401,6 +419,7 @@ function fakeFamilyEventService() {
 type FakeTransport = DiscordMessageTransport & {
   sent: Array<{ channelId: string; payload: DiscordMessagePayload }>;
   edited: Array<{ channelId: string; messageId: string; payload: DiscordMessagePayload }>;
+  sendDirectMessageToGuildMembers: ReturnType<typeof vi.fn>;
   failEdit?: boolean;
 };
 
@@ -418,6 +437,7 @@ function fakeTransport(options: { failEdit?: boolean } = {}): FakeTransport {
       if (this.failEdit) throw new Error('Unknown Message');
       return { messageId };
     },
+    sendDirectMessageToGuildMembers: vi.fn(),
   };
   return transport;
 }

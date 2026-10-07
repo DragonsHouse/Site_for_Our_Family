@@ -143,6 +143,7 @@ export function FamilyPanel({
           <button
             key={item.key}
             type="button"
+            data-testid={`family-section-${item.key}`}
             onClick={() => setSection(item.key)}
             className={
               section === item.key

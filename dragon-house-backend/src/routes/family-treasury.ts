@@ -15,11 +15,18 @@ const entryWriteSchema = z.object({
   locationReference: z.string().trim().max(240).nullable().optional(),
   description: z.string().trim().max(2000).optional(),
   price: z.string().trim().max(240).nullable().optional(),
+  priceAmount: z.number().min(0).max(999_999_999_999).nullable().optional(),
+  priceNote: z.string().trim().max(500).nullable().optional(),
   note: z.string().trim().max(1000).nullable().optional(),
 }).strict();
-const entryPatchSchema = entryWriteSchema.partial().refine((value) => Object.keys(value).length > 0, {
+const entryPatchSchema = entryWriteSchema.partial().extend({
+  expectedVersion: z.number().int().positive(),
+}).refine((value) => Object.keys(value).length > 1, {
   message: 'At least one field is required.',
 });
+const archiveSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+}).strict();
 
 export function createFamilyTreasuryRouter(
   config: AppConfig,
@@ -65,9 +72,10 @@ export function createFamilyTreasuryRouter(
   router.delete('/family/treasury/entries/:entryId', async (request, response) => {
     if (!treasuryService || !request.familyAuth) return respondServiceUnavailable(response);
     const entryId = entryIdSchema.safeParse(request.params.entryId);
-    if (!entryId.success) return respondValidation(response, 'Invalid treasury entry id.');
+    const body = archiveSchema.safeParse(request.body);
+    if (!entryId.success || !body.success) return respondValidation(response, 'Invalid treasury archive request.');
     try {
-      response.json(await treasuryService.archiveEntry(entryId.data, request.familyAuth));
+      response.json(await treasuryService.archiveEntry(entryId.data, body.data.expectedVersion, request.familyAuth));
     } catch (error) {
       respondTreasuryError(response, error);
     }
@@ -102,8 +110,8 @@ function respondTreasuryError(response: import('express').Response, error: unkno
     return;
   }
   response.status(500).json({
-    code: 'VALIDATION_ERROR',
-    message: FAMILY_TREASURY_ERROR_MESSAGES.VALIDATION_ERROR,
+    code: 'INTERNAL_ERROR',
+    message: 'Скарбниця тимчасово не може виконати дію.',
     details: {},
   });
 }

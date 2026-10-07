@@ -54,6 +54,26 @@ describe('env config', () => {
     expect(config.trustProxy).toBe(false);
   });
 
+  it('keeps destructive Discord member auto-sync opt-in by default', () => {
+    const config = loadConfig({ NODE_ENV: 'test', PORT: '8787' });
+
+    expect(config.discord.sync.autoEnabled).toBe(false);
+  });
+
+  it('parses trusted Discord ingestion identities without hardcoding them', () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      PORT: '8787',
+      DISCORD_TRUSTED_BOT_USER_ID: 'bot-1',
+      DISCORD_TRUSTED_APPLICATION_ID: 'app-1',
+      DISCORD_TRUSTED_WEBHOOK_ID: 'webhook-1',
+    });
+
+    expect(config.discord.trustedBotUserId).toBe('bot-1');
+    expect(config.discord.trustedApplicationId).toBe('app-1');
+    expect(config.discord.trustedWebhookId).toBe('webhook-1');
+  });
+
   it('fails production validation when sync safety configuration is missing', () => {
     const config = loadConfig({ NODE_ENV: 'production', PORT: '8787' });
 

@@ -72,9 +72,12 @@ type BackendPayoutFeedback = {
 type OperationMessage = {
   tone: 'success' | 'error' | 'info';
   text: string;
+  actionLabel?: string;
+  onAction?: () => void;
 };
 
 const BACKEND_WRITE_ERROR_MESSAGE = 'Не вдалося зберегти зміни квесту.';
+const QUEST_CONFLICT_MESSAGE = 'Цей квест уже змінив інший користувач. Оновіть дані й повторіть зміни.';
 
 const STATUS_LABELS: Record<FamilyQuestStatus, string> = {
   draft: 'Чернетка',
@@ -237,7 +240,7 @@ function QuestEditor({
   categories: FamilyQuestCategory[];
   currentUser: FamilyUser;
   onClose: () => void;
-  onSave: (template: FamilyQuestTemplate) => void;
+  onSave: (template: FamilyQuestTemplate) => void | Promise<void>;
 }) {
   const now = new Date().toISOString();
   const fallbackCategory = categories[0] ?? ('Бізнес' as FamilyQuestCategory);
@@ -284,7 +287,7 @@ function QuestEditor({
       return;
     }
     setEditorError(null);
-    onSave({
+    void onSave({
       ...draft,
       title: draft.title.trim() || 'Новий сімейний квест',
       rewardAmount: draft.memberRewardPool,
@@ -305,7 +308,7 @@ function QuestEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
-      <section className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/10 bg-[#111111] p-5 shadow-2xl shadow-red-950/40">
+      <section data-testid="quest-editor" className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/10 bg-[#111111] p-5 shadow-2xl shadow-red-950/40">
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Керування квестом</p>
@@ -319,7 +322,7 @@ function QuestEditor({
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <label className="block text-sm text-slate-300">
             Назва
-            <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
+            <input data-testid="quest-editor-title" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300">
             Слот зображення
@@ -382,11 +385,11 @@ function QuestEditor({
           </label>
           <label className="block text-sm text-slate-300">
             Про квест
-            <textarea value={draft.hint ?? ''} onChange={(event) => setDraft({ ...draft, hint: event.target.value })} rows={3} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
+            <textarea data-testid="quest-editor-description" value={draft.hint ?? ''} onChange={(event) => setDraft({ ...draft, hint: event.target.value })} rows={3} className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300">
             Дата й час
-            <input value={draft.route ?? ''} onChange={(event) => setDraft({ ...draft, route: event.target.value })} placeholder="Можна вказати дату/час або маршрут" className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
+            <input data-testid="quest-editor-route" value={draft.route ?? ''} onChange={(event) => setDraft({ ...draft, route: event.target.value })} placeholder="Можна вказати дату/час або маршрут" className="mt-1 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-slate-100" />
           </label>
           <label className="block text-sm text-slate-300 lg:col-span-2">
             Предмети / вимоги
@@ -404,7 +407,7 @@ function QuestEditor({
           <button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200">
             Скасувати
           </button>
-          <button type="button" onClick={save} className="dh-fire-button rounded-xl px-4 py-2 text-sm font-semibold text-white">
+          <button type="button" data-testid="quest-editor-save" onClick={save} className="dh-fire-button rounded-xl px-4 py-2 text-sm font-semibold text-white">
             Зберегти
           </button>
         </div>
@@ -710,7 +713,7 @@ function ManagerPanel({
         <button type="button" onClick={() => onState(quest.id, 'stopped')} className="rounded-xl border border-red-500/40 px-3 py-2 text-sm text-red-100">Зупинити</button>
         <button type="button" onClick={() => onState(quest.id, 'stopped', window.prompt('Коментар зупинки', '') ?? null)} className="rounded-xl border border-red-500/40 px-3 py-2 text-sm text-red-100">Зупинити з коментарем</button>
         <button type="button" onClick={() => onState(quest.id, 'completed')} className="rounded-xl border border-red-500/40 px-3 py-2 text-sm text-red-100">Завершити</button>
-        <button type="button" onClick={() => onEditQuest(quest)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Редагувати</button>
+        <button type="button" data-testid="quest-edit" onClick={() => onEditQuest(quest)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Редагувати</button>
         <button type="button" onClick={changeTime} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Змінити дату й час</button>
         <button type="button" onClick={() => onReminder(quest)} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Нагадати</button>
         <button type="button" onClick={() => onShowMessage(`Учасники:\n${quest.participants.map((item) => item.userId).join('\n') || '-'}`)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Переглянути учасників</button>
@@ -780,7 +783,12 @@ function QuestCard({
   const totalPeople = quest ? getFamilyQuestPeople(quest).length : 0;
 
   return (
-    <article className={`dh-quest-card relative overflow-hidden rounded-3xl p-4 ${template.isActive ? '' : 'opacity-65'}`}>
+    <article
+      className={`dh-quest-card relative overflow-hidden rounded-3xl p-4 ${template.isActive ? '' : 'opacity-65'}`}
+      data-testid="quest-card"
+      data-template-id={template.id}
+      data-quest-id={quest?.id ?? ''}
+    >
       <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
         <QuestImage template={template} />
         <div className="space-y-4">
@@ -829,8 +837,8 @@ function QuestCard({
               </>
             ) : null}
             <button type="button" onClick={() => onShowMessage(`${template.title}\n\n${template.hint ?? template.steps.join('\n')}\n\nМаршрут: ${template.route ?? '-'}\nПредмети: ${template.requiredItems ?? template.items ?? '-'}`)} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200">Про квест</button>
-            {canManage ? <button type="button" onClick={() => onEditTemplate(template)} className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200">Шаблон</button> : null}
-            {canManage ? <button type="button" onClick={() => onDeleteTemplate(template.id)} className="rounded-xl border border-red-500/40 px-4 py-2 text-sm text-red-100">Видалити</button> : null}
+            {canManage ? <button type="button" data-testid="quest-template-edit" onClick={() => onEditTemplate(template)} className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200">Шаблон</button> : null}
+            {canManage ? <button type="button" data-testid="quest-template-archive" onClick={() => onDeleteTemplate(template.id)} className="rounded-xl border border-red-500/40 px-4 py-2 text-sm text-red-100">Видалити</button> : null}
           </div>
 
           {report ? (
@@ -950,12 +958,23 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     return template?.source === 'backend';
   }
 
-  function showOperationMessage(text: string, tone: OperationMessage['tone'] = 'info') {
-    setOperationMessage({ text, tone });
+  function showOperationMessage(text: string, tone: OperationMessage['tone'] = 'info', action?: Pick<OperationMessage, 'actionLabel' | 'onAction'>) {
+    setOperationMessage({ text, tone, ...action });
   }
 
   function showBackendWriteError(error: unknown) {
+    if (isQuestConflict(error)) {
+      setCreating(false);
+      setEditingTemplate(null);
+      setEditingQuest(null);
+      showOperationMessage(QUEST_CONFLICT_MESSAGE, 'error', { actionLabel: 'Оновити дані', onAction: () => void reloadBackendQuests() });
+      return;
+    }
     showOperationMessage(error instanceof Error ? error.message : BACKEND_WRITE_ERROR_MESSAGE, 'error');
+  }
+
+  function isQuestConflict(error: unknown): boolean {
+    return error instanceof FamilyQuestPayoutApiError && error.status === 409;
   }
 
   function startCreatingTemplate() {
@@ -987,9 +1006,10 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
         isActive: template.isActive,
         cooldownHours: template.cooldownHours ?? 24,
       };
+      const payloadWithVersion = isBackendTemplate(template) ? { ...payload, expectedVersion: template.version ?? 1 } : payload;
       try {
         const saved = isBackendTemplate(template)
-          ? await updateBackendFamilyQuestTemplate(template.id, payload)
+          ? await updateBackendFamilyQuestTemplate(template.id, payloadWithVersion)
           : await createBackendFamilyQuestTemplate(payload);
         setTemplates((current) => {
           const mapped = mapBackendQuestTemplate(saved);
@@ -1014,7 +1034,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     if (!window.confirm('Архівувати цей шаблон квесту?')) return;
     if (questReadSource === 'backend' || isBackendTemplate(template)) {
       try {
-        await archiveBackendFamilyQuestTemplate(templateId);
+        await archiveBackendFamilyQuestTemplate(templateId, template?.version ?? 1);
         await reloadBackendQuests();
       } catch (error) {
         showBackendWriteError(error);
@@ -1053,7 +1073,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     persistQuests([buildQuestFromTemplate(template, currentUser), ...quests]);
   }
 
-  async function updateQuest(nextQuest: FamilyQuest) {
+  async function updateQuest(nextQuest: FamilyQuest): Promise<boolean> {
     if (questReadSource === 'backend' || isBackendQuest(nextQuest)) {
       try {
         const updated = await updateBackendFamilyQuest(nextQuest.id, {
@@ -1067,18 +1087,21 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
           familyReward: nextQuest.familyReward ?? nextQuest.familyBankShare ?? 0,
           rewardMode: nextQuest.rewardMode ?? nextQuest.splitMode,
           requiredItems: nextQuest.requiredItems ?? nextQuest.items ?? null,
+          expectedVersion: nextQuest.version ?? 1,
         });
         persistBackendQuestUpdate(mapBackendQuest(updated));
         await reloadBackendQuests();
+        return true;
       } catch (error) {
         showBackendWriteError(error);
+        return false;
       }
-      return;
     }
     const planned = applyQuestRewardPlan(nextQuest);
     persistQuests(quests.some((quest) => quest.id === planned.id) ? quests.map((quest) => (quest.id === planned.id ? planned : quest)) : [planned, ...quests]);
     if (rewardQuest?.id === planned.id) setRewardQuest(planned);
     if (editingQuest?.id === planned.id) setEditingQuest(planned);
+    return true;
   }
 
   function persistBackendQuestUpdate(nextQuest: FamilyQuest) {
@@ -1104,7 +1127,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
       try {
         const updated = status === 'completed'
           ? await completeBackendFamilyQuest(questId, comment)
-          : await updateBackendFamilyQuest(questId, { status });
+          : await updateBackendFamilyQuest(questId, { status, expectedVersion: quest.version ?? 1 });
         persistBackendQuestUpdate(mapBackendQuest(updated));
         await reloadBackendQuests();
       } catch (error) {
@@ -1392,9 +1415,15 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
             }
             role="status"
             aria-live="polite"
+            data-testid="quest-operation-message"
           >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <span>{operationMessage.text}</span>
+              {operationMessage.onAction ? (
+                <button type="button" data-testid="quest-conflict-refresh" onClick={operationMessage.onAction} className="self-start rounded-lg border border-amber-200/40 px-2 py-1 text-xs font-semibold text-amber-50">
+                  {operationMessage.actionLabel ?? 'Оновити дані'}
+                </button>
+              ) : null}
               <button type="button" onClick={() => setOperationMessage(null)} className="self-start rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-200">
                 Закрити
               </button>
@@ -1470,8 +1499,8 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
           categories={categories}
           currentUser={currentUser}
           onClose={() => setEditingQuest(null)}
-          onSave={(template) => {
-            updateQuest({
+          onSave={async (template) => {
+            const saved = await updateQuest({
               ...editingQuest,
               title: template.title,
               description: template.hint ?? editingQuest.description,
@@ -1493,7 +1522,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
               cooldownHours: template.cooldownHours,
               updatedAt: new Date().toISOString()
             });
-            setEditingQuest(null);
+            if (saved) setEditingQuest(null);
           }}
         />
       ) : null}

@@ -6,7 +6,11 @@ import type {
   TowerDefenseListQuery,
   TowerDefenseRecord,
   TowerDefenseResponseRecord,
+  TowerKdReminderCandidate,
+  TowerKdReminderDeliveryInput,
+  TowerGuardImportSignal,
   TowerRecord,
+  UpdateTowerCooldownInput,
   UpdateTowerDefenseInput,
 } from './tower-defense-models.js';
 
@@ -51,6 +55,15 @@ export interface TowerDefenseRepository {
   removeResponse(defenseId: string, familyMemberId: string, now: string): Promise<TowerDefenseResponseRecord>;
   upsertAttendance(input: UpsertDefenseAttendanceInput): Promise<TowerDefenseAttendanceRecord>;
   listFireGuardRoster(): Promise<FireGuardRosterRecord[]>;
+  reconcileExternalTowerGuardSignals?(input: {
+    signals: TowerGuardImportSignal[];
+    systemActorFamilyMemberId: string;
+    closeStale: boolean;
+    kdReminderIntervalSeconds: number;
+    now: string;
+  }): Promise<{ processedCount: number; closedStaleCount: number; kdReminderCandidates: TowerKdReminderCandidate[] }>;
+  recordTowerKdReminderDelivery?(input: TowerKdReminderDeliveryInput): Promise<void>;
+  updateTowerCooldownState?(input: UpdateTowerCooldownInput): Promise<TowerRecord | null>;
 }
 
 export class MemoryTowerDefenseRepository implements TowerDefenseRepository {
@@ -94,10 +107,10 @@ export class MemoryTowerDefenseRepository implements TowerDefenseRepository {
       scheduledAt: input.scheduledAt ?? null,
       startsAt: input.startsAt,
       endedAt: input.endedAt ?? null,
-      timezone: input.timezone ?? 'Europe/Kiev',
+      timezone: input.timezone ?? 'Europe/Kyiv',
       phase: input.phase ?? 'planning',
       wave: input.wave ?? 1,
-      commanderFamilyMemberId: input.commanderFamilyMemberId,
+      commanderFamilyMemberId: input.commanderFamilyMemberId ?? null,
       commanderDisplayName: null,
       createdByFamilyMemberId: input.createdByFamilyMemberId,
       minimumGuardCount: input.minimumGuardCount,
@@ -241,6 +254,192 @@ export class MemoryTowerDefenseRepository implements TowerDefenseRepository {
 
   async listFireGuardRoster(): Promise<FireGuardRosterRecord[]> {
     return [...this.roster].sort((left, right) => left.role.localeCompare(right.role) || left.displayName.localeCompare(right.displayName));
+  }
+
+  async reconcileExternalTowerGuardSignals(input: {
+    signals: TowerGuardImportSignal[];
+    systemActorFamilyMemberId: string;
+    closeStale: boolean;
+    kdReminderIntervalSeconds: number;
+    now: string;
+  }): Promise<{ processedCount: number; closedStaleCount: number; kdReminderCandidates: TowerKdReminderCandidate[] }> {
+    const kdReminderCandidates: TowerKdReminderCandidate[] = [];
+    for (const signal of input.signals) {
+      let tower = this.towers.find((item) => item.towerCode === signal.towerCode);
+      if (!tower) {
+        tower = {
+          id: randomUUID(),
+          towerCode: signal.towerCode,
+          name: signal.towerName,
+          locationLabel: signal.towerName,
+          mapMetadata: {},
+          imageAssetId: null,
+          iconAssetId: null,
+          isActive: true,
+          externalSource: 'discord_tower_guard',
+          externalId: String(signal.towerNumber),
+          metadata: { source: 'discord_tower_guard', towerNumber: signal.towerNumber },
+          createdAt: input.now,
+          updatedAt: input.now,
+        };
+        this.towers.push(tower);
+      }
+      const externalId = `tower:${signal.towerNumber}`;
+      const existing = this.defenses.find((item) => item.externalSource === 'discord_tower_guard' && item.externalId === externalId);
+      const status = signal.protectionDown ? 'active' : 'gathering';
+      const metadata = {
+        ...(existing?.metadata ?? {}),
+        source: 'discord_tower_guard',
+        sourceMessageId: signal.externalId,
+        sourceChannelId: signal.channelId,
+        sourceAuthorId: signal.authorId,
+        parserVersion: 1,
+        importedAt: existing?.metadata.importedAt ?? input.now,
+        lastSeenAt: input.now,
+        towerNumber: signal.towerNumber,
+        protectionDown: signal.protectionDown,
+        cooldownNeedsUpdate: signal.cooldownNeedsUpdate,
+        cooldownAt: signal.cooldownAt,
+        statusText: signal.statusText,
+        lastDiscordMessageAt: signal.messageEditedAt ?? signal.messageCreatedAt,
+      };
+      if (existing) {
+        Object.assign(existing, {
+          tower,
+          title: `Оборона ${signal.towerName}`,
+          description: signal.statusText,
+          status,
+          priority: signal.protectionDown ? 'critical' : 'high',
+          phase: signal.protectionDown ? 'combat' : 'signal',
+          discord: { ...existing.discord, channelId: signal.channelId, messageId: signal.externalId, syncedAt: input.now },
+          metadata,
+          updatedAt: input.now,
+        });
+      } else {
+        this.defenses.push({
+          id: randomUUID(),
+          tower,
+          title: `Оборона ${signal.towerName}`,
+          description: signal.statusText,
+          status,
+          priority: signal.protectionDown ? 'critical' : 'high',
+          scheduledAt: null,
+          startsAt: signal.messageCreatedAt,
+          endedAt: null,
+          timezone: 'Europe/Kyiv',
+          phase: signal.protectionDown ? 'combat' : 'signal',
+          wave: 1,
+          commanderFamilyMemberId: null,
+          commanderDisplayName: null,
+          createdByFamilyMemberId: input.systemActorFamilyMemberId,
+          minimumGuardCount: 1,
+          recommendedGuardCount: 1,
+          maximumGuardCount: 3,
+          result: 'pending',
+          score: null,
+          notes: null,
+          failureReason: null,
+          completedByFamilyMemberId: null,
+          completedAt: null,
+          xp: 0,
+          leaderboardEligible: true,
+          statisticsEligible: true,
+          discord: { guildId: null, channelId: signal.channelId, messageId: signal.externalId, voiceChannelId: null, syncedAt: input.now },
+          externalSource: 'discord_tower_guard',
+          externalId,
+          syncIdempotencyKey: `discord-tower-guard:${externalId}`,
+          eventProjectionKey: `tower-defense:discord:${externalId}`,
+          metadata,
+          createdAt: input.now,
+          updatedAt: input.now,
+          responses: [],
+          attendance: [],
+        });
+      }
+      const cooldownAt = signal.cooldownAt ? Date.parse(signal.cooldownAt) : NaN;
+      const cooldownStatus = !signal.cooldownAt || signal.cooldownNeedsUpdate
+        ? 'missing'
+        : cooldownAt <= Date.parse(input.now)
+          ? 'stale'
+          : 'current';
+      const existingReminderAt = tower.metadata.lastKdReminderAt;
+      const resolvedAt = tower.metadata.kdReminderResolvedAt;
+      const reminderBlocked = typeof existingReminderAt === 'string' &&
+        !(typeof resolvedAt === 'string' && Date.parse(resolvedAt) > Date.parse(existingReminderAt)) &&
+        Date.parse(input.now) - Date.parse(existingReminderAt) < input.kdReminderIntervalSeconds * 1000;
+      const conditionKey = `${tower.id}:${cooldownStatus}:${signal.cooldownAt ?? 'none'}`;
+      if (cooldownStatus !== 'current' && tower.metadata.missingConditionKey !== conditionKey && !reminderBlocked) {
+        kdReminderCandidates.push({
+          towerId: tower.id,
+          towerName: tower.name,
+          towerCode: tower.towerCode,
+          reason: cooldownStatus,
+          missingConditionKey: conditionKey,
+        });
+        tower.metadata = { ...tower.metadata, missingConditionKey: conditionKey };
+      }
+      if (cooldownStatus === 'current') {
+        tower.metadata = { ...tower.metadata, missingConditionKey: null, kdReminderResolvedAt: input.now };
+      }
+    }
+    let closedStaleCount = 0;
+    if (input.closeStale) {
+      const activeExternalIds = new Set(input.signals.map((signal) => `tower:${signal.towerNumber}`));
+      for (const defense of this.defenses) {
+        if (defense.externalSource !== 'discord_tower_guard' || !['scheduled', 'gathering', 'active'].includes(defense.status)) continue;
+        if (activeExternalIds.has(defense.externalId ?? '')) continue;
+        defense.status = 'cancelled';
+        defense.result = 'cancelled';
+        defense.phase = 'closed';
+        defense.endedAt = defense.endedAt ?? input.now;
+        defense.metadata = { ...defense.metadata, closedByDiscordTowerSync: true, closedReason: 'not_present_in_confident_discord_tower_guard_snapshot' };
+        defense.updatedAt = input.now;
+        closedStaleCount += 1;
+      }
+    }
+    return { processedCount: input.signals.length, closedStaleCount, kdReminderCandidates };
+  }
+
+  async recordTowerKdReminderDelivery(input: TowerKdReminderDeliveryInput): Promise<void> {
+    const tower = this.towers.find((item) => item.id === input.towerId);
+    if (!tower) return;
+    tower.metadata = {
+      ...tower.metadata,
+      lastKdReminderAt: input.now,
+      lastKdReminderReason: input.reason,
+      lastKdReminderResult: input.result,
+      lastKdReminderError: input.error ?? null,
+    };
+  }
+
+  async updateTowerCooldownState(input: UpdateTowerCooldownInput): Promise<TowerRecord | null> {
+    const tower = this.towers.find((item) => item.id === input.towerId);
+    if (!tower) return null;
+    if ((tower.cooldownState?.updatedAt ?? null) !== input.expectedUpdatedAt) return null;
+    const status = input.clear || !input.cooldownAt
+      ? 'missing'
+      : Date.parse(input.cooldownAt) > Date.parse(input.now)
+        ? 'current'
+        : 'stale';
+    tower.cooldownState = {
+      towerId: tower.id,
+      cooldownAt: input.clear ? null : input.cooldownAt,
+      cooldownStatus: status,
+      source: 'hub',
+      sourceChannelId: null,
+      sourceMessageId: null,
+      sourceAuthorId: input.actorFamilyMemberId,
+      missingConditionKey: status === 'current' ? null : `${tower.id}:${status}:${input.cooldownAt ?? 'none'}`,
+      lastKdReminderAt: tower.cooldownState?.lastKdReminderAt ?? null,
+      lastKdReminderReason: tower.cooldownState?.lastKdReminderReason ?? null,
+      lastKdReminderResult: tower.cooldownState?.lastKdReminderResult ?? null,
+      lastKdReminderError: tower.cooldownState?.lastKdReminderError ?? null,
+      reminderCycleResolvedAt: status === 'current' ? input.now : tower.cooldownState?.reminderCycleResolvedAt ?? null,
+      metadata: { manual: true },
+      updatedAt: input.now,
+    };
+    tower.updatedAt = input.now;
+    return tower;
   }
 
   private filterDefenses(query: TowerDefenseListQuery) {

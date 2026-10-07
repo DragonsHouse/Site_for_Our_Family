@@ -1,8 +1,8 @@
 # Dragon House Family Hub
 
-Dragon House Family Hub is a local family dashboard and backend for managing Dragon House members, authentication, tasks, quests, resources, profile data, and related family tools.
+Dragon House Family Hub is a family dashboard and backend for managing Dragon House members, authentication, quests, events, tower defense, treasury/accounting, resources, profile data, and Discord operational workflows.
 
-This repository preserves the current local working baseline. It is not configured for production deployment yet.
+Authoritative business state lives in the backend and PostgreSQL. The Hub is the rich management/read/control interface. Discord is an operational and projection interface: Discord actions call the same backend domain services as Hub actions, and Discord messages must not become a parallel business database.
 
 ## Repository structure
 
@@ -33,7 +33,7 @@ npm run build
 
 Path: `dragon-house-backend/`
 
-The backend is a Node.js TypeScript API with Express, PostgreSQL repositories, authentication, migrations, and tests.
+The backend is a Node.js TypeScript API with Express, PostgreSQL repositories, authentication, migrations, Discord orchestration, accounting boundaries, and tests.
 
 Basic local commands:
 
@@ -62,9 +62,17 @@ Production deployment is not configured yet.
 
 ## Discord member synchronization
 
-Discord is the source of truth for Family Hub membership, Discord identity, server nickname, avatar, primary hierarchy rank, mapped family role, and permissions granted by Discord role mappings.
+Discord is the source of truth for guild membership, Discord identity, server nickname, avatar, primary hierarchy rank, mapped family role, and permissions granted by Discord role mappings.
 
-Family Hub remains the source of truth for internal data such as notes, quests, accounting, statistics, settings, manual permission grants, and manual permission denials.
+Family Hub backend and PostgreSQL remain the source of truth for internal data such as notes, quests, treasury, accounting, statistics, events, tower defense, settings, manual permission grants, and manual permission denials.
+
+Discord automation is intentionally bounded:
+
+- Discord may join/help/withdraw/respond through backend services.
+- Discord may publish projections for quests, tower defense, and events.
+- Discord may ingest trusted Dragon House operational messages only from configured trusted bot/application/webhook IDs.
+- Discord must not approve payouts, mark accounting transactions paid, change salaries, bypass proof, or create arbitrary accounting state.
+- Family chat/history channels are not bulk-scraped into Hub.
 
 ### Sync lifecycle
 
@@ -102,6 +110,9 @@ Use environment variables for all deployment-specific values:
 
 - `DATABASE_URL`
 - `DISCORD_BOT_TOKEN`
+- `DISCORD_TRUSTED_BOT_USER_ID`
+- `DISCORD_TRUSTED_APPLICATION_ID`
+- `DISCORD_TRUSTED_WEBHOOK_ID`
 - `DISCORD_GUILD_ID`
 - `DISCORD_CLIENT_ID`
 - `DISCORD_CLIENT_SECRET`
@@ -122,6 +133,12 @@ Use environment variables for all deployment-specific values:
 - `DISCORD_SYNC_DRY_RUN_RATE_LIMIT_PER_MINUTE`
 - `DISCORD_SYNC_APPLY_RATE_LIMIT_PER_HOUR`
 - `DISCORD_SYNC_REPORT_RATE_LIMIT_PER_MINUTE`
+- `DISCORD_SYNC_AUTO_ENABLED=false` by default; enable deliberately only after dry-run verification
+- `DISCORD_TOWER_SYNC_ENABLED`
+- `DISCORD_TOWER_SYNC_ACTOR_MEMBER_ID` for the explicit system actor used by tower imports
+- `DISCORD_TOWER_SYNC_MESSAGE_LIMIT`
+- `DISCORD_TOWER_CAPTER_ROLE_ID` for targeted KD reminders; never use `@everyone`/`@here`
+- `DISCORD_TOWER_KD_REMINDER_INTERVAL_SECONDS`
 - `DISCORD_SYNC_REPORT_DIR` if filesystem report copies are wanted
 - `LOG_LEVEL`
 - `LOG_FORMAT`
@@ -129,6 +146,12 @@ Use environment variables for all deployment-specific values:
 - `FRONTEND_ALLOWED_ORIGINS`
 
 Production should run behind HTTPS and a reverse proxy. Do not commit real `.env` files or production credentials.
+
+Discord Developer Portal requirements:
+
+- Enable the Message Content privileged intent while ingestion still reads trusted message text.
+- Configure only guild commands during the current stage.
+- Grant text/embed publishing permissions per channel: View Channel, Send Messages, Read Message History, Embed Links. Attach Files is required only for future attachment operations.
 
 ### Discord OAuth login
 
@@ -157,6 +180,7 @@ The exact staging and production hosts must be replaced with the deployed HTTPS 
 ### Security model
 
 - Apply sync is owner-only.
+- Automatic destructive member sync is opt-in; `DISCORD_SYNC_AUTO_ENABLED` defaults to `false`.
 - Apply sync is protected by a database-backed advisory lock scoped to the Discord guild.
 - Apply sync is idempotency-keyed to protect duplicate requests. Reusing the same key with a different plan is rejected.
 - Apply sync refuses stale plans by comparing the submitted plan identity and `planHash` with a freshly generated dry-run.
@@ -167,6 +191,67 @@ The exact staging and production hosts must be replaced with the deployed HTTPS 
 - Production logs are structured JSON when `LOG_FORMAT=json`; secret-like fields are redacted before logging.
 - Discord OAuth access tokens are used only server-side to resolve identity and are not persisted after login completion.
 - OAuth state, PKCE verifier, and login completion codes are short-lived, single-use, and stored durably in PostgreSQL.
+- Operational Discord ingestion requires an allowlisted channel and configured trusted source identity.
+- Discord accounting feeds are informational/evidence-only unless proof is copied into controlled storage with source message metadata.
+
+### Current channel map
+
+- welcome: reserved/read-only operational context.
+- nickname change: operational read/audit.
+- family history: reserved; no bulk history ingestion.
+- family chat: reserved; no bulk family-chat scraping.
+- quant news: reserved projection channel.
+- quest info: operational read.
+- quest announcements: quest projection/write channel.
+- quest payments: accounting-related evidence/feed channel, not payment authority.
+- tower guard: tower operational read/projection channel.
+- events: event projection/write channel.
+- admin log: audit/read channel.
+- accounting: accounting feed/evidence channel.
+- family photos: reserved media/evidence channel.
+
+### Migrations and CI
+
+Migrations are forward-only. Do not rewrite already-applied migrations; add a new migration for schema changes. CI runs backend typecheck, lint, tests, build, `db:migrate`, `db:verify`, and `db:migrate:status`, plus frontend typecheck, tests, lint, and `build:chrome`. The E2E CI job starts a fresh PostgreSQL service, prepares `dragon_house_e2e`, starts the real backend, builds the Chrome app, and runs Playwright against real browser -> backend HTTP -> PostgreSQL flows.
+
+### Real backend E2E workflow
+
+Use a separate E2E database only. The backend refuses E2E reset/seed/test-auth unless `NODE_ENV=test`, `E2E_TEST_MODE=true`, and the connected database name matches `E2E_DATABASE_NAME` and contains `e2e`.
+
+Local commands:
+
+```bash
+# E2E setup/reset/seed
+cd dragon-house-backend
+$env:NODE_ENV='test'
+$env:E2E_TEST_MODE='true'
+$env:E2E_DATABASE_NAME='dragon_house_e2e'
+$env:DATABASE_URL='postgresql://dragon_house:dragon_house@127.0.0.1:5433/dragon_house_e2e'
+$env:PORT='8788'
+npm run e2e:db:reset
+npm run e2e:db:setup
+npm run db:verify
+
+# backend start for E2E
+npm run e2e:start
+```
+
+In another terminal:
+
+```bash
+cd chrome_app
+$env:PLAYWRIGHT_BACKEND_URL='http://127.0.0.1:8788'
+$env:VITE_DRAGON_HOUSE_BACKEND_API_BASE_URL='http://127.0.0.1:8788'
+npm run build:chrome
+npm run test:e2e:real
+```
+
+Clean/reset E2E data:
+
+```bash
+cd dragon-house-backend
+npm run e2e:db:reset
+```
 
 ### Audit policy
 
@@ -176,10 +261,14 @@ Create events include the initial safe member context. Permission-change audit e
 
 Auth tests keep production password hashing unchanged. Test setup reuses precomputed bcrypt hashes so the normal `npm run test` command remains deterministic and CI-friendly.
 
+### Backup and restore
+
+The current Family Backup UI is not a production PostgreSQL backup system. Production backup planning must cover PostgreSQL dumps or PITR, payment-proof/file storage, an off-machine copy, a retention policy, and a restore test in a safe environment before the backup can be treated as reliable.
+
 ### Known limitations
 
 - OAuth login supports the Chrome extension flow, but public staging/production URLs and Discord Developer Portal redirect URLs still need to be configured before deployment.
 - The current unauthenticated OAuth rate limiter is process-local and suitable for one backend instance. Multi-instance production should move it to PostgreSQL or Redis.
-- Scheduled sync is not implemented yet.
+- Scheduled Discord member sync exists but is disabled by default and must be enabled only after dry-run verification.
 - Discord banner/profile decoration fields are not fetched until the Discord reader supports those API fields.
-- Deployment, Docker production images, HTTPS, and reverse proxy configuration are not included yet.
+- Deployment, Docker production images, HTTPS, reverse proxy configuration, sanitized staging bootstrap, and payment-proof object storage are not included yet.

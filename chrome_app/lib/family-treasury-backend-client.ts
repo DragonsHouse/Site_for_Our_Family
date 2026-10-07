@@ -8,10 +8,23 @@ export type TreasuryEntryInput = {
   locationReference?: string | null;
   description?: string;
   price?: string | null;
+  priceAmount?: number | null;
+  priceNote?: string | null;
   note?: string | null;
 };
 
-export type TreasuryEntryPatch = Partial<TreasuryEntryInput>;
+export type TreasuryEntryPatch = Partial<TreasuryEntryInput> & { expectedVersion: number };
+
+export class FamilyTreasuryApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string
+  ) {
+    super(message);
+    this.name = 'FamilyTreasuryApiError';
+  }
+}
 
 export async function listFamilyTreasuryEntries(signal?: AbortSignal): Promise<{ items: FamilyEconomyEntry[] }> {
   const response = await authenticatedFetch('/api/family/treasury/entries', { method: 'GET', signal });
@@ -32,9 +45,10 @@ export async function updateFamilyTreasuryEntry(entryId: string, input: Treasury
   }));
 }
 
-export async function archiveFamilyTreasuryEntry(entryId: string): Promise<FamilyEconomyEntry> {
+export async function archiveFamilyTreasuryEntry(entryId: string, expectedVersion: number): Promise<FamilyEconomyEntry> {
   return parseEntryResponse(await authenticatedFetch(`/api/family/treasury/entries/${encodeURIComponent(entryId)}`, {
     method: 'DELETE',
+    body: JSON.stringify({ expectedVersion }),
   }));
 }
 
@@ -57,7 +71,8 @@ async function parseJson(response: Response): Promise<unknown> {
   }
   if (!response.ok) {
     const message = isRecord(body) && typeof body.message === 'string' ? body.message : 'Не вдалося зберегти дані.';
-    throw new Error(message);
+    const code = isRecord(body) && typeof body.code === 'string' ? body.code : undefined;
+    throw new FamilyTreasuryApiError(message, response.status, code);
   }
   return body;
 }
@@ -72,11 +87,14 @@ function parseEntry(value: unknown): FamilyEconomyEntry {
     locationReference: nullableStringField(value, 'locationReference'),
     description: stringField(value, 'description'),
     price: nullableStringField(value, 'price'),
+    priceAmount: nullableNumberField(value, 'priceAmount'),
+    priceNote: nullableStringField(value, 'priceNote'),
     note: nullableStringField(value, 'note'),
     createdBy: nullableStringField(value, 'createdByFamilyMemberId') ?? '',
     createdAt: stringField(value, 'createdAt'),
     updatedAt: stringField(value, 'updatedAt'),
     isActive: booleanField(value, 'isActive'),
+    version: numberField(value, 'version'),
   };
 }
 
@@ -99,6 +117,16 @@ function nullableStringField(record: Record<string, unknown>, key: string) {
 function booleanField(record: Record<string, unknown>, key: string) {
   if (typeof record[key] !== 'boolean') throw new Error('Не вдалося прочитати дані.');
   return record[key];
+}
+
+function numberField(record: Record<string, unknown>, key: string) {
+  if (typeof record[key] !== 'number' || !Number.isFinite(record[key])) throw new Error('Не вдалося прочитати числові дані.');
+  return record[key];
+}
+
+function nullableNumberField(record: Record<string, unknown>, key: string) {
+  if (record[key] === null || record[key] === undefined) return null;
+  return numberField(record, key);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

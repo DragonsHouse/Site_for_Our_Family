@@ -17,6 +17,7 @@ export type BackendFamilyQuestTemplateDto = {
   isActive: boolean;
   cooldownHours: number;
   cooldownUntil: string | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -124,6 +125,7 @@ export type BackendFamilyQuestDto = {
   reportSentToAccountingAt: string | null;
   paidAt: string | null;
   paidByFamilyMemberId: string | null;
+  version: number;
   participants: BackendFamilyQuestPersonDto[];
   helpers: BackendFamilyQuestPersonDto[];
   rewards: BackendFamilyQuestRewardDto[];
@@ -187,6 +189,7 @@ function assertTemplate(value: unknown): BackendFamilyQuestTemplateDto {
     isActive: booleanField(value, 'isActive'),
     cooldownHours: numberField(value, 'cooldownHours'),
     cooldownUntil: nullableStringField(value, 'cooldownUntil'),
+    version: numberField(value, 'version'),
     createdAt: stringField(value, 'createdAt'),
     updatedAt: stringField(value, 'updatedAt'),
   };
@@ -216,6 +219,7 @@ function assertQuest(value: unknown): BackendFamilyQuestDto {
     reportSentToAccountingAt: nullableStringField(value, 'reportSentToAccountingAt'),
     paidAt: nullableStringField(value, 'paidAt'),
     paidByFamilyMemberId: nullableStringField(value, 'paidByFamilyMemberId'),
+    version: numberField(value, 'version'),
     participants: arrayField(value, 'participants').map(assertPerson),
     helpers: arrayField(value, 'helpers').map(assertPerson),
     rewards: arrayField(value, 'rewards').map(assertReward),

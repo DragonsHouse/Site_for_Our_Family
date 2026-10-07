@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { randomUUID } from 'node:crypto';
 import type {
   CreateTowerDefenseInput,
   FireGuardRosterRecord,
@@ -6,7 +7,12 @@ import type {
   TowerDefenseListQuery,
   TowerDefenseRecord,
   TowerDefenseResponseRecord,
+  TowerKdReminderCandidate,
+  TowerKdReminderDeliveryInput,
+  TowerGuardImportSignal,
+  TowerCooldownStateRecord,
   TowerRecord,
+  UpdateTowerCooldownInput,
   UpdateTowerDefenseInput,
 } from './tower-defense-models.js';
 import type { TowerDefenseRepository, UpsertDefenseAttendanceInput, UpsertDefenseResponseInput } from './tower-defense-repository.js';
@@ -27,6 +33,24 @@ type TowerRow = {
   updated_at: Date;
 };
 
+type CooldownStateRow = {
+  tower_id: string;
+  cooldown_at: Date | null;
+  cooldown_status: TowerCooldownStateRecord['cooldownStatus'];
+  source: TowerCooldownStateRecord['source'];
+  source_channel_id: string | null;
+  source_message_id: string | null;
+  source_author_id: string | null;
+  missing_condition_key: string | null;
+  last_kd_reminder_at: Date | null;
+  last_kd_reminder_reason: string | null;
+  last_kd_reminder_result: TowerCooldownStateRecord['lastKdReminderResult'];
+  last_kd_reminder_error: string | null;
+  reminder_cycle_resolved_at: Date | null;
+  metadata: Record<string, unknown>;
+  updated_at: Date;
+};
+
 type DefenseRow = {
   id: string;
   tower_id: string;
@@ -40,7 +64,7 @@ type DefenseRow = {
   timezone: string;
   phase: string;
   wave: number;
-  commander_family_member_id: string;
+  commander_family_member_id: string | null;
   commander_display_name: string | null;
   created_by_family_member_id: string;
   minimum_guard_count: number;
@@ -143,12 +167,17 @@ export class PgTowerDefenseRepository implements TowerDefenseRepository {
 
   async listTowers(): Promise<TowerRecord[]> {
     const result = await this.pool.query<TowerRow>('select * from family_towers order by is_active desc, name asc, id asc');
-    return result.rows.map(mapTower);
+    const towers = result.rows.map(mapTower);
+    await attachCooldownStates(this.pool, towers);
+    return towers;
   }
 
   async findTowerById(id: string): Promise<TowerRecord | null> {
     const result = await this.pool.query<TowerRow>('select * from family_towers where id = $1 limit 1', [id]);
-    return result.rows[0] ? mapTower(result.rows[0]) : null;
+    if (!result.rows[0]) return null;
+    const tower = mapTower(result.rows[0]);
+    await attachCooldownStates(this.pool, [tower]);
+    return tower;
   }
 
   async familyMemberExists(id: string): Promise<boolean> {
@@ -190,10 +219,10 @@ export class PgTowerDefenseRepository implements TowerDefenseRepository {
         input.scheduledAt ?? null,
         input.startsAt,
         input.endedAt ?? null,
-        input.timezone ?? 'Europe/Kiev',
+        input.timezone ?? 'Europe/Kyiv',
         input.phase ?? 'planning',
         input.wave ?? 1,
-        input.commanderFamilyMemberId,
+        input.commanderFamilyMemberId ?? null,
         input.createdByFamilyMemberId,
         input.minimumGuardCount,
         input.recommendedGuardCount,
@@ -343,6 +372,114 @@ export class PgTowerDefenseRepository implements TowerDefenseRepository {
     return result.rows.map(mapRoster);
   }
 
+  async reconcileExternalTowerGuardSignals(input: {
+    signals: TowerGuardImportSignal[];
+    systemActorFamilyMemberId: string;
+    closeStale: boolean;
+    kdReminderIntervalSeconds: number;
+    now: string;
+  }): Promise<{ processedCount: number; closedStaleCount: number; kdReminderCandidates: TowerKdReminderCandidate[] }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      const kdReminderCandidates: TowerKdReminderCandidate[] = [];
+      for (const signal of input.signals) {
+        const towerId = await upsertTowerGuardTower(client, signal, input.now);
+        await upsertTowerGuardDefense(client, signal, towerId, input.systemActorFamilyMemberId, input.now);
+        const reminder = await upsertTowerCooldownState(client, signal, towerId, input.kdReminderIntervalSeconds, input.now);
+        if (reminder) kdReminderCandidates.push(reminder);
+      }
+      const closedStaleCount = input.closeStale
+        ? await closeStaleTowerGuardDefenses(client, input.signals, input.now)
+        : 0;
+      await client.query('commit');
+      return { processedCount: input.signals.length, closedStaleCount, kdReminderCandidates };
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async recordTowerKdReminderDelivery(input: TowerKdReminderDeliveryInput): Promise<void> {
+    await this.pool.query(
+      `update family_tower_cooldown_states
+       set last_kd_reminder_at = $2,
+           last_kd_reminder_reason = $3,
+           last_kd_reminder_result = $4,
+           last_kd_reminder_error = $5,
+           updated_at = $2
+       where tower_id = $1`,
+      [input.towerId, input.now, input.reason, input.result, input.error ?? null],
+    );
+  }
+
+  async updateTowerCooldownState(input: UpdateTowerCooldownInput): Promise<TowerRecord | null> {
+    const cooldownStatus = input.clear || !input.cooldownAt
+      ? 'missing'
+      : Date.parse(input.cooldownAt) > Date.parse(input.now)
+        ? 'current'
+        : 'stale';
+    const missingConditionKey = cooldownStatus === 'current' ? null : `${input.towerId}:${cooldownStatus}:${input.cooldownAt ?? 'none'}`;
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      const before = await client.query<CooldownStateRow>('select * from family_tower_cooldown_states where tower_id = $1 for update', [input.towerId]);
+      const currentUpdatedAt = before.rows[0]?.updated_at.toISOString() ?? null;
+      if (currentUpdatedAt !== input.expectedUpdatedAt) {
+        await client.query('rollback');
+        return null;
+      }
+      await client.query(
+        `insert into family_tower_cooldown_states
+           (tower_id, cooldown_at, cooldown_status, source, source_author_id,
+            missing_condition_key, reminder_cycle_resolved_at, metadata, created_at, updated_at)
+         values ($1, $2, $3, 'hub', $4, $5, case when $3 = 'current' then $6::timestamptz else null end, $7::jsonb, $6, $6)
+         on conflict (tower_id)
+         do update set
+           cooldown_at = excluded.cooldown_at,
+           cooldown_status = excluded.cooldown_status,
+           source = 'hub',
+           source_author_id = excluded.source_author_id,
+           missing_condition_key = excluded.missing_condition_key,
+           reminder_cycle_resolved_at = case when excluded.cooldown_status = 'current' then excluded.updated_at else family_tower_cooldown_states.reminder_cycle_resolved_at end,
+           metadata = family_tower_cooldown_states.metadata || excluded.metadata,
+           updated_at = excluded.updated_at`,
+        [
+          input.towerId,
+          input.clear ? null : input.cooldownAt,
+          cooldownStatus,
+          input.actorFamilyMemberId,
+          missingConditionKey,
+          input.now,
+          JSON.stringify({ manual: true, cleared: input.clear }),
+        ],
+      );
+      await client.query(
+        `insert into family_audit_log
+           (id, actor_family_member_id, actor_type, action, entity_type, entity_id, before_data, after_data, metadata)
+         values ($1, $2, 'user', 'tower_kd_updated', 'family_tower', $3, $4::jsonb, $5::jsonb, $6::jsonb)`,
+        [
+          randomUUID(),
+          input.actorFamilyMemberId,
+          input.towerId,
+          JSON.stringify(before.rows[0] ? mapCooldownState(before.rows[0]) : null),
+          JSON.stringify({ cooldownAt: input.clear ? null : input.cooldownAt, cooldownStatus, source: 'hub' }),
+          JSON.stringify({ expectedUpdatedAt: input.expectedUpdatedAt, manual: true }),
+        ],
+      );
+      await client.query('commit');
+      const tower = await this.findTowerById(input.towerId);
+      return tower;
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   private async queryDefenseRows(query: TowerDefenseListQuery): Promise<DefenseRow[]> {
     const values: unknown[] = [];
     const where: string[] = [];
@@ -423,6 +560,214 @@ const DEFENSE_SELECT = `
   left join family_members commander on commander.id = d.commander_family_member_id
 `;
 
+async function upsertTowerGuardTower(client: pg.PoolClient, signal: TowerGuardImportSignal, now: string): Promise<string> {
+  const result = await client.query<{ id: string }>(
+    `insert into family_towers
+       (tower_code, name, location_label, map_metadata, is_active, external_source, external_id, metadata, updated_at)
+     values
+       ($1, $2, $2, '{}'::jsonb, true, 'discord_tower_guard', $3, $4::jsonb, $5)
+     on conflict (tower_code)
+     do update set
+       name = excluded.name,
+       location_label = excluded.location_label,
+       is_active = true,
+       external_source = excluded.external_source,
+       external_id = excluded.external_id,
+       metadata = family_towers.metadata || excluded.metadata,
+       updated_at = excluded.updated_at
+     returning id`,
+    [
+      signal.towerCode,
+      signal.towerName,
+      String(signal.towerNumber),
+      JSON.stringify({
+        source: 'discord_tower_guard',
+        towerNumber: signal.towerNumber,
+        visual: { icon: 'Tower', markerColor: signal.protectionDown ? 'crimson' : 'amber' },
+      }),
+      now,
+    ],
+  );
+  return result.rows[0]!.id;
+}
+
+async function upsertTowerGuardDefense(
+  client: pg.PoolClient,
+  signal: TowerGuardImportSignal,
+  towerId: string,
+  actorMemberId: string,
+  now: string,
+): Promise<void> {
+  const status = signal.protectionDown ? 'active' : 'gathering';
+  const priority = signal.protectionDown ? 'critical' : 'high';
+  const phase = signal.protectionDown ? 'combat' : 'signal';
+  const externalId = `tower:${signal.towerNumber}`;
+  const metadata = {
+    sourceType: 'discord',
+    source: 'discord_tower_guard',
+    guildId: null,
+    sourceMessageId: signal.externalId,
+    messageId: signal.externalId,
+    sourceChannelId: signal.channelId,
+    channelId: signal.channelId,
+    authorId: signal.authorId,
+    parserVersion: 1,
+    importedAt: now,
+    lastSeenAt: now,
+    towerNumber: signal.towerNumber,
+    protectionDown: signal.protectionDown,
+    cooldownNeedsUpdate: signal.cooldownNeedsUpdate,
+    cooldownAt: signal.cooldownAt,
+    statusText: signal.statusText,
+    lastDiscordMessageAt: signal.messageEditedAt ?? signal.messageCreatedAt,
+  };
+  await client.query(
+    `insert into family_tower_defenses
+       (tower_id, title, description, status, priority, starts_at, timezone, phase, wave,
+        commander_family_member_id, created_by_family_member_id, minimum_guard_count, recommended_guard_count,
+        maximum_guard_count, guild_id, channel_id, message_id, synced_at, external_source, external_id,
+        sync_idempotency_key, event_projection_key, metadata, created_at, updated_at)
+     values
+       ($1, $2, $3, $4, $5, $6, 'Europe/Kyiv', $7, 1, null, $8, 1, 1, 3, $9, $10, $11, $12,
+        'discord_tower_guard', $13, $14, $15, $16::jsonb, $12, $12)
+     on conflict (external_source, external_id)
+     where external_source is not null and external_id is not null
+     do update set
+       tower_id = excluded.tower_id,
+       title = excluded.title,
+       description = excluded.description,
+       status = excluded.status,
+       priority = excluded.priority,
+       starts_at = least(family_tower_defenses.starts_at, excluded.starts_at),
+       phase = excluded.phase,
+       guild_id = excluded.guild_id,
+       channel_id = excluded.channel_id,
+       message_id = excluded.message_id,
+       synced_at = excluded.synced_at,
+       metadata = family_tower_defenses.metadata || excluded.metadata,
+       updated_at = excluded.updated_at`,
+    [
+      towerId,
+      `Оборона ${signal.towerName}`,
+      signal.statusText,
+      status,
+      priority,
+      signal.messageCreatedAt,
+      phase,
+      actorMemberId,
+      null,
+      signal.channelId,
+      signal.externalId,
+      now,
+      externalId,
+      `discord-tower-guard:${externalId}`,
+      `tower-defense:discord:${externalId}`,
+      JSON.stringify(metadata),
+    ],
+  );
+}
+
+async function closeStaleTowerGuardDefenses(client: pg.PoolClient, signals: TowerGuardImportSignal[], now: string): Promise<number> {
+  const activeExternalIds = signals.map((signal) => `tower:${signal.towerNumber}`);
+  const result = await client.query(
+    `update family_tower_defenses
+     set status = 'cancelled',
+         result = 'cancelled',
+         phase = 'closed',
+         ended_at = coalesce(ended_at, $1),
+         metadata = metadata || $2::jsonb,
+         updated_at = $1
+     where external_source = 'discord_tower_guard'
+       and status in ('scheduled', 'gathering', 'active')
+       and not (external_id = any($3::text[]))`,
+    [
+      now,
+      JSON.stringify({ closedByDiscordTowerSync: true, closedReason: 'not_present_in_confident_discord_tower_guard_snapshot' }),
+      activeExternalIds,
+    ],
+  );
+  return result.rowCount ?? 0;
+}
+
+async function upsertTowerCooldownState(
+  client: pg.PoolClient,
+  signal: TowerGuardImportSignal,
+  towerId: string,
+  reminderIntervalSeconds: number,
+  now: string,
+): Promise<TowerKdReminderCandidate | null> {
+  const cooldownStatus = cooldownState(signal, now);
+  const missingConditionKey = cooldownStatus === 'current' ? null : `${towerId}:${cooldownStatus}:${signal.cooldownAt ?? 'none'}`;
+  const result = await client.query<{
+    should_remind: boolean;
+    tower_code: string;
+    tower_name: string;
+  }>(
+    `insert into family_tower_cooldown_states
+       (tower_id, cooldown_at, cooldown_status, source, source_channel_id, source_message_id,
+        source_author_id, missing_condition_key, reminder_cycle_resolved_at, metadata, created_at, updated_at)
+     values
+       ($1, $2, $3, 'discord', $4, $5, $6, $7,
+        case when $3 = 'current' then $8::timestamptz else null end,
+        $9::jsonb, $8, $8)
+     on conflict (tower_id)
+     do update set
+       cooldown_at = excluded.cooldown_at,
+       cooldown_status = excluded.cooldown_status,
+       source = excluded.source,
+       source_channel_id = excluded.source_channel_id,
+       source_message_id = excluded.source_message_id,
+       source_author_id = excluded.source_author_id,
+       missing_condition_key = excluded.missing_condition_key,
+       reminder_cycle_resolved_at = case
+         when excluded.cooldown_status = 'current' then excluded.updated_at
+         else family_tower_cooldown_states.reminder_cycle_resolved_at
+       end,
+       metadata = family_tower_cooldown_states.metadata || excluded.metadata,
+       updated_at = excluded.updated_at
+     returning
+       cooldown_status <> 'current'
+       and missing_condition_key is not null
+       and (
+         last_kd_reminder_at is null
+         or (reminder_cycle_resolved_at is not null and reminder_cycle_resolved_at > last_kd_reminder_at)
+         or last_kd_reminder_at <= $8::timestamptz - ($10::text || ' seconds')::interval
+       ) as should_remind,
+       $11::text as tower_code,
+       $12::text as tower_name`,
+    [
+      towerId,
+      signal.cooldownAt,
+      cooldownStatus,
+      signal.channelId,
+      signal.externalId,
+      signal.authorId,
+      missingConditionKey,
+      now,
+      JSON.stringify({ protectionDown: signal.protectionDown, cooldownNeedsUpdate: signal.cooldownNeedsUpdate }),
+      reminderIntervalSeconds,
+      signal.towerCode,
+      signal.towerName,
+    ],
+  );
+  const row = result.rows[0];
+  if (!row?.should_remind || !missingConditionKey || cooldownStatus === 'current') return null;
+  return {
+    towerId,
+    towerName: row.tower_name,
+    towerCode: row.tower_code,
+    reason: cooldownStatus,
+    missingConditionKey,
+  };
+}
+
+function cooldownState(signal: TowerGuardImportSignal, now: string): 'current' | 'stale' | 'missing' {
+  if (!signal.cooldownAt || signal.cooldownNeedsUpdate) return 'missing';
+  const cooldownTime = Date.parse(signal.cooldownAt);
+  if (!Number.isFinite(cooldownTime)) return 'missing';
+  return cooldownTime > Date.parse(now) ? 'current' : 'stale';
+}
+
 function mapTower(row: TowerRow): TowerRecord {
   return {
     id: row.id,
@@ -437,6 +782,33 @@ function mapTower(row: TowerRow): TowerRecord {
     externalId: row.external_id,
     metadata: row.metadata ?? {},
     createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  };
+}
+
+async function attachCooldownStates(pool: pg.Pool, towers: TowerRecord[]): Promise<void> {
+  if (!towers.length) return;
+  const result = await pool.query<CooldownStateRow>('select * from family_tower_cooldown_states where tower_id = any($1)', [towers.map((tower) => tower.id)]);
+  const byTower = new Map(result.rows.map((row) => [row.tower_id, mapCooldownState(row)]));
+  for (const tower of towers) tower.cooldownState = byTower.get(tower.id) ?? null;
+}
+
+function mapCooldownState(row: CooldownStateRow): TowerCooldownStateRecord {
+  return {
+    towerId: row.tower_id,
+    cooldownAt: iso(row.cooldown_at),
+    cooldownStatus: row.cooldown_status,
+    source: row.source,
+    sourceChannelId: row.source_channel_id,
+    sourceMessageId: row.source_message_id,
+    sourceAuthorId: row.source_author_id,
+    missingConditionKey: row.missing_condition_key,
+    lastKdReminderAt: iso(row.last_kd_reminder_at),
+    lastKdReminderReason: row.last_kd_reminder_reason,
+    lastKdReminderResult: row.last_kd_reminder_result,
+    lastKdReminderError: row.last_kd_reminder_error,
+    reminderCycleResolvedAt: iso(row.reminder_cycle_resolved_at),
+    metadata: row.metadata ?? {},
     updatedAt: row.updated_at.toISOString(),
   };
 }

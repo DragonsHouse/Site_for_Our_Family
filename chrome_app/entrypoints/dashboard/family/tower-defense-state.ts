@@ -34,6 +34,7 @@ import type {
   DragonGuardResponseStatus,
   DragonFireGuardRosterEntry,
   DragonTowerDefinition,
+  DragonTowerCooldownState,
   DragonTowerDefense,
   DragonTowerDefenseCreateInput,
   DragonTowerDefenseFilters,
@@ -340,6 +341,21 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     [dependencies.backendOperations, now, persistDefense, replaceDefense, runMutation]
   );
 
+  const updateTowerCooldown = useCallback(
+    (tower: DragonTowerDefinition, payload: { cooldownAt?: string | null; clear?: boolean; expectedUpdatedAt?: string | null }) => {
+      return runMutation(async () => {
+        if (!dependencies.backendOperations || !dependencies.backendOperations.updateTowerCooldown) {
+          throw new Error('Оновлення КД через backend недоступне.');
+        }
+        const updated = await dependencies.backendOperations.updateTowerCooldown(tower, payload);
+        setTowerDefinitions((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+        await loadBackendReadState();
+        return updated.cooldownState as DragonTowerCooldownState | null | undefined;
+      });
+    },
+    [dependencies.backendOperations, loadBackendReadState, runMutation]
+  );
+
   return {
     now,
     filters,
@@ -378,6 +394,7 @@ export function useDragonTowerDefenseState(dependencies: DragonTowerDefenseState
     startDefense,
     completeDefense,
     cancelDefense,
+    updateTowerCooldown,
     buildCompletionOutput: buildTowerDefenseCompletionOutput,
     buildProfileTimeline: buildTowerDefenseProfileTimeline
   };

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { canManageDiscordIntegration } from '../../../lib/family-permissions';
 import type { FamilyUser } from '../../../lib/family-types';
+import { listFamilyAuditLog, type FamilyAuditLogFilters, type FamilyAuditLogRecord } from '../../../lib/family-audit-log-client';
 import {
   DragonBadge,
   DragonButton,
@@ -147,6 +148,7 @@ export function DragonDiscordSyncScreen({
       )}
 
       <DragonDiscordAuditHistory history={sync.history} onSelect={sync.setSelectedAudit} />
+      <FamilyAuditLogPanel />
 
       {sync.selectedItem ? <DragonDiscordConflictDialog item={sync.selectedItem} onClose={() => sync.setSelectedItem(null)} /> : null}
       {sync.selectedAudit ? <DragonDiscordAuditDialog audit={sync.selectedAudit} onClose={() => sync.setSelectedAudit(null)} /> : null}
@@ -417,6 +419,169 @@ export function DragonDiscordAuditHistory({
       )}
     </DragonPanel>
   );
+}
+
+function FamilyAuditLogPanel() {
+  const [filters, setFilters] = useState<FamilyAuditLogFilters>({ limit: 20, offset: 0 });
+  const [items, setItems] = useState<FamilyAuditLogRecord[]>([]);
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadAudit = async (mode: 'replace' | 'append' = 'replace') => {
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await listFamilyAuditLog({ ...filters, offset: mode === 'append' ? nextOffset ?? 0 : 0, limit: filters.limit ?? 20 });
+      setItems((current) => mode === 'append' ? [...current, ...page.items] : page.items);
+      setNextOffset(page.page.nextOffset);
+      setFilters((current) => ({ ...current, offset: mode === 'append' ? page.page.offset : 0 }));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Не вдалося завантажити історію змін.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAudit('replace');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.entityType, filters.action, filters.actorFamilyMemberId, filters.from, filters.to]);
+
+  const update = (patch: Partial<FamilyAuditLogFilters>) => setFilters((current) => ({ ...current, ...patch, offset: 0 }));
+
+  return (
+    <DragonPanel className="dh-discord-sync-history" data-family-audit-log="frontend">
+      <div className="dh-dragon-section-head">
+        <p className="dh-dragon-eyebrow">Історія</p>
+        <h2>Історія змін Hub</h2>
+      </div>
+      <div className="grid gap-2 md:grid-cols-5">
+        <DragonSelect value={filters.entityType ?? ''} onChange={(event) => update({ entityType: event.currentTarget.value || undefined })} aria-label="Фільтр за модулем">
+          <option value="">Усі модулі</option>
+          <option value="family_treasury_entry">Скарбниця</option>
+          <option value="family_member">Учасники</option>
+          <option value="family_quest">Квести</option>
+          <option value="family_quest_template">Шаблони квестів</option>
+          <option value="family_event">Події</option>
+          <option value="family_tower">Вишки/KD</option>
+          <option value="premium">Премії</option>
+          <option value="payout_batch">Виплати</option>
+        </DragonSelect>
+        <DragonInput value={filters.action ?? ''} onChange={(event) => update({ action: event.currentTarget.value || undefined })} placeholder="Дія" aria-label="Фільтр за дією" />
+        <DragonInput value={filters.actorFamilyMemberId ?? ''} onChange={(event) => update({ actorFamilyMemberId: event.currentTarget.value || undefined })} placeholder="Учасник" aria-label="Фільтр за учасником" />
+        <DragonInput type="date" value={dateOnly(filters.from)} onChange={(event) => update({ from: event.currentTarget.value ? new Date(`${event.currentTarget.value}T00:00:00.000Z`).toISOString() : undefined })} aria-label="Дата від" />
+        <DragonInput type="date" value={dateOnly(filters.to)} onChange={(event) => update({ to: event.currentTarget.value ? new Date(`${event.currentTarget.value}T23:59:59.999Z`).toISOString() : undefined })} aria-label="Дата до" />
+      </div>
+      {error ? <DragonRetry title="Історію змін не завантажено" description={error} onRetry={() => void loadAudit('replace')} /> : null}
+      <div className="dh-discord-sync-history-list mt-4">
+        {items.map((item) => (
+          <DragonCard key={item.id} className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <strong>{friendlyActor(item)}</strong>
+                <span className="ml-2">{friendlyAction(item.action)} · {friendlyEntity(item.entityType)}</span>
+              </div>
+              <span>{formatDiscordSyncDateTime(item.createdAt)}</span>
+            </div>
+            <p>{auditSummary(item)}</p>
+            <details className="dh-discord-sync-technical">
+              <summary>Технічні деталі</summary>
+              <pre>{JSON.stringify({
+                auditId: item.id,
+                actorFamilyMemberId: item.actorFamilyMemberId,
+                actorType: item.actorType,
+                entityId: item.entityId,
+                beforeData: item.beforeData,
+                afterData: item.afterData,
+                metadata: item.metadata
+              }, null, 2)}</pre>
+            </details>
+          </DragonCard>
+        ))}
+      </div>
+      {!items.length && !loading && !error ? (
+        <DragonEmptyState title="Історії змін поки немає" description="Коли менеджери або система змінять дані, записи з'являться тут." />
+      ) : null}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <DragonButton type="button" variant="secondary" onClick={() => void loadAudit('replace')} disabled={loading}>
+          {loading ? 'Завантажуємо...' : 'Оновити'}
+        </DragonButton>
+        {nextOffset !== null ? (
+          <DragonButton type="button" variant="ghost" onClick={() => void loadAudit('append')} disabled={loading}>
+            Завантажити ще
+          </DragonButton>
+        ) : null}
+      </div>
+    </DragonPanel>
+  );
+}
+
+function friendlyActor(item: FamilyAuditLogRecord): string {
+  if (item.actorName) return item.actorName;
+  if (item.actorType === 'discord') return 'Discord';
+  if (item.actorType === 'system') return 'Система';
+  return 'Невідомий учасник';
+}
+
+function friendlyEntity(entityType: string): string {
+  const labels: Record<string, string> = {
+    family_treasury_entry: 'Скарбниця',
+    family_member: 'Учасники',
+    family_quest: 'Квести',
+    family_quest_template: 'Шаблони квестів',
+    family_event: 'Події',
+    family_tower: 'Вишки/KD',
+    premium: 'Премії',
+    payout_batch: 'Виплати',
+  };
+  return labels[entityType] ?? entityType;
+}
+
+function friendlyAction(action: string): string {
+  const labels: Record<string, string> = {
+    treasury_entry_created: 'створено запис',
+    treasury_entry_updated: 'змінено запис',
+    treasury_entry_archived: 'архівовано запис',
+    member_restored: 'учасника відновлено',
+    member_updated: 'учасника змінено',
+    quest_created: 'квест створено',
+    quest_updated: 'квест змінено',
+    quest_template_created: 'шаблон створено',
+    quest_template_updated: 'шаблон змінено',
+    quest_completed: 'квест завершено',
+    tower_kd_updated: 'КД оновлено',
+    tower_kd_reminder_sent: 'нагадування каптьорам надіслано',
+    tower_kd_reminder_failed: 'нагадування каптьорам не надіслано',
+    premium_created: 'премію створено',
+    adjustment_created: 'ручне коригування',
+    payout_batch_finalized: 'виплату фіналізовано',
+    payment_proof_uploaded: 'доказ оплати додано',
+  };
+  return labels[action] ?? action.replaceAll('_', ' ');
+}
+
+function auditSummary(item: FamilyAuditLogRecord): string {
+  const before = summarizeAuditData(item.beforeData);
+  const after = summarizeAuditData(item.afterData);
+  if (before && after) return `Було: ${before}. Стало: ${after}.`;
+  if (after) return `Нове значення: ${after}.`;
+  if (before) return `Попереднє значення: ${before}.`;
+  return 'Зміна зафіксована в audit log.';
+}
+
+function summarizeAuditData(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const pairs = ['title', 'nickname', 'status', 'rank', 'role', 'priceAmount', 'priceNote', 'cooldownAt']
+    .filter((key) => record[key] !== undefined && record[key] !== null)
+    .slice(0, 4)
+    .map((key) => `${key}: ${String(record[key])}`);
+  return pairs.length ? pairs.join(', ') : null;
+}
+
+function dateOnly(value?: string): string {
+  return value ? value.slice(0, 10) : '';
 }
 
 export function DragonDiscordAuditDialog({ audit, onClose }: { audit: DiscordSyncAuditRecord; onClose: () => void }) {

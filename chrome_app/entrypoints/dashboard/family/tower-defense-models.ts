@@ -27,6 +27,19 @@ export type DragonTowerVisualMetadata = {
 
 export type DragonTowerDefenseDataSource = 'backend' | 'local';
 
+export type DragonTowerCooldownState = {
+  cooldownAt: string | null;
+  status: 'current' | 'stale' | 'missing';
+  source: 'discord' | 'hub' | 'system';
+  lastUpdatedAt: string;
+  lastReminderAt: string | null;
+  lastReminderReason: string | null;
+  lastReminderResult: 'sent' | 'failed' | 'skipped' | null;
+  lastReminderError: string | null;
+  reminderTarget: string | null;
+  expectedUpdatedAt: string | null;
+};
+
 export type DragonTowerDefinition = {
   id: string;
   backendTowerId?: string;
@@ -37,6 +50,7 @@ export type DragonTowerDefinition = {
   visual?: DragonTowerVisualMetadata;
   active: boolean;
   source: DragonTowerDefenseDataSource;
+  cooldownState?: DragonTowerCooldownState | null;
 };
 
 export type DragonGuardContribution = {

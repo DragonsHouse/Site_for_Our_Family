@@ -45,7 +45,9 @@ export type CreateBackendFamilyEventPayload = {
   metadata?: Record<string, unknown>;
 };
 
-export type UpdateBackendFamilyEventPayload = Partial<CreateBackendFamilyEventPayload>;
+export type UpdateBackendFamilyEventPayload = Partial<CreateBackendFamilyEventPayload> & {
+  expectedVersion?: number;
+};
 
 export async function listBackendFamilyEvents(filters: BackendFamilyEventFilters = {}, signal?: AbortSignal): Promise<BackendFamilyEventListResponse> {
   const params = new URLSearchParams();

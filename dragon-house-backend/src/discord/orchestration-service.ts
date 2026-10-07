@@ -160,17 +160,13 @@ export class DiscordOrchestrationService {
     this.assertConfiguredPublish(channelId, 'Вишки / стаки');
     const defense = await this.towerDefenseService.getDefense(defenseId, auth);
     const payload = renderTowerDefenseMessage(defense);
-    const published = await this.syncMessage({
+    return this.syncMessage({
       sourceModule: 'tower_defense',
       sourceId: defenseId,
       messageKind: 'announcement',
       guildId: this.config.discord.guildId!,
       channelId,
     }, payload, 'Вишки / стаки');
-    if (published.state === 'published' && this.transport?.sendDirectMessageToGuildMembers) {
-      await this.transport.sendDirectMessageToGuildMembers(this.config.discord.guildId!, payload);
-    }
-    return published;
   }
   async publishFamilyEvent(eventId: string, channelId: string, auth: Parameters<FamilyEventService['getEvent']>[1]): Promise<DiscordPublishReadModel> {
     if (!this.familyEventService) throw new Error('Family Event service is unavailable.');
@@ -259,7 +255,7 @@ export class DiscordOrchestrationService {
       return success('q', parsed, 'Ви вийшли з квесту.');
     }
     if (parsed.action === 'complete') {
-      await this.questService.completeQuest(parsed.sourceId, { comment: 'Completed from Discord orchestration.' }, auth, now);
+      await this.questService.completeQuest(parsed.sourceId, { comment: 'Завершено через Discord-дію Dragon House.' }, auth, now);
       return success('q', parsed, 'Квест позначено виконаним у Hub.');
     }
     const quest = await this.questService.getQuest(parsed.sourceId, auth);
@@ -292,7 +288,7 @@ export class DiscordOrchestrationService {
       return success('t', parsed, parsed.value === 'lost' ? 'Оборону завершено як втрачену.' : 'Оборону завершено як успішну.');
     }
     if (parsed.action === 'cancel') {
-      await this.towerDefenseService.cancelDefense(parsed.sourceId, { reason: 'Cancelled from Discord orchestration.' }, auth, now);
+      await this.towerDefenseService.cancelDefense(parsed.sourceId, { reason: 'Скасовано через Discord-дію Dragon House.' }, auth, now);
       return success('t', parsed, 'Оборону скасовано в Hub.');
     }
     const defense = await this.towerDefenseService.getDefense(parsed.sourceId, auth);
@@ -322,7 +318,7 @@ export class DiscordOrchestrationService {
       return success('e', parsed, 'Подію завершено в Hub.');
     }
     if (parsed.action === 'cancel') {
-      await this.familyEventService.cancelEvent(parsed.sourceId, { reason: 'Cancelled from Discord orchestration.' }, auth, now);
+      await this.familyEventService.cancelEvent(parsed.sourceId, { reason: 'Скасовано через Discord-дію Dragon House.' }, auth, now);
       return success('e', parsed, 'Подію скасовано в Hub.');
     }
     const event = await this.familyEventService.getEvent(parsed.sourceId, auth);
@@ -332,10 +328,11 @@ export class DiscordOrchestrationService {
   private async handleMeCommand(discordUserId: string): Promise<DiscordInteractionResponse> {
     const identity = await this.identityResolver.resolve(discordUserId);
     return commandSuccess('me', [
-      'Discord привʼязано до Dragon House Hub.',
+      'Dragon House Bot: працює',
+      'Акаунт: привʼязано',
+      'Доступ до Hub: активний',
       `Нік: ${identity.familyMember.nickname}`,
       `Роль: ${roleLabel(identity.familyMember)}`,
-      `Статус: ${identity.familyMember.status === 'active' ? 'активний' : 'неактивний'}`,
     ].join('\n'));
   }
 
@@ -343,11 +340,11 @@ export class DiscordOrchestrationService {
     try {
       const identity = await this.identityResolver.resolve(discordUserId);
       return commandSuccess('status', [
-        'Dragon House Hub',
-        'Discord: привʼязано',
-        `Member: ${identity.familyMember.nickname}`,
+        'Dragon House Bot: працює',
+        'Акаунт: привʼязано',
+        'Доступ до Hub: активний',
+        `Нік: ${identity.familyMember.nickname}`,
         `Роль: ${roleLabel(identity.familyMember)}`,
-        `Оркестрація: ${this.config.discord.orchestration.enabled ? 'увімкнено' : 'вимкнено'}`,
       ].join('\n'));
     } catch (error) {
       const friendly = friendlyDiscordError(error);
@@ -358,8 +355,7 @@ export class DiscordOrchestrationService {
         code: friendly.code,
         content: [
           'Dragon House Hub',
-          'Discord: не привʼязано',
-          `Оркестрація: ${this.config.discord.orchestration.enabled ? 'увімкнено' : 'вимкнено'}`,
+          'Акаунт: не привʼязано',
           friendly.content,
         ].join('\n'),
       };

@@ -10,7 +10,26 @@ export type BackendTowerDto = {
   externalSource: string | null;
   externalId: string | null;
   metadata: Record<string, unknown>;
+  cooldownState?: BackendTowerCooldownStateDto | null;
   createdAt: string;
+  updatedAt: string;
+};
+
+export type BackendTowerCooldownStateDto = {
+  towerId: string;
+  cooldownAt: string | null;
+  cooldownStatus: string;
+  source: string;
+  sourceChannelId: string | null;
+  sourceMessageId: string | null;
+  sourceAuthorId: string | null;
+  missingConditionKey: string | null;
+  lastKdReminderAt: string | null;
+  lastKdReminderReason: string | null;
+  lastKdReminderResult: string | null;
+  lastKdReminderError: string | null;
+  reminderCycleResolvedAt: string | null;
+  metadata: Record<string, unknown>;
   updatedAt: string;
 };
 
@@ -148,6 +167,11 @@ export function assertBackendTowerListResponse(value: unknown): BackendTowerList
   return { items: value.items };
 }
 
+export function assertBackendTowerResponse(value: unknown): BackendTowerDto {
+  if (!isBackendTowerDto(value)) throw new FamilyTowerDefenseApiError('Tower response was malformed', 'MALFORMED_RESPONSE');
+  return value;
+}
+
 export function assertBackendDefenseListResponse(value: unknown): BackendTowerDefenseListResponse {
   if (!isRecord(value) || !Array.isArray(value.items) || !value.items.every(isBackendDefenseDto)) {
     throw new FamilyTowerDefenseApiError('Tower defense list response was malformed', 'MALFORMED_RESPONSE');
@@ -230,7 +254,27 @@ function isBackendTowerDto(value: unknown): value is BackendTowerDto {
     isNullableString(value.externalSource) &&
     isNullableString(value.externalId) &&
     isRecord(value.metadata) &&
+    (value.cooldownState === undefined || value.cooldownState === null || isBackendTowerCooldownStateDto(value.cooldownState)) &&
     isString(value.createdAt) &&
+    isString(value.updatedAt);
+}
+
+function isBackendTowerCooldownStateDto(value: unknown): value is BackendTowerCooldownStateDto {
+  return isRecord(value) &&
+    isString(value.towerId) &&
+    isNullableString(value.cooldownAt) &&
+    isString(value.cooldownStatus) &&
+    isString(value.source) &&
+    isNullableString(value.sourceChannelId) &&
+    isNullableString(value.sourceMessageId) &&
+    isNullableString(value.sourceAuthorId) &&
+    isNullableString(value.missingConditionKey) &&
+    isNullableString(value.lastKdReminderAt) &&
+    isNullableString(value.lastKdReminderReason) &&
+    isNullableString(value.lastKdReminderResult) &&
+    isNullableString(value.lastKdReminderError) &&
+    isNullableString(value.reminderCycleResolvedAt) &&
+    isRecord(value.metadata) &&
     isString(value.updatedAt);
 }
 

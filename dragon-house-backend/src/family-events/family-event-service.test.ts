@@ -21,8 +21,8 @@ describe('FamilyEventService', () => {
     }, auth(ownerId, 'owner'));
     expect(created).toMatchObject({ title: 'War Council', status: 'scheduled', participantCount: 0 });
 
-    const updated = await service.updateEvent(created.id, { locationLabel: 'HQ', priority: 'high' }, auth(ownerId, 'owner'));
-    expect(updated).toMatchObject({ locationLabel: 'HQ', priority: 'high' });
+    const updated = await service.updateEvent(created.id, { locationLabel: 'HQ', priority: 'high', expectedVersion: created.version }, auth(ownerId, 'owner'));
+    expect(updated).toMatchObject({ locationLabel: 'HQ', priority: 'high', version: created.version + 1 });
 
     const listed = await service.listEvents({ status: 'scheduled' }, auth(memberId));
     expect(listed.items.map((event) => event.id)).toContain(created.id);
@@ -66,7 +66,17 @@ describe('FamilyEventService', () => {
     await expect(service.confirmAttendance(eventId, { familyMemberId: memberId, status: 'present' }, auth(ownerId, 'owner'))).rejects.toMatchObject({
       code: 'FAMILY_EVENT_INVALID_ATTENDANCE_MEMBER',
     });
-    await expect(service.updateEvent(eventId, { notes: 'organizer edit' }, auth(ownerId))).resolves.toMatchObject({ notes: 'organizer edit' });
+    await expect(service.updateEvent(eventId, { notes: 'organizer edit', expectedVersion: 1 }, auth(ownerId))).resolves.toMatchObject({ notes: 'organizer edit', version: 2 });
+  });
+
+  it('rejects stale event manager edits', async () => {
+    const { service } = harness();
+    const first = await service.updateEvent(eventId, { notes: 'first save', expectedVersion: 1 }, auth(ownerId, 'owner'));
+    expect(first.version).toBe(2);
+    await expect(service.updateEvent(eventId, { notes: 'stale save', expectedVersion: 1 }, auth(ownerId, 'owner'))).rejects.toMatchObject({
+      code: 'FAMILY_EVENT_VERSION_CONFLICT',
+    });
+    await expect(service.getEvent(eventId, auth(ownerId, 'owner'))).resolves.toMatchObject({ notes: 'first save', version: 2 });
   });
 
   it('blocks nonexistent members and closed event responses', async () => {
@@ -106,6 +116,7 @@ function harness() {
     cancelledByFamilyMemberId: null,
     cancelledAt: null,
     metadata: {},
+    version: 1,
     createdAt: '2026-08-18T09:00:00.000Z',
     updatedAt: '2026-08-18T09:00:00.000Z',
     responses: [],

@@ -8,8 +8,11 @@ export type FamilyTreasuryEntryRecord = {
   locationReference: string | null;
   description: string;
   price: string | null;
+  priceAmount: number | null;
+  priceNote: string | null;
   note: string | null;
   isActive: boolean;
+  version: number;
   createdByFamilyMemberId: string | null;
   updatedByFamilyMemberId: string | null;
   createdAt: string;
@@ -23,7 +26,10 @@ export type FamilyTreasuryEntryInput = {
   locationReference?: string | null;
   description?: string;
   price?: string | null;
+  priceAmount?: number | null;
+  priceNote?: string | null;
   note?: string | null;
+  expectedVersion?: number;
 };
 
 export type FamilyTreasuryListQuery = {

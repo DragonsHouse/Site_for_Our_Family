@@ -1,5 +1,6 @@
 export type TowerDefenseErrorCode =
   | 'TOWER_DEFENSE_SERVICE_UNAVAILABLE'
+  | 'TOWER_DEFENSE_RECONCILIATION_UNAVAILABLE'
   | 'TOWER_DEFENSE_PERMISSION_DENIED'
   | 'TOWER_NOT_FOUND'
   | 'TOWER_INACTIVE'
@@ -7,6 +8,7 @@ export type TowerDefenseErrorCode =
   | 'MEMBER_NOT_FOUND'
   | 'INVALID_GUARD_COUNTS'
   | 'INVALID_TIME_RANGE'
+  | 'TOWER_COOLDOWN_VERSION_CONFLICT'
   | 'INVALID_TRANSITION'
   | 'INVALID_ATTENDANCE_MEMBER'
   | 'DUPLICATE_RESPONSE'
@@ -14,6 +16,7 @@ export type TowerDefenseErrorCode =
 
 export const TOWER_DEFENSE_ERROR_MESSAGES: Record<TowerDefenseErrorCode, string> = {
   TOWER_DEFENSE_SERVICE_UNAVAILABLE: 'Tower Defense service is unavailable.',
+  TOWER_DEFENSE_RECONCILIATION_UNAVAILABLE: 'Tower reconciliation is unavailable.',
   TOWER_DEFENSE_PERMISSION_DENIED: 'Permission denied.',
   TOWER_NOT_FOUND: 'Tower not found.',
   TOWER_INACTIVE: 'Tower is inactive.',
@@ -21,6 +24,7 @@ export const TOWER_DEFENSE_ERROR_MESSAGES: Record<TowerDefenseErrorCode, string>
   MEMBER_NOT_FOUND: 'Family member not found.',
   INVALID_GUARD_COUNTS: 'Guard counts must satisfy minimum <= recommended <= maximum.',
   INVALID_TIME_RANGE: 'Defense time range is invalid.',
+  TOWER_COOLDOWN_VERSION_CONFLICT: 'Tower cooldown was already changed. Refresh and try again.',
   INVALID_TRANSITION: 'Defense status transition is not allowed.',
   INVALID_ATTENDANCE_MEMBER: 'Attendance member must have an active response for this defense.',
   DUPLICATE_RESPONSE: 'Member already has a response for this defense.',

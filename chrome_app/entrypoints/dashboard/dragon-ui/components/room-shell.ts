@@ -180,6 +180,7 @@ export function DragonRoomRail<T extends string>({
         {
           key: item.key,
           type: 'button',
+          'data-testid': `dragon-room-${item.key}`,
           className: cx('dh-dragon-room-rail-item', active && 'is-active', item.locked && 'is-locked'),
           onClick: () => {
             if (!unavailable) onItemSelect(item.key);

@@ -8,15 +8,23 @@ const DISCORD_CONTENT_LIMIT = 2000;
 const DISCORD_TRUNCATION_SUFFIX = '\n...';
 
 export function renderQuestMessage(quest: FamilyQuestDto): DiscordMessagePayload {
+  const activeParticipants = quest.participants.filter((item) => !item.leftAt);
+  const activeHelpers = quest.helpers.filter((item) => !item.leftAt);
+  const paid = quest.paidAt ? quest.totalReward : quest.payouts.reduce((sum, payout) => sum + (payout.status === 'paid' ? payout.amount : 0), 0);
+  const remaining = Math.max(quest.totalReward - paid, 0);
   return withSafeContent({
     content: [
       `**${quest.title}**`,
-      `Статус: ${quest.status}`,
+      `Статус: ${questStatusLabel(quest.status)}`,
       quest.description ? `\n${quest.description}` : '',
       quest.startsAt ? `Час: ${formatDate(quest.startsAt)}` : null,
-      `Учасники: ${quest.participants.filter((item) => !item.leftAt).length}`,
-      `Помічники: ${quest.helpers.filter((item) => !item.leftAt).length}`,
-      quest.memberRewardPool > 0 ? `Фонд людям: ${formatMoney(quest.memberRewardPool)}` : null,
+      `Учасники: ${activeParticipants.length}`,
+      activeHelpers.length ? `Помічники: ${activeHelpers.map((item) => item.displayName).join(', ')}` : null,
+      quest.totalReward > 0 ? `Загальна нагорода: ${formatMoney(quest.totalReward)}$` : null,
+      quest.memberRewardPool > 0 ? `Фонд учасникам: ${formatMoney(quest.memberRewardPool)}$` : null,
+      quest.familyReward > 0 ? `У сімейний банк: ${formatMoney(quest.familyReward)}$` : null,
+      quest.requiredItems ? `Потрібно: ${quest.requiredItems}` : null,
+      quest.totalReward > 0 && (paid > 0 || remaining > 0) ? `Виплачено: ${formatMoney(paid)}$ · Залишилось: ${formatMoney(remaining)}$` : null,
     ].filter(Boolean).join('\n'),
     components: [
       actionRow([
@@ -32,18 +40,22 @@ export function renderQuestMessage(quest: FamilyQuestDto): DiscordMessagePayload
 export function renderTowerDefenseMessage(defense: TowerDefenseDto): DiscordMessagePayload {
   const metadata = readMetadata(defense.metadata);
   const customMessage = readString(metadata.announcementMessage);
-  const initiator = readString(metadata.initiatorFamilyMemberId) ?? defense.createdByFamilyMemberId;
+  const cooldownAt = readString(metadata.cooldownAt);
+  const unavailableCount = defense.responses.filter((response) => response.response === 'unavailable').length;
+  const goingCount = defense.responses.filter((response) => response.response === 'joining' || response.response === 'confirmed').length;
   return withSafeContent({
     content: [
       customMessage,
       `**${defense.title}**`,
       `Вишка: ${defense.tower.name}`,
-      `Статус: ${defense.status}`,
-      `Ініціатор: ${initiator}`,
-      `Час: ${formatDate(defense.startsAt)}`,
-      `Командир: ${defense.commanderDisplayName ?? 'не вказано'}`,
-      `Потрібно людей: ${defense.minimumGuardCount}`,
+      `Статус: ${towerStatusLabel(defense.status)}`,
+      `КД: ${cooldownAt ? formatDate(cooldownAt) : 'немає актуального КД'}`,
+      `Початок: ${formatDate(defense.startsAt)}`,
+      defense.commanderDisplayName ? `Командир: ${defense.commanderDisplayName}` : null,
+      `Мінімум: ${defense.minimumGuardCount}`,
+      `Йдуть: ${goingCount}`,
       `Підтвердили: ${defense.confirmedCount}`,
+      unavailableCount ? `Не можуть: ${unavailableCount}` : null,
       `Готовність: ${defense.presentCount}/${defense.minimumGuardCount}`,
     ].filter(Boolean).join('\n'),
     components: [
@@ -61,8 +73,8 @@ export function renderFamilyEventMessage(event: FamilyEventDto): DiscordMessageP
   return withSafeContent({
     content: [
       `**${event.title}**`,
-      `Тип: ${event.eventType}`,
-      `Статус: ${event.status}`,
+      `Тип: ${eventTypeLabel(event.eventType)}`,
+      `Статус: ${eventStatusLabel(event.status)}`,
       `Час: ${formatDate(event.startsAt)}`,
       event.locationLabel ? `Локація: ${event.locationLabel}` : null,
       `Організатор: ${event.organizerDisplayName ?? 'не вказано'}`,
@@ -119,4 +131,47 @@ function formatDate(value: string): string {
     timeStyle: 'short',
     timeZone: 'Europe/Kyiv',
   }).format(new Date(value));
+}
+
+function questStatusLabel(status: string): string {
+  return {
+    draft: 'чернетка',
+    scheduled: 'заплановано',
+    active: 'активний',
+    completed: 'завершено',
+    cancelled: 'скасовано',
+  }[status] ?? status;
+}
+
+function towerStatusLabel(status: string): string {
+  return {
+    draft: 'чернетка',
+    scheduled: 'заплановано',
+    gathering: 'збір',
+    active: 'активна оборона',
+    completed: 'завершено',
+    cancelled: 'скасовано',
+  }[status] ?? status;
+}
+
+function eventStatusLabel(status: string): string {
+  return {
+    draft: 'чернетка',
+    scheduled: 'заплановано',
+    active: 'триває',
+    completed: 'завершено',
+    cancelled: 'скасовано',
+  }[status] ?? status;
+}
+
+function eventTypeLabel(type: string): string {
+  return {
+    family_meeting: 'сімейна зустріч',
+    training: 'тренування',
+    rp_event: 'RP-подія',
+    family_activity: 'сімейна активність',
+    celebration: 'свято',
+    announcement: 'оголошення',
+    custom: 'інше',
+  }[type] ?? type;
 }

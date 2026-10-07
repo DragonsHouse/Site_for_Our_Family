@@ -61,13 +61,17 @@ export class FamilyEventService {
   async updateEvent(id: string, input: UpdateFamilyEventInput, auth: FamilyAuthContext, now = new Date()): Promise<FamilyEventDto> {
     const event = await this.requireEvent(id);
     this.assertCanManageEvent(auth, event);
+    if (!input.expectedVersion) throw new FamilyEventError('VALIDATION_ERROR', 'expectedVersion is required.', 400);
+    if (event.version !== input.expectedVersion) {
+      throw new FamilyEventError('FAMILY_EVENT_VERSION_CONFLICT', 'Family event was already changed.', 409);
+    }
     if (event.status === 'completed' || event.status === 'cancelled') {
       throw new FamilyEventError('FAMILY_EVENT_INVALID_TRANSITION', 'Closed events cannot be edited.', 409, { status: event.status });
     }
     await this.validateCreateOrUpdate(input, event);
     if (input.organizerFamilyMemberId) await this.assertMemberExists(input.organizerFamilyMemberId);
     const updated = await this.repository.updateEvent(id, { ...input, now: now.toISOString() });
-    if (!updated) throw new FamilyEventError('FAMILY_EVENT_NOT_FOUND', 'Family event not found.', 404);
+    if (!updated) throw new FamilyEventError('FAMILY_EVENT_VERSION_CONFLICT', 'Family event was already changed.', 409);
     return toDto(updated);
   }
 

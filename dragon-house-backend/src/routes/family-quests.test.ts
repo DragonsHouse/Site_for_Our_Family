@@ -151,6 +151,7 @@ function template(): FamilyQuestTemplateRecord {
     cooldownHours: 24,
     cooldownUntil: null,
     metadata: {},
+    version: 1,
     createdAt: now,
     updatedAt: now,
   };
@@ -180,6 +181,7 @@ function quest(): FamilyQuestRecord {
     paidAt: null,
     paidByFamilyMemberId: null,
     metadata: {},
+    version: 1,
     createdAt: now,
     updatedAt: now,
     people: [

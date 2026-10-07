@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryTowerDefenseRepository } from './tower-defense-repository.js';
 import { TowerDefenseService } from './tower-defense-service.js';
-import type { FireGuardRosterRecord, TowerDefenseRecord, TowerRecord } from './tower-defense-models.js';
+import type { FireGuardRosterRecord, TowerDefenseRecord, TowerGuardImportSignal, TowerRecord } from './tower-defense-models.js';
 import type { FamilyAuthContext } from '../types.js';
 
 const now = '2026-08-12T10:00:00.000Z';
@@ -92,6 +92,113 @@ describe('TowerDefenseService', () => {
       endedAt: null,
     });
     await expect(service.cancelDefense(defenseId, { reason: 'again' }, ownerAuth, new Date(now))).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
+  });
+
+  it('reconciles Discord tower guard signals through the domain service without inventing commander', async () => {
+    const service = serviceWith();
+
+    const result = await service.reconcileExternalTowerGuardSignals([towerSignal(50)], {
+      systemActorFamilyMemberId: 'owner-id',
+      confidence: 'complete',
+    }, new Date(now));
+    const defenses = await service.listDefenses({ status: 'all' }, ownerAuth);
+    const imported = defenses.items.find((item) => item.externalSource === 'discord_tower_guard');
+
+    expect(result).toMatchObject({ state: 'applied', processedCount: 1 });
+    expect(imported).toMatchObject({
+      title: 'Оборона Вишка №50',
+      commanderFamilyMemberId: null,
+      createdByFamilyMemberId: 'owner-id',
+      externalId: 'tower:50',
+    });
+  });
+
+  it('does not close stale Discord defenses when reconciliation confidence is degraded', async () => {
+    const service = serviceWith();
+
+    await service.reconcileExternalTowerGuardSignals([towerSignal(50)], {
+      systemActorFamilyMemberId: 'owner-id',
+      confidence: 'complete',
+    }, new Date(now));
+    const degraded = await service.reconcileExternalTowerGuardSignals([towerSignal(51)], {
+      systemActorFamilyMemberId: 'owner-id',
+      confidence: 'degraded',
+    }, new Date('2026-08-12T10:05:00.000Z'));
+    const defenses = await service.listDefenses({ status: 'all' }, ownerAuth);
+
+    expect(degraded).toMatchObject({ state: 'degraded', closedStaleCount: 0 });
+    expect(defenses.items.find((item) => item.externalId === 'tower:50')?.status).toBe('active');
+  });
+
+  it('closes stale Discord defenses only for a confident complete snapshot', async () => {
+    const service = serviceWith();
+
+    await service.reconcileExternalTowerGuardSignals([towerSignal(50), towerSignal(51)], {
+      systemActorFamilyMemberId: 'owner-id',
+      confidence: 'complete',
+    }, new Date(now));
+    const complete = await service.reconcileExternalTowerGuardSignals([towerSignal(51)], {
+      systemActorFamilyMemberId: 'owner-id',
+      confidence: 'complete',
+    }, new Date('2026-08-12T10:05:00.000Z'));
+    const defenses = await service.listDefenses({ status: 'all' }, ownerAuth);
+
+    expect(complete.closedStaleCount).toBe(1);
+    expect(defenses.items.find((item) => item.externalId === 'tower:50')?.status).toBe('cancelled');
+    expect(defenses.items.find((item) => item.externalId === 'tower:51')?.status).toBe('active');
+  });
+
+  it('creates one KD reminder candidate for missing KD and suppresses duplicate polls', async () => {
+    const service = serviceWith();
+    const first = await service.reconcileExternalTowerGuardSignals([towerSignal(50)], {
+      systemActorFamilyMemberId: 'owner-id',
+      confidence: 'complete',
+      kdReminderIntervalSeconds: 3600,
+    }, new Date(now));
+    expect(first.kdReminderCandidates).toHaveLength(1);
+
+    await service.recordTowerKdReminderDelivery({
+      towerId: first.kdReminderCandidates[0]!.towerId,
+      result: 'sent',
+      reason: 'missing_kd',
+    }, new Date(now));
+
+    for (let minute = 1; minute <= 10; minute += 1) {
+      const next = await service.reconcileExternalTowerGuardSignals([towerSignal(50)], {
+        systemActorFamilyMemberId: 'owner-id',
+        confidence: 'complete',
+        kdReminderIntervalSeconds: 3600,
+      }, new Date(`2026-08-12T10:${String(minute).padStart(2, '0')}:00.000Z`));
+      expect(next.kdReminderCandidates).toHaveLength(0);
+    }
+  });
+
+  it('resets KD reminder eligibility after a valid cooldown appears', async () => {
+    const service = serviceWith();
+    const missing = await service.reconcileExternalTowerGuardSignals([towerSignal(50)], {
+      systemActorFamilyMemberId: 'owner-id',
+      confidence: 'complete',
+      kdReminderIntervalSeconds: 3600,
+    }, new Date(now));
+    await service.recordTowerKdReminderDelivery({
+      towerId: missing.kdReminderCandidates[0]!.towerId,
+      result: 'sent',
+      reason: 'missing_kd',
+    }, new Date(now));
+
+    const valid = await service.reconcileExternalTowerGuardSignals([towerSignal(50, { cooldownNeedsUpdate: false, cooldownAt: '2026-08-12T12:00:00.000Z' })], {
+      systemActorFamilyMemberId: 'owner-id',
+      confidence: 'complete',
+      kdReminderIntervalSeconds: 3600,
+    }, new Date('2026-08-12T10:05:00.000Z'));
+    expect(valid.kdReminderCandidates).toHaveLength(0);
+
+    const missingAgain = await service.reconcileExternalTowerGuardSignals([towerSignal(50)], {
+      systemActorFamilyMemberId: 'owner-id',
+      confidence: 'complete',
+      kdReminderIntervalSeconds: 3600,
+    }, new Date('2026-08-12T10:06:00.000Z'));
+    expect(missingAgain.kdReminderCandidates).toHaveLength(1);
   });
 });
 
@@ -188,5 +295,28 @@ function createInput() {
     minimumGuardCount: 1,
     recommendedGuardCount: 2,
     maximumGuardCount: 5,
+  };
+}
+
+function towerSignal(towerNumber: number, overrides: Partial<TowerGuardImportSignal> = {}): TowerGuardImportSignal {
+  return { ...towerSignalBase(towerNumber), ...overrides };
+}
+
+function towerSignalBase(towerNumber: number) {
+  return {
+    externalId: `message-${towerNumber}`,
+    channelId: 'tower-channel',
+    authorId: 'trusted-bot',
+    authorName: 'Dragon Bot',
+    messageCreatedAt: now,
+    messageEditedAt: null,
+    towerNumber,
+    towerCode: `NO-${towerNumber}`,
+    towerName: `Вишка №${towerNumber}`,
+    protectionDown: true,
+    cooldownNeedsUpdate: true,
+    cooldownAt: null,
+    statusText: 'Захист впав. Потрібно оновити КД.',
+    rawText: `Вишка №${towerNumber}`,
   };
 }

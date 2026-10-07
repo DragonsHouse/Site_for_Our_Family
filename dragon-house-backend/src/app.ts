@@ -46,6 +46,7 @@ import { createDiscordOrchestrationRouter } from './routes/discord-orchestration
 import { createDiscordSyncRouter } from './routes/discord-sync.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createDiscordAuthRouter } from './routes/auth-discord.js';
+import { createE2eAuthRouter } from './routes/e2e-auth.js';
 import { createHealthRouter } from './routes/health.js';
 import { MemoryFamilyMemberRepository, type FamilyMemberRepository } from './members/member-repository.js';
 import { PgFamilyMemberRepository } from './members/pg-member-repository.js';
@@ -56,6 +57,7 @@ import { PgFamilyQuestRepository } from './quests/pg-quest-repository.js';
 import { MemoryFamilyQuestRepository, type FamilyQuestRepository } from './quests/quest-repository.js';
 import { FamilyQuestService } from './quests/quest-service.js';
 import { createFamilyTreasuryRouter } from './routes/family-treasury.js';
+import { createFamilyAuditLogRouter } from './routes/family-audit-log.js';
 import { PgFamilyTreasuryRepository } from './treasury/pg-treasury-repository.js';
 import { MemoryFamilyTreasuryRepository, type FamilyTreasuryRepository } from './treasury/treasury-repository.js';
 import { FamilyTreasuryService } from './treasury/treasury-service.js';
@@ -321,6 +323,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   app.use('/api', healthRouter);
   app.use('/', healthRouter);
   app.use('/api', createAuthRouter(config, authService));
+  app.use('/api', createE2eAuthRouter(config, authService));
   app.use('/api', createDiscordAuthRouter(config, oauthLoginService));
   app.use('/api', createFamilyMembersRouter(config, authService, memberService));
   app.use('/api', createFamilyAccountingRouter(config, authService, accountingReadService, accountingService, discordService));
@@ -330,6 +333,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   app.use('/api', createFamilyCalendarRouter(config, authService, familyCalendarService));
   app.use('/api', createFamilyQuestsRouter(config, authService, questService, questPayoutService, discordService));
   app.use('/api', createFamilyTreasuryRouter(config, authService, treasuryService));
+  app.use('/api', createFamilyAuditLogRouter(config, authService, pgPool));
   app.use('/api', createFamilyTowerDefenseRouter(config, authService, towerDefenseService, rewardAllocationService, achievementService, discordOrchestrationService));
   app.use('/api', createDiscordRouter(discordService));
   app.use('/api', createDiscordOrchestrationRouter(config, authService, discordOrchestrationService));

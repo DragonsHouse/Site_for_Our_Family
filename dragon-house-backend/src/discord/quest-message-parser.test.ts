@@ -84,6 +84,46 @@ describe('parseDiscordQuestMessage', () => {
       payoutStatus: 'paid',
     });
   });
+
+  it.each([
+    ['Не видано', 'unpaid'],
+    ['Видано', 'paid'],
+    ['Не виплачено', 'unpaid'],
+    ['Виплачено', 'paid'],
+    ['Очікує рішення', 'pending'],
+  ] as const)('classifies payout text "%s" as %s', (statusText, expectedStatus) => {
+    const quest = parseDiscordQuestMessage({
+      id: `message-${expectedStatus}-${statusText}`,
+      channelId: 'quests',
+      authorId: 'dragon-bot',
+      authorName: 'Dragon',
+      createdAt: '2026-09-13T05:28:00.000Z',
+      editedAt: null,
+      content: '',
+      embeds: [{
+        title: 'Лісові трофеї • Завершено',
+        description: [
+          '🕒 неділя, 13 вересня 2026 р. 8:28',
+          '**Учасники (1/1)**',
+          '@Boris_Dragons',
+          '',
+          '🎁 Нагороди:',
+          `@Boris_Dragons 💵 600 000$ · ${statusText}`,
+        ].join('\n'),
+        fields: [],
+      }],
+    });
+
+    expect(quest?.participantDetails?.[0]?.payoutStatus).toBe(expectedStatus);
+  });
+
+  it('uses Europe/Kyiv DST offset for Ukrainian quest dates', () => {
+    const summerQuest = parseDiscordQuestMessage(questWithDate('summer', 'неділя, 13 вересня 2026 р. 8:28'));
+    const winterQuest = parseDiscordQuestMessage(questWithDate('winter', 'неділя, 13 грудня 2026 р. 8:28'));
+
+    expect(summerQuest?.startsAt).toBe('2026-09-13T08:28:00+03:00');
+    expect(winterQuest?.startsAt).toBe('2026-12-13T08:28:00+02:00');
+  });
 });
 
 describe('aggregateDiscordQuestAuditMessages', () => {
@@ -109,6 +149,23 @@ describe('aggregateDiscordQuestAuditMessages', () => {
       remainingReward: 0,
     });
   });
+
+  it('reconstructs every unique reward recipient when participant events are incomplete', () => {
+    const items = aggregateDiscordQuestAuditMessages([
+      audit('m1', '2026-09-13T05:28:46.183Z', '<t:1789277326:f> · <@100> · **quest.create**\nСтворено квест **Лісові трофеї**\n  • questId: `quest-1`'),
+      audit('m2', '2026-09-13T05:29:00.000Z', '<t:1789277340:f> · <@100> · **quest.participant.add**\n  • questId: `quest-1`\n  • user: `100`'),
+      audit('m3', '2026-09-13T05:30:00.000Z', '<t:1789277400:f> · <@100> · **quest.reward.add**\nНагорода <@100>: 100$\n  • questId: `quest-1`\n  • recipient: `100`'),
+      audit('m4', '2026-09-13T05:31:00.000Z', '<t:1789277460:f> · <@100> · **quest.reward.add**\nНагорода <@200>: 200$\n  • questId: `quest-1`\n  • recipient: `200`'),
+      audit('m5', '2026-09-13T05:31:30.000Z', '<t:1789277490:f> · <@100> · **quest.reward.add**\nНагорода <@200>: 200$\n  • questId: `quest-1`\n  • recipient: `200`'),
+      audit('m6', '2026-09-13T05:32:00.000Z', '<t:1789277520:f> · <@100> · **quest.reward.add**\nНагорода <@300>: 300$\n  • questId: `quest-1`\n  • recipient: `300`'),
+      audit('m7', '2026-09-13T05:33:00.000Z', '<t:1789277580:f> · <@100> · **quest.helper.add**\n  • questId: `quest-1`\n  • user: `400`'),
+      audit('m8', '2026-09-13T05:34:00.000Z', '<t:1789277640:f> · <@100> · **quest.participant.remove**\n  • questId: `quest-1`\n  • user: `300`'),
+    ]);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]?.participants).toEqual(['<@100>', '<@200>']);
+    expect(items[0]?.helpers).toEqual(['<@400>']);
+  });
 });
 
 function audit(id: string, createdAt: string, content: string) {
@@ -120,5 +177,29 @@ function audit(id: string, createdAt: string, content: string) {
     createdAt,
     editedAt: null,
     content,
+  };
+}
+
+function questWithDate(id: string, dateLine: string) {
+  return {
+    id,
+    channelId: 'quests',
+    authorId: 'dragon-bot',
+    authorName: 'Dragon',
+    createdAt: '2026-09-13T05:28:00.000Z',
+    editedAt: null,
+    content: '',
+    embeds: [{
+      title: 'Лісові трофеї • Завершено',
+      description: [
+        `🕒 ${dateLine}`,
+        '**Учасники (1/1)**',
+        '@Boris_Dragons',
+        '',
+        '🎁 Нагороди:',
+        '@Boris_Dragons 💵 600 000$ · Видано',
+      ].join('\n'),
+      fields: [],
+    }],
   };
 }

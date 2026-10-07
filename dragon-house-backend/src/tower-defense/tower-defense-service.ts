@@ -12,6 +12,10 @@ import type {
   TowerDefenseResponseRecord,
   TowerDefenseResult,
   TowerDefenseStatus,
+  TowerKdReminderDeliveryInput,
+  TowerGuardImportSignal,
+  TowerGuardReconciliationConfidence,
+  TowerGuardReconciliationResult,
   TowerRecord,
   UpdateTowerDefenseInput,
 } from './tower-defense-models.js';
@@ -54,6 +58,78 @@ export class TowerDefenseService {
   async listFireGuardRoster(auth: FamilyAuthContext): Promise<{ items: FireGuardRosterRecord[] }> {
     this.assertCanRead(auth);
     return { items: await this.repository.listFireGuardRoster() };
+  }
+
+  async updateTowerCooldown(
+    towerId: string,
+    input: { cooldownAt?: string | null; clear?: boolean; expectedUpdatedAt?: string | null },
+    auth: FamilyAuthContext,
+    now = new Date(),
+  ): Promise<TowerRecord> {
+    this.assertCanManage(auth);
+    if (!this.repository.updateTowerCooldownState) {
+      throw new TowerDefenseError('TOWER_DEFENSE_RECONCILIATION_UNAVAILABLE', 'Tower KD state is unavailable.', 503);
+    }
+    const tower = await this.repository.findTowerById(towerId);
+    if (!tower) throw new TowerDefenseError('TOWER_NOT_FOUND', 'Tower not found.', 404, { towerId });
+    const clear = input.clear === true;
+    const cooldownAt = clear ? null : input.cooldownAt ?? null;
+    if (!clear && !cooldownAt) {
+      throw new TowerDefenseError('VALIDATION_ERROR', 'cooldownAt is required unless clear is true.', 400);
+    }
+    if (cooldownAt && Number.isNaN(Date.parse(cooldownAt))) {
+      throw new TowerDefenseError('INVALID_TIME_RANGE', 'cooldownAt must be a valid timestamp.', 400, { cooldownAt });
+    }
+    const updated = await this.repository.updateTowerCooldownState({
+      towerId,
+      cooldownAt,
+      clear,
+      expectedUpdatedAt: input.expectedUpdatedAt ?? null,
+      actorFamilyMemberId: auth.familyMemberId,
+      now: now.toISOString(),
+    });
+    if (!updated) {
+      throw new TowerDefenseError('TOWER_COOLDOWN_VERSION_CONFLICT', 'Tower cooldown was already changed.', 409, { towerId });
+    }
+    return updated;
+  }
+
+  async reconcileExternalTowerGuardSignals(
+    signals: TowerGuardImportSignal[],
+    input: { systemActorFamilyMemberId: string; confidence: TowerGuardReconciliationConfidence; kdReminderIntervalSeconds?: number },
+    now = new Date(),
+  ): Promise<TowerGuardReconciliationResult> {
+    if (!this.repository.reconcileExternalTowerGuardSignals) {
+      throw new TowerDefenseError('TOWER_DEFENSE_RECONCILIATION_UNAVAILABLE', 'Tower reconciliation is unavailable.', 503);
+    }
+    await this.assertMemberExists(input.systemActorFamilyMemberId);
+    const uniqueSignals = uniqueLatestSignals(signals);
+    const warnings: string[] = [];
+    if (!uniqueSignals.length) warnings.push('No trusted current tower signals were available.');
+    if (uniqueSignals.length < signals.length) warnings.push('Duplicate tower signals were collapsed before reconciliation.');
+    const closeStale = input.confidence === 'complete' && uniqueSignals.length > 0;
+    if (!closeStale) warnings.push('Snapshot confidence is degraded; stale defenses were left unchanged.');
+    const result = await this.repository.reconcileExternalTowerGuardSignals({
+      signals: uniqueSignals,
+      systemActorFamilyMemberId: input.systemActorFamilyMemberId,
+      closeStale,
+      kdReminderIntervalSeconds: input.kdReminderIntervalSeconds ?? 3600,
+      now: now.toISOString(),
+    });
+    return {
+      state: input.confidence === 'complete' ? 'applied' : 'degraded',
+      processedCount: result.processedCount,
+      closedStaleCount: result.closedStaleCount,
+      kdReminderCandidates: result.kdReminderCandidates,
+      warnings,
+    };
+  }
+
+  async recordTowerKdReminderDelivery(input: Omit<TowerKdReminderDeliveryInput, 'now'>, now = new Date()): Promise<void> {
+    if (!this.repository.recordTowerKdReminderDelivery) {
+      throw new TowerDefenseError('TOWER_DEFENSE_RECONCILIATION_UNAVAILABLE', 'Tower KD reminder state is unavailable.', 503);
+    }
+    await this.repository.recordTowerKdReminderDelivery({ ...input, now: now.toISOString() });
   }
 
   async createDefense(input: CreateTowerDefenseInput, auth: FamilyAuthContext, now = new Date()): Promise<TowerDefenseDto> {
@@ -289,4 +365,17 @@ function toDto(defense: TowerDefenseRecord): TowerDefenseDto {
     ...defense,
     ...calculateDerivedCounts(defense),
   };
+}
+
+function uniqueLatestSignals(signals: TowerGuardImportSignal[]): TowerGuardImportSignal[] {
+  const byTower = new Map<number, TowerGuardImportSignal>();
+  for (const signal of signals) {
+    const current = byTower.get(signal.towerNumber);
+    if (!current || latestSignalTime(signal) > latestSignalTime(current)) byTower.set(signal.towerNumber, signal);
+  }
+  return [...byTower.values()].sort((left, right) => left.towerNumber - right.towerNumber);
+}
+
+function latestSignalTime(signal: TowerGuardImportSignal): number {
+  return new Date(signal.messageEditedAt ?? signal.messageCreatedAt).getTime();
 }

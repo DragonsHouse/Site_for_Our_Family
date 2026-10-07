@@ -87,7 +87,7 @@ export class MemoryFamilyEventRepository implements FamilyEventRepository {
       priority: input.priority ?? 'normal',
       startsAt: input.startsAt,
       endsAt: input.endsAt ?? null,
-      timezone: input.timezone ?? 'Europe/Kiev',
+      timezone: input.timezone ?? 'Europe/Kyiv',
       allDay: input.allDay ?? false,
       locationLabel: input.locationLabel ?? null,
       createdByFamilyMemberId: input.createdByFamilyMemberId,
@@ -102,6 +102,7 @@ export class MemoryFamilyEventRepository implements FamilyEventRepository {
       cancelledByFamilyMemberId: null,
       cancelledAt: null,
       metadata: input.metadata ?? {},
+      version: 1,
       createdAt: input.now,
       updatedAt: input.now,
       responses: [],
@@ -122,6 +123,7 @@ export class MemoryFamilyEventRepository implements FamilyEventRepository {
     const index = this.events.findIndex((event) => event.id === id);
     if (index < 0) return null;
     const current = this.events[index]!;
+    if (input.expectedVersion !== undefined && current.version !== input.expectedVersion) return null;
     const updated: FamilyEventRecord = {
       ...current,
       title: input.title ?? current.title,
@@ -144,6 +146,7 @@ export class MemoryFamilyEventRepository implements FamilyEventRepository {
       cancelledByFamilyMemberId: input.cancelledByFamilyMemberId !== undefined ? input.cancelledByFamilyMemberId : current.cancelledByFamilyMemberId,
       cancelledAt: input.cancelledAt !== undefined ? input.cancelledAt : current.cancelledAt,
       metadata: input.metadata ?? current.metadata,
+      version: current.version + 1,
       updatedAt: input.now,
     };
     this.events[index] = updated;

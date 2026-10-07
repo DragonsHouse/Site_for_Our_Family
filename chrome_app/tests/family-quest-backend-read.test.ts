@@ -25,6 +25,7 @@ const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.me
 function template(overrides: Partial<BackendFamilyQuestTemplateDto> = {}): BackendFamilyQuestTemplateDto {
   return {
     id: 'template-1',
+    version: 1,
     templateKey: 'template-key',
     title: 'Backend template',
     category: 'Бізнес',
@@ -49,6 +50,7 @@ function template(overrides: Partial<BackendFamilyQuestTemplateDto> = {}): Backe
 function quest(overrides: Partial<BackendFamilyQuestDto> = {}): BackendFamilyQuestDto {
   return {
     id: '11111111-1111-4111-8111-111111111111',
+    version: 1,
     templateId: 'template-1',
     title: 'Backend quest',
     description: 'Backend quest description',

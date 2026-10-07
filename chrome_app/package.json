@@ -25,6 +25,8 @@
     "map:sync-assets:with-images": "node scripts/sync-map-assets.mjs --include-popup-images",
     "map:build-default-data": "node scripts/build-map-default-data.mjs",
     "test": "npm run test:auth-source && npm run test:extension-shell",
+    "test:e2e": "playwright test",
+    "test:e2e:real": "playwright test --config playwright.real-backend.config.ts",
     "test:auth-source": "node --experimental-strip-types --test tests/family-backend-current-user.test.ts tests/family-legacy-auth-cleanup.test.ts tests/family-member-data-source-boundary.test.ts tests/family-persistent-login.test.ts tests/family-auth-outcome-router.test.ts tests/family-discord-link-state.test.ts tests/family-profile-page.test.ts tests/family-members-directory.test.ts tests/family-members-sort.test.ts tests/family-member-activity-backend.test.ts tests/family-events-backend.test.ts tests/family-achievements-backend.test.ts tests/family-reward-allocations-backend.test.ts tests/family-accounting-backend.test.ts tests/family-discord-orchestration.test.ts tests/family-quest-backend-payout.test.ts tests/family-quest-backend-read.test.ts tests/dragon-design-system.test.ts tests/dragon-ui-primitives.test.ts tests/dragon-room-shell.test.ts tests/dragon-ember-gate.test.ts tests/dragon-calendar-module.test.ts tests/dragon-data-architecture.test.ts tests/dragon-members-module.test.ts tests/dragon-profile-module.test.ts tests/dragon-achievement-engine.test.ts tests/dragon-birthday-feature.test.ts tests/dragon-foundation-hardening.test.ts tests/dragon-event-engine.test.ts tests/dragon-tower-defense.test.ts tests/dragon-discord-sync.test.ts",
     "test:extension-shell": "node --experimental-strip-types --test tests/extension-shell-contract.test.ts",
     "lint": "eslint .",
@@ -36,6 +38,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/chrome": "^0.0.298",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

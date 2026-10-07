@@ -9,6 +9,7 @@ import type {
   DragonGuardResponseStatus,
   DragonTowerDefinition,
   DragonTowerDefense,
+  DragonTowerCooldownState,
   DragonTowerMapMetadata,
   DragonTowerVisualMetadata
 } from '../entrypoints/dashboard/family/tower-defense-models.ts';
@@ -41,7 +42,26 @@ export function mapBackendTower(tower: BackendTowerDto): DragonTowerDefinition {
     map: mapTowerMap(tower.mapMetadata),
     visual: mapTowerVisual(tower),
     active: tower.isActive,
-    source: 'backend'
+    source: 'backend',
+    cooldownState: mapTowerCooldownState(tower.cooldownState)
+  };
+}
+
+function mapTowerCooldownState(state: BackendTowerDto['cooldownState']): DragonTowerCooldownState | null {
+  if (!state) return null;
+  return {
+    cooldownAt: state.cooldownAt,
+    status: state.cooldownStatus === 'current' || state.cooldownStatus === 'stale' ? state.cooldownStatus : 'missing',
+    source: state.source === 'hub' || state.source === 'system' ? state.source : 'discord',
+    lastUpdatedAt: state.updatedAt,
+    lastReminderAt: state.lastKdReminderAt,
+    lastReminderReason: state.lastKdReminderReason,
+    lastReminderResult: state.lastKdReminderResult === 'sent' || state.lastKdReminderResult === 'failed' || state.lastKdReminderResult === 'skipped'
+      ? state.lastKdReminderResult
+      : null,
+    lastReminderError: state.lastKdReminderError,
+    reminderTarget: typeof state.metadata.reminderTarget === 'string' ? state.metadata.reminderTarget : null,
+    expectedUpdatedAt: state.updatedAt,
   };
 }
 

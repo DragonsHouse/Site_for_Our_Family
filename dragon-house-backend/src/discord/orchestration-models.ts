@@ -118,6 +118,11 @@ export type DiscordMessagePayload = {
   content: string;
   components?: Array<Record<string, unknown>>;
   embeds?: Array<Record<string, unknown>>;
+  allowedMentions?: {
+    parse?: Array<'roles' | 'users' | 'everyone'>;
+    roles?: string[];
+    users?: string[];
+  };
 };
 
 export interface DiscordMessageTransport {

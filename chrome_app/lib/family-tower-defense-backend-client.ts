@@ -6,12 +6,14 @@ import {
   assertBackendDefenseResponse,
   assertBackendRosterResponse,
   assertBackendTowerListResponse,
+  assertBackendTowerResponse,
   type BackendCompleteDefenseResponse,
   type BackendDefenseAttendanceDto,
   type BackendDefenseResponseDto,
   type BackendFireGuardRosterResponse,
   type BackendTowerDefenseDto,
   type BackendTowerDefenseListResponse,
+  type BackendTowerDto,
   type BackendTowerListResponse
 } from './family-tower-defense-backend-response.ts';
 
@@ -67,6 +69,10 @@ export type BackendAttendancePayload = {
 
 export async function listBackendFamilyTowers(signal?: AbortSignal): Promise<BackendTowerListResponse> {
   return assertBackendTowerListResponse(await requestJson('/api/family/towers', { method: 'GET', signal }));
+}
+
+export async function updateBackendTowerCooldown(towerId: string, payload: { cooldownAt?: string | null; clear?: boolean; expectedUpdatedAt?: string | null }): Promise<BackendTowerDto> {
+  return assertBackendTowerResponse(await requestJson(`/api/family/towers/${encodeURIComponent(towerId)}/cooldown`, { method: 'PATCH', body: JSON.stringify(payload) }));
 }
 
 export async function listBackendTowerDefenses(filters: BackendTowerDefenseFilters = {}, signal?: AbortSignal): Promise<BackendTowerDefenseListResponse> {
