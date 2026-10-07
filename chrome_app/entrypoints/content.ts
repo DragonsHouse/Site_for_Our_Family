@@ -1,3 +1,4 @@
+import { defineContentScript } from 'wxt/utils/define-content-script';
 import { getSettings } from '../lib/storage';
 import type { ParseResult } from '../lib/types';
 

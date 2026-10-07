@@ -1,3 +1,4 @@
+import { defineBackground } from 'wxt/utils/define-background';
 import { QUANTFUN_EVENTS_URL } from '../lib/constants';
 import { DRAGON_HOUSE_ASSETS } from '../lib/family-assets';
 import {
