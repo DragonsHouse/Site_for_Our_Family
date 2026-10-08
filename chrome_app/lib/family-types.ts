@@ -165,11 +165,14 @@ export type FamilyPremiumRules = {
 
 export type FamilyEditableContentBlock = {
   id: string;
+  scope?: 'home' | 'rules' | 'recruitment';
   title: string;
   body: string;
   contact: string | null;
   updatedBy: string | null;
   updatedAt: string;
+  sortOrder?: number;
+  version?: number;
 };
 
 export type FamilyLedgerEntryType = 'income' | 'expense' | 'payout' | 'adjustment';
@@ -750,6 +753,8 @@ export type FamilyPost = FamilySyncMetadata & {
   serverName: string | null;
   isReadBy: string[];
   notificationRequired?: boolean;
+  version?: number;
+  archivedAt?: string | null;
 };
 
 export type FamilyNotificationType =
@@ -816,6 +821,7 @@ export type RecruitmentSettings = {
   contact: string;
   author: string;
   updatedAt: string;
+  version?: number;
 };
 
 export type FamilyMapZoneType = 'dragon_house' | 'ally' | 'neutral' | 'enemy' | 'server';

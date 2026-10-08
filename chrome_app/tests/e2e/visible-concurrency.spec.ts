@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page, type Response } from '@playwright/test';
 
 const dashboardUrl = process.env.PLAYWRIGHT_DASHBOARD_URL ?? 'http://127.0.0.1:4176/dashboard.html';
 const apiBaseUrl = process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://127.0.0.1:8788';
@@ -119,21 +119,30 @@ test('TREASURY: visible stale price edit shows conflict, refreshes, and keeps ar
     const winnerNote = `winner note ${Date.now()}`;
     const loserAmount = String(90000 + (Date.now() % 1000));
 
-    await saveAndExpectOk(pageA, 'PATCH', `/api/family/treasury/entries/${seededTreasuryEntryId}`, () => cardA.getByTestId('treasury-entry-price-amount').fill(winnerAmount));
-    await saveAndExpectOk(pageA, 'PATCH', `/api/family/treasury/entries/${seededTreasuryEntryId}`, () => cardA.getByTestId('treasury-entry-price-note').fill(winnerNote));
+    await cardA.getByTestId('treasury-entry-edit').click();
+    await cardB.getByTestId('treasury-entry-edit').click();
+    await expectNoBackendResponse(pageA, 'PATCH', `/api/family/treasury/entries/${seededTreasuryEntryId}`, async () => {
+      await cardA.getByTestId('treasury-entry-price-amount').fill(winnerAmount);
+      await cardA.getByTestId('treasury-entry-price-note').fill(winnerNote);
+    });
+    await saveAndExpectOk(pageA, 'PATCH', `/api/family/treasury/entries/${seededTreasuryEntryId}`, () => cardA.getByTestId('treasury-entry-save').click());
 
-    await saveAndExpectConflict(pageB, 'PATCH', `/api/family/treasury/entries/${seededTreasuryEntryId}`, () => cardB.getByTestId('treasury-entry-price-amount').fill(loserAmount));
+    await expectNoBackendResponse(pageB, 'PATCH', `/api/family/treasury/entries/${seededTreasuryEntryId}`, () => cardB.getByTestId('treasury-entry-price-amount').fill(loserAmount));
+    await saveAndExpectConflict(pageB, 'PATCH', `/api/family/treasury/entries/${seededTreasuryEntryId}`, () => cardB.getByTestId('treasury-entry-save').click());
     await expect(pageB.getByTestId('treasury-error')).toContainText(/Скарбниц|Оновити дані/u);
     await pageB.getByTestId('treasury-conflict-refresh').click();
     const refreshedB = pageB.locator(`[data-entry-id="${seededTreasuryEntryId}"]`);
-    await expect(refreshedB.getByTestId('treasury-entry-price-amount')).toHaveValue(winnerAmount);
-    await expect(refreshedB.getByTestId('treasury-entry-price-note')).toHaveValue(winnerNote);
+    await expect(refreshedB).toContainText(Number(winnerAmount).toLocaleString('uk-UA'));
+    await expect(refreshedB).toContainText(winnerNote);
 
     const { pageA: archiveA, pageB: archiveB, close: closeArchive } = await openActorPair(browser);
     try {
       const staleArchiveCard = await openTreasuryEntry(archiveB, seededTreasuryEntryId);
       const currentArchiveCard = await openTreasuryEntry(archiveA, seededTreasuryEntryId);
-      await saveAndExpectOk(archiveA, 'PATCH', `/api/family/treasury/entries/${seededTreasuryEntryId}`, () => currentArchiveCard.getByTestId('treasury-entry-title').fill(`Archive winner ${Date.now()}`));
+      await currentArchiveCard.getByTestId('treasury-entry-edit').click();
+      await staleArchiveCard.getByTestId('treasury-entry-edit').click();
+      await currentArchiveCard.getByTestId('treasury-entry-title').fill(`Archive winner ${Date.now()}`);
+      await saveAndExpectOk(archiveA, 'PATCH', `/api/family/treasury/entries/${seededTreasuryEntryId}`, () => currentArchiveCard.getByTestId('treasury-entry-save').click());
       await saveAndExpectConflict(archiveB, 'DELETE', `/api/family/treasury/entries/${seededTreasuryEntryId}`, () => staleArchiveCard.getByTestId('treasury-entry-archive').click());
       await expect(archiveB.getByTestId('treasury-error')).toContainText(/Скарбниц|Оновити дані/u);
     } finally {
@@ -256,6 +265,21 @@ async function saveAndExpectConflict(page: Page, method: string, path: string, a
   await action();
   const response = await responsePromise;
   expect(response.status()).toBe(409);
+}
+
+async function expectNoBackendResponse(page: Page, method: string, path: string, action: () => Promise<unknown>) {
+  let matched = false;
+  const listener = (response: Response) => {
+    if (response.url().includes(path) && response.request().method() === method) matched = true;
+  };
+  page.on('response', listener);
+  try {
+    await action();
+    await page.waitForTimeout(350);
+    expect(matched).toBe(false);
+  } finally {
+    page.off('response', listener);
+  }
 }
 
 async function installChromeShim(page: Page) {

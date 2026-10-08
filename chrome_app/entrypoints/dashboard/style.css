@@ -3303,6 +3303,82 @@ body {
   box-shadow: 0 0 18px rgba(255, 26, 0, 0.24);
 }
 
+.dh-panel,
+.dh-card,
+.dh-dragon-panel,
+.dh-dragon-card {
+  isolation: isolate;
+}
+
+.dh-panel::before,
+.dh-card:not(.dh-quest-card)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(255, 186, 104, 0.13), transparent 15rem),
+    radial-gradient(circle at 92% 100%, rgba(151, 28, 12, 0.11), transparent 18rem),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.035), transparent 36%);
+  opacity: 0.72;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.dh-panel::after,
+.dh-card::after {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  top: 0;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 184, 92, 0.68), rgba(255, 90, 0, 0.34), transparent);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.dh-dragon-section-head {
+  position: relative;
+  padding-bottom: 0.85rem;
+}
+
+.dh-dragon-section-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: min(16rem, 64%);
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 184, 92, 0.72), rgba(255, 90, 0, 0.32), transparent);
+  box-shadow: 0 0 18px rgba(255, 90, 0, 0.22);
+}
+
+.dh-dragon-hero h1,
+.dh-dragon-section-head h2,
+.dh-panel h1,
+.dh-panel h2 {
+  text-shadow:
+    0 0 18px rgba(255, 90, 0, 0.12),
+    0 1px 0 rgba(255, 236, 186, 0.12);
+}
+
+.dh-card:hover,
+.dh-dragon-card.is-interactive:hover,
+.dh-tab-active,
+.dh-fire-button:not(:disabled):hover {
+  filter: saturate(1.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dh-card:hover,
+  .dh-dragon-card.is-interactive:hover,
+  .dh-fire-button:not(:disabled):hover {
+    transform: none;
+  }
+}
+
 .dh-reward-card {
   border: 1px solid rgba(255, 255, 255, 0.09);
   background:

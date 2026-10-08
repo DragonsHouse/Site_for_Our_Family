@@ -194,11 +194,11 @@ export function DragonDiscordIntegrationStatus({
         <summary>Технічні деталі</summary>
         <dl>
           <div>
-            <dt>Guild ID</dt>
+            <dt>ID сервера Discord</dt>
             <dd>{status?.guildId ?? 'немає'}</dd>
           </div>
           <div>
-            <dt>Plan TTL</dt>
+            <dt>Термін дії плану</dt>
             <dd>{status?.planTtlSeconds ?? 0}s</dd>
           </div>
         </dl>
@@ -318,7 +318,7 @@ export function DragonDiscordConflictDialog({ item, onClose }: { item: DiscordSy
       <div className="dh-discord-sync-diff">
         {item.proposedFieldChanges.map((change) => (
           <div key={change.field}>
-            <strong>{change.field}</strong>
+            <strong>{friendlyField(change.field)}</strong>
             <span>{String(change.current ?? 'порожньо')}</span>
             <span>{String(change.proposed ?? 'порожньо')}</span>
           </div>
@@ -342,7 +342,7 @@ export function DragonDiscordConflictDialog({ item, onClose }: { item: DiscordSy
             <dd>{item.discordUserId}</dd>
           </div>
           <div>
-            <dt>Family member ID</dt>
+            <dt>ID учасника Family Hub</dt>
             <dd>{item.matchedFamilyMemberId ?? 'немає'}</dd>
           </div>
         </dl>
@@ -538,6 +538,22 @@ function friendlyEntity(entityType: string): string {
   return labels[entityType] ?? entityType;
 }
 
+function friendlyField(field: string): string {
+  const labels: Record<string, string> = {
+    title: 'Назва',
+    nickname: 'Позивний',
+    status: 'Стан',
+    rank: 'Ранг',
+    role: 'Роль',
+    priceAmount: 'Ціна',
+    priceNote: 'Примітка до ціни',
+    cooldownAt: 'КД діє до',
+    permissionsDiscord: 'Права з Discord',
+    sent_to_accounting: 'Передано в бухгалтерію'
+  };
+  return labels[field] ?? 'Невідоме поле';
+}
+
 function friendlyAction(action: string): string {
   const labels: Record<string, string> = {
     treasury_entry_created: 'створено запис',
@@ -558,7 +574,7 @@ function friendlyAction(action: string): string {
     payout_batch_finalized: 'виплату фіналізовано',
     payment_proof_uploaded: 'доказ оплати додано',
   };
-  return labels[action] ?? action.replaceAll('_', ' ');
+  return labels[action] ?? 'Невідома дія';
 }
 
 function auditSummary(item: FamilyAuditLogRecord): string {
@@ -576,7 +592,7 @@ function summarizeAuditData(value: unknown): string | null {
   const pairs = ['title', 'nickname', 'status', 'rank', 'role', 'priceAmount', 'priceNote', 'cooldownAt']
     .filter((key) => record[key] !== undefined && record[key] !== null)
     .slice(0, 4)
-    .map((key) => `${key}: ${String(record[key])}`);
+    .map((key) => `${friendlyField(key)}: ${String(record[key])}`);
   return pairs.length ? pairs.join(', ') : null;
 }
 
@@ -613,7 +629,7 @@ export function DragonDiscordAuditDialog({ audit, onClose }: { audit: DiscordSyn
             <dd>{audit.planId ?? 'немає'}</dd>
           </div>
           <div>
-            <dt>Application status</dt>
+            <dt>Статус застосування</dt>
             <dd>{audit.applicationStatus}</dd>
           </div>
         </dl>

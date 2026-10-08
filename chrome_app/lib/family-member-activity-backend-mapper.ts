@@ -19,11 +19,37 @@ export function mapBackendMemberActivityItem(item: BackendMemberActivityItemDto)
     type: item.type,
     sourceModule: item.sourceModule,
     occurredAt: item.occurredAt,
-    title: item.title,
-    description: item.description,
+    title: localizeActivityTitle(item.title, item.type),
+    description: localizeActivityDescription(item.description, item.type),
     relatedLabel: relatedLabel(item.metadata),
     xpDelta: typeof item.xpDelta === 'number' ? item.xpDelta : null,
   };
+}
+
+function localizeActivityTitle(title: string, type: BackendMemberActivityItemDto['type']): string {
+  const byType: Partial<Record<BackendMemberActivityItemDto['type'], string>> = {
+    tower_defense_commanded: 'Командування обороною',
+    tower_defense_attended: 'Участь в обороні',
+    tower_defense_defended: 'Захист вишки',
+    quest_completed: 'Сімейний квест виконано',
+    quest_best_participant: 'Кращий учасник квесту',
+    achievement_earned: 'Відзнаку відкрито',
+    reward_earned: 'Нагороду нараховано',
+  };
+  return byType[type] ?? title;
+}
+
+function localizeActivityDescription(description: string, type: BackendMemberActivityItemDto['type']): string {
+  const byType: Partial<Record<BackendMemberActivityItemDto['type'], string>> = {
+    tower_defense_commanded: 'Учасник командував обороною вишки.',
+    tower_defense_attended: 'Участь в обороні підтверджено.',
+    tower_defense_defended: 'Захист вишки зафіксовано.',
+    quest_completed: 'Участь у сімейному квесті підтверджено.',
+    quest_best_participant: 'Учасника відзначено як кращого в квесті.',
+    achievement_earned: 'Відзнаку додано до профілю.',
+    reward_earned: 'Нагороду додано до профілю.',
+  };
+  return byType[type] ?? description;
 }
 
 export function mapBackendMemberProfileReport(report: BackendMemberProfileReportDto): MemberProfileReportSummary {

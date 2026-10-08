@@ -1,37 +1,51 @@
-import { useState } from 'react';
-import { canManageFamilyContent } from '../../../lib/family-permissions';
+import { useEffect, useState } from 'react';
 import {
-  DEFAULT_FAMILY_CONTENT_BLOCKS,
-  readFamilyContentBlocks,
-  saveFamilyContentBlock
-} from '../../../lib/family-repositories';
+  listBackendFamilyContentBlocks,
+  updateBackendFamilyContentBlock
+} from '../../../lib/family-content-backend-client';
+import { canManageFamilyContent } from '../../../lib/family-permissions';
 import type { FamilyEditableContentBlock, FamilyUser } from '../../../lib/family-types';
 import { FamilyContentEditor } from './family-content-editor';
 
-const RULE_BLOCK_IDS = DEFAULT_FAMILY_CONTENT_BLOCKS
-  .filter((block) => block.id.startsWith('family-rule-'))
-  .map((block) => block.id);
-
 function getRuleBlocks(blocks: FamilyEditableContentBlock[]) {
-  return RULE_BLOCK_IDS.map((id) => blocks.find((block) => block.id === id)).filter(
-    (block): block is FamilyEditableContentBlock => Boolean(block)
-  );
+  return blocks.filter((block) => block.id.startsWith('family-rule-'));
 }
 
 export function FamilyRules({ currentUser }: { currentUser: FamilyUser }) {
   const canEditContent = canManageFamilyContent(currentUser);
-  const [contentBlocks, setContentBlocks] = useState<FamilyEditableContentBlock[]>(() => readFamilyContentBlocks());
+  const [contentBlocks, setContentBlocks] = useState<FamilyEditableContentBlock[]>([]);
+  const [contentError, setContentError] = useState<string | null>(null);
   const [editingBlock, setEditingBlock] = useState<FamilyEditableContentBlock | null>(null);
   const rules = getRuleBlocks(contentBlocks);
 
-  function saveContentBlock(block: FamilyEditableContentBlock) {
-    setContentBlocks(saveFamilyContentBlock(block, currentUser.nickname));
+  useEffect(() => {
+    const controller = new AbortController();
+    setContentError(null);
+    listBackendFamilyContentBlocks('rules', controller.signal)
+      .then((result) => setContentBlocks(result.items))
+      .catch((error) => {
+        if (!controller.signal.aborted) setContentError(error instanceof Error ? error.message : 'Правила тимчасово недоступні.');
+      });
+    return () => controller.abort();
+  }, []);
+
+  async function saveContentBlock(block: FamilyEditableContentBlock) {
+    const updated = await updateBackendFamilyContentBlock(block);
+    setContentBlocks((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     setEditingBlock(null);
   }
 
   return (
     <section className="rounded-2xl border border-red-950/70 bg-slate-950/75 p-5">
       <h2 className="text-lg font-semibold text-white">Правила сім’ї</h2>
+      <p className="mt-1 text-sm text-slate-400">
+        Єдина shared-версія правил Dragon House зберігається в backend і видима всім учасникам.
+      </p>
+      {contentError ? (
+        <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+          {contentError}
+        </div>
+      ) : null}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         {rules.map((rule) => (
           <article key={rule.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -59,6 +73,7 @@ export function FamilyRules({ currentUser }: { currentUser: FamilyUser }) {
             <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
               {rule.contact ? <span>Контакт / автор: {rule.contact}</span> : null}
               <span>Оновлено: {new Date(rule.updatedAt).toLocaleString('uk-UA')}</span>
+              <span>Версія: {rule.version ?? 1}</span>
             </div>
           </article>
         ))}

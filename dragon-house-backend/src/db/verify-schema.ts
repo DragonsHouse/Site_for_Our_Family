@@ -50,6 +50,9 @@ const requiredTables = [
   'family_member_reward_grants',
   'family_reward_allocations',
   'family_treasury_entries',
+  'family_content_blocks',
+  'family_recruitment_settings',
+  'family_news_posts',
 ];
 
 async function tableExists(pool: NonNullable<ReturnType<typeof createPgPool>>, tableName: string) {
@@ -430,6 +433,32 @@ async function runChecks() {
     }
     checks.push({ name: 'idx_family_treasury_entries_active_category exists', ok: await indexExists(pool, 'idx_family_treasury_entries_active_category') });
     checks.push({ name: 'idx_family_treasury_entries_version exists', ok: await indexExists(pool, 'idx_family_treasury_entries_version') });
+    checks.push({ name: 'family_content_blocks.id primary key', ok: await constraintExists(pool, 'family_content_blocks', 'p', 'id') });
+    for (const column of ['scope', 'title', 'body', 'sort_order', 'version', 'updated_at']) {
+      checks.push({ name: `family_content_blocks.${column} column`, ok: await columnExists(pool, 'family_content_blocks', column) });
+    }
+    checks.push({
+      name: 'family_content_blocks.updated_by_family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'family_content_blocks', 'updated_by_family_member_id', 'family_members', 'id'),
+    });
+    checks.push({ name: 'idx_family_content_blocks_scope_order exists', ok: await indexExists(pool, 'idx_family_content_blocks_scope_order') });
+    checks.push({ name: 'family_recruitment_settings.id primary key', ok: await constraintExists(pool, 'family_recruitment_settings', 'p', 'id') });
+    for (const column of ['is_open', 'description', 'requirements', 'contact', 'version', 'updated_at']) {
+      checks.push({ name: `family_recruitment_settings.${column} column`, ok: await columnExists(pool, 'family_recruitment_settings', column) });
+    }
+    checks.push({
+      name: 'family_recruitment_settings.updated_by_family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'family_recruitment_settings', 'updated_by_family_member_id', 'family_members', 'id'),
+    });
+    checks.push({ name: 'family_news_posts.id primary key', ok: await constraintExists(pool, 'family_news_posts', 'p', 'id') });
+    for (const column of ['type', 'title', 'body', 'author_name', 'pinned', 'urgent', 'notification_required', 'archived_at', 'version', 'created_at', 'updated_at']) {
+      checks.push({ name: `family_news_posts.${column} column`, ok: await columnExists(pool, 'family_news_posts', column) });
+    }
+    checks.push({
+      name: 'family_news_posts.author_family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'family_news_posts', 'author_family_member_id', 'family_members', 'id'),
+    });
+    checks.push({ name: 'idx_family_news_posts_visible exists', ok: await indexExists(pool, 'idx_family_news_posts_visible') });
     checks.push({ name: 'family_towers.id primary key', ok: await constraintExists(pool, 'family_towers', 'p', 'id') });
     checks.push({ name: 'family_towers.tower_code unique', ok: await constraintExists(pool, 'family_towers', 'u', 'tower_code') });
     checks.push({ name: 'family_tower_defenses.id primary key', ok: await constraintExists(pool, 'family_tower_defenses', 'p', 'id') });

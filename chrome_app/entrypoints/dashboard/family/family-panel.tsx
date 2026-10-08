@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DRAGON_HOUSE_ASSETS } from '../../../lib/family-assets';
-import { saveFamilyPosts } from '../../../lib/family-data';
+import { createBackendFamilyNewsPost } from '../../../lib/family-content-backend-client';
 import {
   canManageDiscordIntegration,
   canManageBackups,
@@ -40,6 +40,7 @@ export function FamilyPanel({
   currentUser,
   users,
   posts,
+  postsError,
   onPostsChange,
   onUserAccessChange,
   onUserCreate,
@@ -51,6 +52,7 @@ export function FamilyPanel({
   currentUser: FamilyUser;
   users: FamilyUser[];
   posts: FamilyPost[];
+  postsError?: string | null;
   onPostsChange: (posts: FamilyPost[]) => void;
   onUserAccessChange: (
     nickname: string,
@@ -130,10 +132,16 @@ export function FamilyPanel({
     }
   }, [posts]);
 
-  function createPost(post: FamilyPost) {
-    const nextPosts = [post, ...posts];
-    saveFamilyPosts(nextPosts);
-    onPostsChange(nextPosts);
+  async function createPost(post: FamilyPost) {
+    const created = await createBackendFamilyNewsPost({
+      type: post.type,
+      title: post.title,
+      body: post.body,
+      pinned: post.isPinned,
+      urgent: post.type === 'urgent',
+      notificationRequired: post.notificationRequired ?? post.type === 'urgent',
+    });
+    onPostsChange([created, ...posts]);
   }
 
   return (
@@ -170,7 +178,7 @@ export function FamilyPanel({
           onOpenSection={setSection}
         />
       ) : null}
-      {section === 'feed' ? <FamilyFeed posts={posts} /> : null}
+      {section === 'feed' ? <FamilyFeed posts={posts} error={postsError} /> : null}
       {section === 'economy' ? <FamilyEconomy currentUser={currentUser} /> : null}
       {section === 'members' ? (
         <FamilyMembers

@@ -11,7 +11,7 @@ const FILTERS: Array<{ key: FamilyPostType | 'all'; label: string }> = [
   { key: 'info', label: 'Інформація' }
 ];
 
-export function FamilyFeed({ posts }: { posts: FamilyPost[] }) {
+export function FamilyFeed({ posts, error }: { posts: FamilyPost[]; error?: string | null }) {
   const [filter, setFilter] = useState<FamilyPostType | 'all'>('all');
   const urgentPosts = posts.filter((post) => post.type === 'urgent');
   const filteredPosts = useMemo(
@@ -25,6 +25,12 @@ export function FamilyFeed({ posts }: { posts: FamilyPost[] }) {
       <p className="mt-1 text-sm text-slate-400">
         Рішення керівництва, зміни в сім’ї, підвищення, досягнення, активності, оголошення і збори.
       </p>
+
+      {error ? (
+        <div className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-100" role="alert">
+          Новини Dragon House зараз недоступні: {error}
+        </div>
+      ) : null}
 
       {urgentPosts.length ? (
         <div className="dh-news-card dh-news-card-urgent mt-4 rounded-2xl p-4 pl-5">

@@ -118,7 +118,7 @@ describe('DiscordOrchestrationService', () => {
     await service.publishTowerDefense('00000000-0000-4000-8000-000000000002', channelId, auth);
 
     expect(transport.sent).toHaveLength(1);
-    expect(transport.sendDirectMessageToGuildMembers).not.toHaveBeenCalled();
+    expect('sendDirectMessageToGuildMembers' in transport).toBe(false);
   });
 
   it('keeps a successful domain mutation when automatic Discord sync fails and exposes retry state', async () => {
@@ -419,7 +419,6 @@ function fakeFamilyEventService() {
 type FakeTransport = DiscordMessageTransport & {
   sent: Array<{ channelId: string; payload: DiscordMessagePayload }>;
   edited: Array<{ channelId: string; messageId: string; payload: DiscordMessagePayload }>;
-  sendDirectMessageToGuildMembers: ReturnType<typeof vi.fn>;
   failEdit?: boolean;
 };
 
@@ -437,7 +436,6 @@ function fakeTransport(options: { failEdit?: boolean } = {}): FakeTransport {
       if (this.failEdit) throw new Error('Unknown Message');
       return { messageId };
     },
-    sendDirectMessageToGuildMembers: vi.fn(),
   };
   return transport;
 }

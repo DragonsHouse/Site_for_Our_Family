@@ -61,6 +61,10 @@ import { createFamilyAuditLogRouter } from './routes/family-audit-log.js';
 import { PgFamilyTreasuryRepository } from './treasury/pg-treasury-repository.js';
 import { MemoryFamilyTreasuryRepository, type FamilyTreasuryRepository } from './treasury/treasury-repository.js';
 import { FamilyTreasuryService } from './treasury/treasury-service.js';
+import { PgFamilyContentRepository } from './content/pg-content-repository.js';
+import { MemoryFamilyContentRepository, type FamilyContentRepository } from './content/content-repository.js';
+import { FamilyContentService } from './content/content-service.js';
+import { createFamilyContentRouter } from './routes/family-content.js';
 import { FamilyAccountingReadService } from './accounting/accounting-read-service.js';
 import { FamilyAccountingService } from './accounting/accounting-service.js';
 import { FamilyQuestPayoutService } from './accounting/quest-payout-service.js';
@@ -116,6 +120,8 @@ export type AppDependencies = {
   questService?: FamilyQuestService | null;
   treasuryRepository?: FamilyTreasuryRepository;
   treasuryService?: FamilyTreasuryService | null;
+  contentRepository?: FamilyContentRepository;
+  contentService?: FamilyContentService | null;
   questPayoutService?: FamilyQuestPayoutService | null;
   accountingReadService?: FamilyAccountingReadService | null;
   accountingService?: FamilyAccountingService | null;
@@ -184,6 +190,15 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
       ? dependencies.treasuryService
       : treasuryRepository
         ? new FamilyTreasuryService(treasuryRepository)
+        : null;
+  const contentRepository =
+    dependencies.contentRepository ??
+    (pgPool ? new PgFamilyContentRepository(pgPool) : new MemoryFamilyContentRepository());
+  const contentService =
+    dependencies.contentService !== undefined
+      ? dependencies.contentService
+      : contentRepository
+        ? new FamilyContentService(contentRepository)
         : null;
   const questPayoutService =
     dependencies.questPayoutService !== undefined
@@ -333,6 +348,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   app.use('/api', createFamilyCalendarRouter(config, authService, familyCalendarService));
   app.use('/api', createFamilyQuestsRouter(config, authService, questService, questPayoutService, discordService));
   app.use('/api', createFamilyTreasuryRouter(config, authService, treasuryService));
+  app.use('/api', createFamilyContentRouter(config, authService, contentService));
   app.use('/api', createFamilyAuditLogRouter(config, authService, pgPool));
   app.use('/api', createFamilyTowerDefenseRouter(config, authService, towerDefenseService, rewardAllocationService, achievementService, discordOrchestrationService));
   app.use('/api', createDiscordRouter(discordService));
@@ -368,6 +384,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     questService,
     treasuryRepository,
     treasuryService,
+    contentRepository,
+    contentService,
     questPayoutService,
     accountingReadService,
     accountingService,

@@ -20,6 +20,7 @@ coverage/
 logs/
 test-results/
 playwright-report/
+playwright-results/
 chrome_app/.artifacts/
 
 # Browser profiles and temporary runtime data

@@ -141,6 +141,88 @@ test('TREASURY: create/update/archive, price fields, version increment, stale 40
   expect(archived.isActive).toBe(false);
 });
 
+test('CONTENT: News, Home, Rules and Recruitment are shared backend state across accounts', async ({ page }) => {
+  await loginAs(page, 'owner');
+  const marker = Date.now();
+
+  const createdPost = await api(page, '/api/family/news/posts', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'family_news',
+      title: `E2E Shared News ${marker}`,
+      body: 'Новина створена власником і має бути видима іншому акаунту після reload.',
+      pinned: true,
+      notificationRequired: false,
+    }),
+  });
+  expect(createdPost.title).toBe(`E2E Shared News ${marker}`);
+
+  const homeBlocks = await api(page, '/api/family/content/blocks?scope=home');
+  const homeIntro = homeBlocks.items.find((item: any) => item.id === 'home-intro');
+  expect(homeIntro).toBeTruthy();
+  const updatedHome = await api(page, `/api/family/content/blocks/${homeIntro.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      title: homeIntro.title,
+      body: `E2E shared home body ${marker}`,
+      contact: homeIntro.contact,
+      expectedVersion: homeIntro.version,
+    }),
+  });
+  expect(updatedHome.body).toBe(`E2E shared home body ${marker}`);
+
+  const ruleBlocks = await api(page, '/api/family/content/blocks?scope=rules');
+  const firstRule = ruleBlocks.items[0];
+  expect(firstRule).toBeTruthy();
+  const updatedRule = await api(page, `/api/family/content/blocks/${firstRule.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      title: firstRule.title,
+      body: `E2E shared rule ${marker}`,
+      contact: firstRule.contact,
+      expectedVersion: firstRule.version,
+    }),
+  });
+  expect(updatedRule.body).toBe(`E2E shared rule ${marker}`);
+
+  const recruitment = await api(page, '/api/family/recruitment/settings');
+  const updatedRecruitment = await api(page, '/api/family/recruitment/settings', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      isOpen: !recruitment.isOpen,
+      description: `E2E recruitment shared ${marker}`,
+      requirements: ['E2E вимога без localStorage', 'Другий акаунт бачить backend state'],
+      contact: 'E2E_Owner',
+      expectedVersion: recruitment.version,
+    }),
+  });
+  expect(updatedRecruitment.description).toBe(`E2E recruitment shared ${marker}`);
+
+  await loginAs(page, 'member');
+  const memberNews = await api(page, '/api/family/news/posts');
+  expect(memberNews.items.some((item: any) => item.id === createdPost.id && item.title === createdPost.title)).toBe(true);
+  expect((await api(page, '/api/family/content/blocks?scope=home')).items.find((item: any) => item.id === 'home-intro').body).toBe(updatedHome.body);
+  expect((await api(page, '/api/family/content/blocks?scope=rules')).items.find((item: any) => item.id === firstRule.id).body).toBe(updatedRule.body);
+  expect((await api(page, '/api/family/recruitment/settings')).description).toBe(updatedRecruitment.description);
+
+  const memberDenied = await rawApi(page, `/api/family/content/blocks/${homeIntro.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      title: homeIntro.title,
+      body: 'member overwrite should fail',
+      contact: homeIntro.contact,
+      expectedVersion: updatedHome.version,
+    }),
+  });
+  expect(memberDenied.status).toBe(403);
+});
+
+test('PERMISSIONS: manage_rewards survives backend and frontend contract', async ({ page }) => {
+  await loginAs(page, 'owner');
+  const me = await api(page, '/api/auth/me');
+  expect(me.permissions).toContain('manage_rewards');
+});
+
 test('EVENT: create/edit, real conflict, friendly Ukrainian message, reload gets server version', async ({ browser, page }) => {
   await loginAs(page, 'owner');
   const event = await api(page, '/api/family/events', {

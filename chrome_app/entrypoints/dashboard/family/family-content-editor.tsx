@@ -21,24 +21,34 @@ export function FamilyContentEditor({
 }: {
   block: FamilyEditableContentBlock;
   onClose: () => void;
-  onSave: (block: FamilyEditableContentBlock) => void;
+  onSave: (block: FamilyEditableContentBlock) => void | Promise<void>;
 }) {
   const [title, setTitle] = useState(block.title);
   const [body, setBody] = useState(block.body);
   const [contact, setContact] = useState(block.contact ?? '');
   const [updatedAt, setUpdatedAt] = useState(() => toDateTimeLocal(block.updatedAt));
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  function save() {
+  async function save() {
     const cleanTitle = title.trim();
     const cleanBody = body.trim();
     if (!cleanTitle || !cleanBody) return;
-    onSave({
-      ...block,
-      title: cleanTitle,
-      body: cleanBody,
-      contact: contact.trim() || null,
-      updatedAt: fromDateTimeLocal(updatedAt, block.updatedAt)
-    });
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onSave({
+        ...block,
+        title: cleanTitle,
+        body: cleanBody,
+        contact: contact.trim() || null,
+        updatedAt: fromDateTimeLocal(updatedAt, block.updatedAt)
+      });
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Не вдалося зберегти зміни.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -97,6 +107,11 @@ export function FamilyContentEditor({
               />
             </label>
           </div>
+          {saveError ? (
+            <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100" role="alert">
+              {saveError}
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-5 flex justify-end gap-2 border-t border-slate-800 pt-4">
@@ -109,8 +124,8 @@ export function FamilyContentEditor({
           </button>
           <button
             type="button"
-            onClick={save}
-            disabled={!title.trim() || !body.trim()}
+            onClick={() => void save()}
+            disabled={saving || !title.trim() || !body.trim()}
             className="rounded-xl bg-gradient-to-r from-red-700 to-amber-500 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Зберегти

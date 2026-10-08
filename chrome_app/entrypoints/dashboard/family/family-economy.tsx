@@ -19,8 +19,10 @@ const CATEGORY_LABELS: Record<FamilyEconomyCategory | 'all', string> = {
 };
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as Array<FamilyEconomyCategory | 'all'>;
-const SAVE_ERROR = 'Не вдалося зберегти дані.';
+const SAVE_ERROR = 'Не вдалося зберегти дані Скарбниці.';
 const TREASURY_CONFLICT_MESSAGE = 'Дані Скарбниці вже змінилися в іншому вікні. Натисни «Оновити дані», щоб побачити актуальну версію.';
+
+type TreasuryDraft = Partial<Pick<FamilyEconomyEntry, 'category' | 'title' | 'locationNumber' | 'locationReference' | 'description' | 'priceAmount' | 'priceNote' | 'note'>>;
 
 export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
   const [entries, setEntries] = useState<FamilyEconomyEntry[]>([]);
@@ -32,6 +34,8 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorAction, setErrorAction] = useState<'reload' | 'retry'>('retry');
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [entryDraft, setEntryDraft] = useState<TreasuryDraft | null>(null);
   const canManage = canManageFamilyEconomy(currentUser);
 
   useEffect(() => {
@@ -43,7 +47,7 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
       .then((result) => setEntries(result.items))
       .catch((loadError) => {
         if (controller.signal.aborted) return;
-        setError(loadError instanceof Error ? loadError.message : 'Не вдалося завантажити дані.');
+        setError(loadError instanceof Error ? loadError.message : 'Не вдалося завантажити Скарбницю.');
       })
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false);
@@ -57,7 +61,7 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
       if (!entry.isActive) return false;
       if (category !== 'all' && entry.category !== category) return false;
       if (!normalizedQuery) return true;
-      return [entry.title, entry.description, entry.note, entry.priceNote, entry.price, entry.priceAmount, entry.locationNumber, entry.locationReference]
+      return [entry.title, entry.description, entry.note, entry.priceNote, entry.locationNumber, entry.locationReference]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedQuery));
     });
@@ -70,8 +74,9 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
     try {
       const result = await listFamilyTreasuryEntries();
       setEntries(result.items);
+      cancelEditing();
     } catch (reloadError) {
-      setError(reloadError instanceof Error ? reloadError.message : 'Не вдалося завантажити дані.');
+      setError(reloadError instanceof Error ? reloadError.message : 'Не вдалося завантажити Скарбницю.');
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +112,8 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
     setErrorAction('retry');
     try {
       const archived = await archiveFamilyTreasuryEntry(entryId, entry.version ?? 1);
-      setEntries((current) => current.map((entry) => (entry.id === entryId ? archived : entry)));
+      setEntries((current) => current.map((item) => (item.id === entryId ? archived : item)));
+      cancelEditing();
     } catch (saveError) {
       showSaveError(saveError);
     } finally {
@@ -115,25 +121,53 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
     }
   }
 
-  async function updateEntry(
-    entryId: string,
-    updates: Partial<Pick<FamilyEconomyEntry, 'category' | 'title' | 'locationNumber' | 'locationReference' | 'description' | 'price' | 'priceAmount' | 'priceNote' | 'note'>>
-  ) {
+  function startEditing(entry: FamilyEconomyEntry) {
+    setEditingEntryId(entry.id);
+    setEntryDraft({
+      category: entry.category,
+      title: entry.title,
+      locationNumber: entry.locationNumber,
+      locationReference: entry.locationReference,
+      description: entry.description,
+      priceAmount: entry.priceAmount,
+      priceNote: entry.priceNote ?? entry.price,
+      note: entry.note,
+    });
+  }
+
+  function cancelEditing() {
+    setEditingEntryId(null);
+    setEntryDraft(null);
+  }
+
+  function patchDraft(updates: TreasuryDraft) {
+    setEntryDraft((current) => ({ ...(current ?? {}), ...updates }));
+  }
+
+  async function saveEntry(entryId: string) {
     const currentEntry = entries.find((entry) => entry.id === entryId);
-    if (!currentEntry) return;
-    const previous = entries;
-    const optimistic = entries.map((entry) =>
-      entry.id === entryId ? { ...entry, ...updates, updatedAt: new Date().toISOString() } : entry
-    );
-    setEntries(optimistic);
+    if (!currentEntry || !entryDraft) return;
+    setIsSaving(true);
     setError(null);
     setErrorAction('retry');
     try {
-      const updated = await updateFamilyTreasuryEntry(entryId, { ...updates, expectedVersion: currentEntry.version ?? 1 });
+      const updated = await updateFamilyTreasuryEntry(entryId, {
+        category: entryDraft.category,
+        title: entryDraft.title,
+        locationNumber: entryDraft.locationNumber,
+        locationReference: entryDraft.locationReference,
+        description: entryDraft.description,
+        priceAmount: entryDraft.priceAmount,
+        priceNote: entryDraft.priceNote,
+        note: entryDraft.note,
+        expectedVersion: currentEntry.version ?? 1,
+      });
       setEntries((current) => current.map((entry) => (entry.id === entryId ? updated : entry)));
+      cancelEditing();
     } catch (saveError) {
-      setEntries(previous);
       showSaveError(saveError);
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -151,16 +185,15 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
     <section className="rounded-2xl border border-red-950/70 bg-slate-950/75 p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white">Скарбниця Dragon House</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Скарбниця Dragon House</p>
+          <h2 className="mt-1 text-xl font-semibold text-white">Ресурси, ціни й вигідні місця</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Це сімейна база ресурсів: паливо, одяг, зброя, магазини та інші корисні точки.
+            Дані зберігаються в backend. Редагування йде через чернетку, тому Hub не надсилає PATCH на кожен символ.
           </p>
         </div>
-        {canManage ? (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-            Доступно: додати, редагувати або архівувати запис.
-          </div>
-        ) : null}
+        <button type="button" onClick={() => void reload()} className="rounded-xl border border-slate-700 px-3 py-2 text-sm text-slate-100">
+          Оновити дані
+        </button>
       </div>
 
       {error ? (
@@ -226,121 +259,161 @@ export function FamilyEconomy({ currentUser }: { currentUser: FamilyUser }) {
       {!isLoading && filteredEntries.length === 0 ? <div className="mt-4 text-sm text-slate-300">Даних поки немає.</div> : null}
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filteredEntries.map((entry) => (
-          <article key={entry.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4" data-testid="treasury-entry-card" data-entry-id={entry.id}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1 space-y-2">
-                {canManage ? (
-                  <>
-                    <select
-                      data-testid="treasury-entry-category"
-                      value={entry.category}
-                      onChange={(event) => void updateEntry(entry.id, { category: event.target.value as FamilyEconomyCategory })}
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs uppercase tracking-[0.14em] text-amber-200"
-                      aria-label="Категорія запису"
-                    >
-                      {CATEGORIES.filter((item) => item !== 'all').map((item) => (
-                        <option key={item} value={item}>
-                          {CATEGORY_LABELS[item]}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      data-testid="treasury-entry-title"
-                      value={entry.title}
-                      onChange={(event) => void updateEntry(entry.id, { title: event.target.value })}
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-base font-semibold text-white"
-                      aria-label="Назва запису"
-                    />
-                  </>
-                ) : (
-                  <>
-                    <div className="text-xs uppercase tracking-[0.2em] text-amber-300">
-                      {CATEGORY_LABELS[entry.category]}
-                    </div>
-                    <h3 className="mt-1 text-base font-semibold text-white">{entry.title}</h3>
-                  </>
-                )}
-              </div>
-              <span className="rounded-full border border-slate-700 px-2 py-1 text-xs text-slate-300">
-                {entry.locationNumber ?? entry.locationReference ?? 'без номера'}
-              </span>
-            </div>
-            {canManage ? (
-              <div className="mt-3 grid gap-2">
-                <input
-                  data-testid="treasury-entry-location"
-                  value={entry.locationNumber ?? ''}
-                  onChange={(event) => void updateEntry(entry.id, { locationNumber: event.target.value.trim() || null })}
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
-                  placeholder="Номер або коротка локація"
-                  aria-label="Номер або локація"
-                />
-                <textarea
-                  data-testid="treasury-entry-description"
-                  value={entry.description}
-                  onChange={(event) => void updateEntry(entry.id, { description: event.target.value })}
-                  rows={3}
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
-                  aria-label="Опис запису"
-                />
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <input
-                    data-testid="treasury-entry-price-amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={entry.priceAmount ?? ''}
-                    onChange={(event) => void updateEntry(entry.id, { priceAmount: event.target.value.trim() ? Number(event.target.value) : null })}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
-                    placeholder="Ціна"
-                    aria-label="Ціна"
-                  />
-                  <input
-                    data-testid="treasury-entry-price-note"
-                    value={entry.priceNote ?? entry.price ?? ''}
-                    onChange={(event) => void updateEntry(entry.id, { priceNote: event.target.value.trim() || null })}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
-                    placeholder="Примітка до ціни"
-                    aria-label="Примітка до ціни"
-                  />
-                  <input
-                    value={entry.price ?? ''}
-                    onChange={(event) => void updateEntry(entry.id, { price: event.target.value.trim() || null })}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
-                    placeholder="Ціна / умови"
-                    aria-label="Ціна або умови"
-                  />
-                  <input
-                    value={entry.note ?? ''}
-                    onChange={(event) => void updateEntry(entry.id, { note: event.target.value.trim() || null })}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
-                    placeholder="Примітка"
-                    aria-label="Примітка"
-                  />
+        {filteredEntries.map((entry) => {
+          const isEditing = editingEntryId === entry.id && entryDraft;
+          const draft = isEditing ? entryDraft : entry;
+          return (
+            <article key={entry.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4" data-testid="treasury-entry-card" data-entry-id={entry.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  {isEditing ? (
+                    <>
+                      <select
+                        data-testid="treasury-entry-category"
+                        value={draft.category}
+                        onChange={(event) => patchDraft({ category: event.target.value as FamilyEconomyCategory })}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs uppercase tracking-[0.14em] text-amber-200"
+                        aria-label="Категорія запису"
+                      >
+                        {CATEGORIES.filter((item) => item !== 'all').map((item) => (
+                          <option key={item} value={item}>
+                            {CATEGORY_LABELS[item]}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        data-testid="treasury-entry-title"
+                        value={draft.title ?? ''}
+                        onChange={(event) => patchDraft({ title: event.target.value })}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-base font-semibold text-white"
+                        aria-label="Назва запису"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-xs uppercase tracking-[0.2em] text-amber-300">
+                        {CATEGORY_LABELS[entry.category]}
+                      </div>
+                      <h3 className="mt-1 text-base font-semibold text-white">{entry.title}</h3>
+                    </>
+                  )}
                 </div>
+                <span className="rounded-full border border-slate-700 px-2 py-1 text-xs text-slate-300">
+                  {entry.locationNumber ?? entry.locationReference ?? 'без номера'}
+                </span>
               </div>
-            ) : (
-              <p className="mt-3 text-sm text-slate-300">{entry.description}</p>
-            )}
-            {entry.note || entry.price ? (
-              <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                {entry.note ?? entry.price}
-              </div>
-            ) : null}
-            {canManage ? (
-              <button
-                type="button"
-                data-testid="treasury-entry-archive"
-                onClick={() => void deactivateEntry(entry.id)}
-                disabled={isSaving}
-                className="mt-3 rounded-lg border border-red-500/50 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Архівувати
-              </button>
-            ) : null}
-          </article>
-        ))}
+
+              {isEditing ? (
+                <div className="mt-3 grid gap-2">
+                  <input
+                    data-testid="treasury-entry-location"
+                    value={draft.locationNumber ?? ''}
+                    onChange={(event) => patchDraft({ locationNumber: event.target.value.trim() || null })}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                    placeholder="Номер або коротка локація"
+                    aria-label="Номер або локація"
+                  />
+                  <textarea
+                    data-testid="treasury-entry-description"
+                    value={draft.description ?? ''}
+                    onChange={(event) => patchDraft({ description: event.target.value })}
+                    rows={3}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                    aria-label="Опис запису"
+                  />
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      data-testid="treasury-entry-price-amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={draft.priceAmount ?? ''}
+                      onChange={(event) => patchDraft({ priceAmount: event.target.value.trim() ? Number(event.target.value) : null })}
+                      className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                      placeholder="Ціна"
+                      aria-label="Ціна"
+                    />
+                    <input
+                      data-testid="treasury-entry-price-note"
+                      value={draft.priceNote ?? ''}
+                      onChange={(event) => patchDraft({ priceNote: event.target.value.trim() || null })}
+                      className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                      placeholder="Примітка до ціни"
+                      aria-label="Примітка до ціни"
+                    />
+                    <input
+                      value={draft.note ?? ''}
+                      onChange={(event) => patchDraft({ note: event.target.value.trim() || null })}
+                      className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100 sm:col-span-2"
+                      placeholder="Примітка"
+                      aria-label="Примітка"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      data-testid="treasury-entry-save"
+                      onClick={() => void saveEntry(entry.id)}
+                      disabled={isSaving || !String(draft.title ?? '').trim()}
+                      className="rounded-lg border border-amber-500/60 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-100 disabled:opacity-50"
+                    >
+                      Зберегти
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEditing}
+                      disabled={isSaving}
+                      className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-100 disabled:opacity-50"
+                    >
+                      Скасувати
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="mt-3 text-sm text-slate-300">{entry.description}</p>
+                  {(entry.priceAmount != null || entry.priceNote) ? (
+                    <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                      {entry.priceAmount != null ? <div>Ціна: {entry.priceAmount.toLocaleString('uk-UA')} $</div> : null}
+                      {entry.priceNote ? <div>Примітка до ціни: {entry.priceNote}</div> : null}
+                    </div>
+                  ) : null}
+                  {entry.note ? (
+                    <div className="mt-3 rounded-xl border border-slate-700 bg-black/25 px-3 py-2 text-sm text-slate-200">
+                      Примітка: {entry.note}
+                    </div>
+                  ) : null}
+                </>
+              )}
+
+              {canManage ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {!isEditing ? (
+                    <button
+                      type="button"
+                      data-testid="treasury-entry-edit"
+                      onClick={() => startEditing(entry)}
+                      disabled={isSaving}
+                      className="rounded-lg border border-amber-500/50 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Редагувати
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    data-testid="treasury-entry-archive"
+                    onClick={() => void deactivateEntry(entry.id)}
+                    disabled={isSaving}
+                    className="rounded-lg border border-red-500/50 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Архівувати
+                  </button>
+                  <span className="self-center text-xs text-slate-500">Версія: {entry.version ?? 1}</span>
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

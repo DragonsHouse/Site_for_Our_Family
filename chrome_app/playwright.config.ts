@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   testIgnore: /(real-backend|visible-concurrency)\.spec\.ts/u,
+  outputDir: './playwright-results/smoke',
   timeout: 30_000,
   expect: {
     timeout: 5_000,

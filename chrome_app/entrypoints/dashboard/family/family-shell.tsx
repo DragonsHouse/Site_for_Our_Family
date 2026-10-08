@@ -49,6 +49,7 @@ export function FamilyShell({
   currentUser,
   familyUsers,
   posts,
+  postsError,
   activeTab,
   onTabChange,
   onPostsChange,
@@ -65,6 +66,7 @@ export function FamilyShell({
   currentUser: FamilyUser;
   familyUsers: FamilyUser[];
   posts: FamilyPost[];
+  postsError?: string | null;
   activeTab: FamilyTab;
   onTabChange: (tab: FamilyTab) => void;
   onPostsChange: (posts: FamilyPost[]) => void;
@@ -175,6 +177,7 @@ export function FamilyShell({
             currentUser={currentUser}
             users={familyUsers}
             posts={posts}
+            postsError={postsError}
             onPostsChange={onPostsChange}
             onUserAccessChange={onUserAccessChange}
             onUserCreate={onUserCreate}

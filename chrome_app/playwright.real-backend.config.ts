@@ -5,6 +5,7 @@ process.env.PLAYWRIGHT_DASHBOARD_URL ??= 'http://127.0.0.1:4176/dashboard.html';
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: /(real-backend|visible-concurrency)\.spec\.ts/u,
+  outputDir: './playwright-results/real-backend',
   globalSetup: './tests/e2e/global-setup-real-backend.ts',
   timeout: 60_000,
   expect: { timeout: 10_000 },

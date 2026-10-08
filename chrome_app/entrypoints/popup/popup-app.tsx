@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DRAGON_HOUSE_HUB_PRODUCT_NAME, DRAGON_HOUSE_LABEL } from '../../lib/extension-branding';
-import { readFamilyPosts } from '../../lib/family-data';
+import { listBackendFamilyNewsPosts } from '../../lib/family-content-backend-client';
 import {
   getFamilyNotificationsForUser,
   markFamilyNotificationRead,
@@ -135,7 +135,7 @@ export function PopupApp() {
     try {
       const user = await loadPopupCurrentUser();
       setCurrentUser(user);
-      setPosts(readFamilyPosts());
+      setPosts([]);
 
       const settings = await getSettings();
       setSettingsText(
@@ -145,6 +145,7 @@ export function PopupApp() {
 
       await Promise.all([
         user ? refreshNotifications(user.nickname) : Promise.resolve(setNotifications([])),
+        user ? listBackendFamilyNewsPosts().then((result) => setPosts(result.items)) : Promise.resolve(setPosts([])),
         refreshPollStatus(settings.pollIntervalMinutes),
         refreshBuyerSummary(),
         refreshEventsSummary()

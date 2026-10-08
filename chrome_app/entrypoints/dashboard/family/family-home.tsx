@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { canManageFamilyContent, canManageFamilyNews, canViewAccounting } from '../../../lib/family-permissions';
+import { useEffect, useState } from 'react';
 import {
-  getCurrentAccountingMonth,
-  readFamilyContentBlocks,
-  saveFamilyContentBlock
-} from '../../../lib/family-repositories';
+  listBackendFamilyContentBlocks,
+  updateBackendFamilyContentBlock
+} from '../../../lib/family-content-backend-client';
+import { canManageFamilyContent, canManageFamilyNews, canViewAccounting } from '../../../lib/family-permissions';
+import { getCurrentAccountingMonth } from '../../../lib/family-repositories';
 import type { FamilyEditableContentBlock, FamilyPost, FamilySection, FamilyUser } from '../../../lib/family-types';
 import { FamilyContentEditor } from './family-content-editor';
 import { CreateFamilyPost } from './create-family-post';
@@ -13,8 +13,12 @@ import { FamilyPostCard } from './family-post-card';
 
 function findBlock(blocks: FamilyEditableContentBlock[], id: string) {
   const block = blocks.find((item) => item.id === id);
-  if (!block) throw new Error(`Missing family content block: ${id}`);
+  if (!block) return null;
   return block;
+}
+
+function isContentBlock(block: FamilyEditableContentBlock | null): block is FamilyEditableContentBlock {
+  return Boolean(block);
 }
 
 export function FamilyHome({
@@ -38,13 +42,26 @@ export function FamilyHome({
   const onlineUsers = users.filter((user) => user.isOnline || user.status === 'online');
   const accountingMonth = canViewAccounting(currentUser) ? getCurrentAccountingMonth() : null;
   const canEditContent = canManageFamilyContent(currentUser);
-  const [contentBlocks, setContentBlocks] = useState<FamilyEditableContentBlock[]>(() => readFamilyContentBlocks());
+  const [contentBlocks, setContentBlocks] = useState<FamilyEditableContentBlock[]>([]);
+  const [contentError, setContentError] = useState<string | null>(null);
   const [editingBlock, setEditingBlock] = useState<FamilyEditableContentBlock | null>(null);
   const introBlock = findBlock(contentBlocks, 'home-intro');
   const alertBlock = findBlock(contentBlocks, 'home-alert');
 
-  function saveContentBlock(block: FamilyEditableContentBlock) {
-    setContentBlocks(saveFamilyContentBlock(block, currentUser.nickname));
+  useEffect(() => {
+    const controller = new AbortController();
+    setContentError(null);
+    listBackendFamilyContentBlocks('home', controller.signal)
+      .then((result) => setContentBlocks(result.items))
+      .catch((error) => {
+        if (!controller.signal.aborted) setContentError(error instanceof Error ? error.message : 'Матеріали штабу тимчасово недоступні.');
+      });
+    return () => controller.abort();
+  }, []);
+
+  async function saveContentBlock(block: FamilyEditableContentBlock) {
+    const updated = await updateBackendFamilyContentBlock(block);
+    setContentBlocks((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     setEditingBlock(null);
   }
 
@@ -76,8 +93,14 @@ export function FamilyHome({
               </div>
             </div>
 
+            {contentError ? (
+              <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                {contentError}
+              </div>
+            ) : null}
+
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {[introBlock, alertBlock].map((block) => (
+              {[introBlock, alertBlock].filter(isContentBlock).map((block) => (
                 <div key={block.id} className="rounded-xl border border-slate-800 bg-black/30 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>

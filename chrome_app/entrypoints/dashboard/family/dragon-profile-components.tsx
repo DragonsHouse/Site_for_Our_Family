@@ -23,6 +23,7 @@ export function DragonStatisticCard({ statistic }: { statistic: DragonProfileSta
 export function DragonAchievementCard({ achievement }: { achievement: DragonProfileAchievement }) {
   const rarityMeta = DRAGON_ACHIEVEMENT_RARITY_META[achievement.rarity];
   const isSecret = achievement.state === 'secret';
+  const stateLabel = getAchievementStateLabel(achievement.state);
 
   return (
     <DragonCard interactive className={`dh-achievement-card ${rarityMeta.className} is-${achievement.state}`}>
@@ -36,10 +37,10 @@ export function DragonAchievementCard({ achievement }: { achievement: DragonProf
         </div>
         <DragonBadge tone={rarityMeta.tone}>{rarityMeta.label}</DragonBadge>
       </div>
-      <DragonProgress value={achievement.progress} label={`${achievement.title} achievement progress`} />
+      <DragonProgress value={achievement.progress} label={`Прогрес відзнаки ${achievement.title}`} />
       <footer>
-        <span>{achievement.state}</span>
-        <span>{achievement.unlockedAt ? formatDragonProfileDate(achievement.unlockedAt) : achievement.backendAchievementId}</span>
+        <span>{stateLabel}</span>
+        <span>{achievement.unlockedAt ? formatDragonProfileDate(achievement.unlockedAt) : 'Очікує відкриття'}</span>
       </footer>
     </DragonCard>
   );
@@ -56,13 +57,34 @@ export function DragonTimeline({ events }: { events: DragonEventTimelineEntry[] 
             <div>
               <h3>{event.title}</h3>
               <p>{event.description}</p>
-              <DragonBadge tone={meta.tone}>{event.sourceModule}</DragonBadge>
+              <DragonBadge tone={meta.tone}>{getTimelineSourceLabel(event.sourceModule)}</DragonBadge>
             </div>
           </DragonCard>
         );
       })}
     </div>
   );
+}
+
+function getAchievementStateLabel(state: DragonProfileAchievement['state']) {
+  if (state === 'unlocked') return 'Відкрито';
+  if (state === 'secret') return 'Приховано';
+  return 'Не відкрито';
+}
+
+function getTimelineSourceLabel(sourceModule: DragonEventTimelineEntry['sourceModule']) {
+  const labels: Record<DragonEventTimelineEntry['sourceModule'], string> = {
+    events: 'Події',
+    calendar: 'Календар',
+    birthday: 'Дні народження',
+    profile: 'Профіль',
+    quest_board: 'Квести',
+    tower_defense: 'Оборона вишок',
+    resources: 'Ресурси',
+    discord: 'Discord',
+    manual: 'Запис',
+  };
+  return labels[sourceModule];
 }
 
 export function DragonActivityHeatmap({ days }: { days: DragonActivityDay[] }) {

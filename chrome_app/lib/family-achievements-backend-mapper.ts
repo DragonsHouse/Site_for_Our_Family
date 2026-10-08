@@ -88,7 +88,12 @@ function localizeAchievementTitle(name: string, key: string): string {
     'First Flight': 'Перший політ',
     'Watchtower Initiate': 'Новачок вишки',
   };
-  return byKey[key] ?? byName[name] ?? name;
+  const productTitles: Record<string, string> = {
+    event_first_attended: 'Голос ради',
+    tower_first_defended: 'Вартовий вишки',
+    quest_first_completed: 'Перший політ',
+  };
+  return productTitles[key] ?? byKey[key] ?? byName[name] ?? name;
 }
 
 function localizeAchievementDescription(description: string, key: string): string {
@@ -102,7 +107,12 @@ function localizeAchievementDescription(description: string, key: string): strin
     first_flight: 'Узяти участь у першому сімейному квесті.',
     watchtower_initiate: 'Вперше відповісти на оборону вишки.',
   };
-  return descriptions[key] ?? description;
+  const productDescriptions: Record<string, string> = {
+    event_first_attended: 'Взяти участь у сімейній події.',
+    tower_first_defended: 'Допомогти успішно захистити вишку.',
+    quest_first_completed: 'Завершити перший сімейний квест і потрапити до спільної хроніки.',
+  };
+  return productDescriptions[key] ?? descriptions[key] ?? description;
 }
 
 function localizeAchievementRequirement(key: string, fallback: string): string {
@@ -116,7 +126,12 @@ function localizeAchievementRequirement(key: string, fallback: string): string {
     first_flight: 'Узяти участь у першому сімейному квесті',
     watchtower_initiate: 'Відповісти на першу оборону вишки',
   };
-  return requirements[key] ?? fallback;
+  const productRequirements: Record<string, string> = {
+    event_first_attended: 'Відвідати сімейну подію',
+    tower_first_defended: 'Допомогти захистити вишку',
+    quest_first_completed: 'Завершити перший сімейний квест',
+  };
+  return productRequirements[key] ?? requirements[key] ?? fallback;
 }
 
 function localizeRewardName(name: string): string {

@@ -73,7 +73,7 @@ export function FamilyBackupPanel({ currentUser }: { currentUser: FamilyUser }) 
         filename: file.name,
         schemaVersion: nextPreview.backup.schemaVersion,
         result: nextPreview.errors.length ? 'failed' : 'success',
-        summary: nextPreview.errors[0] ?? 'Попередня перевірка completed'
+        summary: nextPreview.errors[0] ?? 'Попередню перевірку завершено'
       });
       setPreview(nextPreview);
       setAudit(readBackupAudit());
@@ -164,18 +164,18 @@ export function FamilyBackupPanel({ currentUser }: { currentUser: FamilyUser }) 
               <div>Файл: <span className="text-white">{preview.filename}</span></div>
               <div>Розмір: <span className="text-white">{formatBytes(preview.fileSize)}</span></div>
               <div>Дата: <span className="text-white">{new Date(preview.backup.exportedAt).toLocaleString('uk-UA')}</span></div>
-              <div>Schema: <span className="text-white">{preview.backup.schemaVersion}</span></div>
-              <div>Application: <span className="text-white">{preview.backup.applicationVersion ?? '-'}</span></div>
+              <div>Версія формату: <span className="text-white">{preview.backup.schemaVersion}</span></div>
+              <div>Версія Hub: <span className="text-white">{preview.backup.applicationVersion ?? '-'}</span></div>
               <div>Автор: <span className="text-white">{preview.backup.exportedBy.nickname} / {preview.backup.exportedBy.familyMemberId}</span></div>
-              <div>Checksum: <span className={preview.checksumValid ? 'text-emerald-300' : 'text-red-300'}>{preview.checksumValid ? 'валідна' : 'невалідна'}</span></div>
-              <div>Compatibility: <span className="text-white">{preview.compatibilityStatus}</span></div>
-              <div>Members: <span className="text-white">{preview.counts.members}</span></div>
-              <div>Quests: <span className="text-white">{preview.counts.quests}</span></div>
-              <div>Accounting entries: <span className="text-white">{preview.counts.accountingEntries}</span></div>
-              <div>Notifications: <span className="text-white">{preview.counts.notifications}</span></div>
-              <div>Assets: <span className="text-white">{preview.counts.assets}</span></div>
-              <div>Unresolved references: <span className="text-white">{preview.counts.unresolvedReferences}</span></div>
-              <div>Conflicts: <span className="text-white">{preview.counts.conflicts}</span></div>
+              <div>Контрольна сума: <span className={preview.checksumValid ? 'text-emerald-300' : 'text-red-300'}>{preview.checksumValid ? 'валідна' : 'невалідна'}</span></div>
+              <div>Сумісність: <span className="text-white">{preview.compatibilityStatus}</span></div>
+              <div>Учасники: <span className="text-white">{preview.counts.members}</span></div>
+              <div>Квести: <span className="text-white">{preview.counts.quests}</span></div>
+              <div>Бухгалтерські записи: <span className="text-white">{preview.counts.accountingEntries}</span></div>
+              <div>Сповіщення: <span className="text-white">{preview.counts.notifications}</span></div>
+              <div>Медіафайли / ресурси: <span className="text-white">{preview.counts.assets}</span></div>
+              <div>Невирішені посилання: <span className="text-white">{preview.counts.unresolvedReferences}</span></div>
+              <div>Конфлікти: <span className="text-white">{preview.counts.conflicts}</span></div>
               {preview.warnings.map((warning) => (
                 <div key={warning} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-100">{warning}</div>
               ))}

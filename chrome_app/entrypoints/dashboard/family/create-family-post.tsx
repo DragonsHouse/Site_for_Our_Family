@@ -17,20 +17,25 @@ export function CreateFamilyPost({
   onCreate
 }: {
   currentUser: FamilyUser;
-  onCreate: (post: FamilyPost) => void;
+  onCreate: (post: FamilyPost) => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<FamilyPostType>('announcement');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [pinned, setPinned] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const canManage = canManageFamilyNews(currentUser);
 
   if (!canManage) return null;
 
-  function submitPost() {
+  async function submitPost() {
     const now = new Date().toISOString();
-    onCreate({
+    setSaving(true);
+    setSubmitError(null);
+    try {
+      await onCreate({
       id: `family-post-${Date.now()}`,
       type,
       title: title.trim(),
@@ -46,12 +51,17 @@ export function CreateFamilyPost({
       targetUserIds: [],
       serverName: 'Quant RP',
       isReadBy: []
-    });
-    setTitle('');
-    setBody('');
-    setPinned(false);
-    setType('announcement');
-    setOpen(false);
+      });
+      setTitle('');
+      setBody('');
+      setPinned(false);
+      setType('announcement');
+      setOpen(false);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Не вдалося опублікувати новину.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -104,10 +114,15 @@ export function CreateFamilyPost({
             />
             Закріпити
           </label>
+          {submitError ? (
+            <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100" role="alert">
+              {submitError}
+            </div>
+          ) : null}
           <button
             type="button"
-            onClick={submitPost}
-            disabled={!title.trim() || !body.trim()}
+            onClick={() => void submitPost()}
+            disabled={saving || !title.trim() || !body.trim()}
             className="w-fit rounded-xl bg-gradient-to-r from-red-700 to-amber-500 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Опублікувати

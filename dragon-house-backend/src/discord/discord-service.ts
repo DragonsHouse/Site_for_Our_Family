@@ -9,9 +9,7 @@ import type {
   DiscordConnectionStatus,
   ExternalAccountingMessage,
   DiscordStatusResponse,
-  ExternalFamilyNews,
   ExternalFamilyQuest,
-  ExternalSyncResult,
   PublicDiscordConfig,
 } from '../types.js';
 import { getAllowedChannelIds, isAllowedChannel } from './channel-allowlist.js';
@@ -280,17 +278,6 @@ export class DiscordService implements DiscordMessageTransport {
     return { ok: true, channelId, requiredPermissions, missingPermissions: [] };
   }
 
-  async resolveMember(_familyUserId: string): Promise<null> {
-    return null;
-  }
-
-  async fetchNewsMessages(): Promise<ExternalFamilyNews[]> {
-    if (!this.config.discord.channels.quantNews || !isAllowedChannel(this.config, this.config.discord.channels.quantNews)) {
-      return [];
-    }
-    return [];
-  }
-
   async fetchQuestMessages(limit = 200): Promise<ExternalFamilyQuest[]> {
     const maxMessages = Math.min(Math.max(limit, 1), 500);
     const embedQuests = this.config.discord.channels.questAnnouncements && isAllowedChannel(this.config, this.config.discord.channels.questAnnouncements)
@@ -399,23 +386,6 @@ export class DiscordService implements DiscordMessageTransport {
       }));
   }
 
-  async publishNews(_postId: string, channelId = this.config.discord.channels.quantNews): Promise<ExternalSyncResult> {
-    if (!channelId || !isAllowedChannel(this.config, channelId)) {
-      return { ok: false, externalId: null, error: 'Channel is not allowed' };
-    }
-    return { ok: false, externalId: null, error: 'Publishing is not implemented' };
-  }
-
-  async publishQuestUpdate(
-    _questId: string,
-    channelId = this.config.discord.channels.questAnnouncements,
-  ): Promise<ExternalSyncResult> {
-    if (!channelId || !isAllowedChannel(this.config, channelId)) {
-      return { ok: false, externalId: null, error: 'Channel is not allowed' };
-    }
-    return { ok: false, externalId: null, error: 'Publishing is not implemented' };
-  }
-
   async sendMessage(channelId: string, payload: DiscordMessagePayload): Promise<{ messageId: string }> {
     const channel = await this.requireTextChannel(channelId);
     const message = await channel.send(toDiscordPayload(payload));
@@ -427,27 +397,6 @@ export class DiscordService implements DiscordMessageTransport {
     const message = await channel.messages.fetch(messageId);
     const updated = await message.edit(toDiscordPayload(payload));
     return { messageId: updated.id };
-  }
-
-  async sendDirectMessageToGuildMembers(guildId: string, payload: DiscordMessagePayload): Promise<{ attempted: number; sent: number; failed: number }> {
-    if (this.disabled) throw new Error('Discord is not configured');
-    if (!this.client.isReady()) throw new Error('Discord client is not connected');
-    const guild = await this.client.guilds.fetch(guildId);
-    const members = await guild.members.fetch();
-    let attempted = 0;
-    let sent = 0;
-    let failed = 0;
-    for (const member of members.values()) {
-      if (member.user.bot) continue;
-      attempted += 1;
-      try {
-        await member.send(toDiscordPayload(payload));
-        sent += 1;
-      } catch {
-        failed += 1;
-      }
-    }
-    return { attempted, sent, failed };
   }
 
   getAllowedChannelIds(): string[] {

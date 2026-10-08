@@ -36,7 +36,7 @@ import {
   resolveBackendFamilyUser,
   restoreCurrentBackendFamilyUser
 } from '../../lib/family-backend-user-session';
-import { readFamilyPosts } from '../../lib/family-data';
+import { listBackendFamilyNewsPosts } from '../../lib/family-content-backend-client';
 import type { FamilyPermission, FamilyPost, FamilyRole, FamilySection, FamilyTab, FamilyUser } from '../../lib/family-types';
 import { AuthStartupGate } from './auth/AuthStartupGate';
 import { DragonEmberGate } from './auth/DragonEmberGate';
@@ -661,7 +661,8 @@ export function FamilyHubApp() {
   const [currentUser, setCurrentUser] = useState<FamilyUser | null>(null);
   const memberDataSource = useMemo(() => createFamilyMemberDataSource(), []);
   const [familyUsers, setFamilyUsers] = useState<FamilyUser[]>([]);
-  const [posts, setPosts] = useState<FamilyPost[]>(() => readFamilyPosts());
+  const [posts, setPosts] = useState<FamilyPost[]>([]);
+  const [postsError, setPostsError] = useState<string | null>(null);
   const [authState, setAuthState] = useState<FamilyHubAuthState>({ status: 'checking' });
   const [activeTab, setActiveTab] = useState<FamilyTab>(() => getInitialFamilyTab());
   const [initialSection] = useState<FamilySection>(() => getInitialFamilySection());
@@ -686,6 +687,18 @@ export function FamilyHubApp() {
     return users;
   }
 
+  async function refreshFamilyNewsPosts() {
+    try {
+      const result = await listBackendFamilyNewsPosts();
+      setPosts(result.items);
+      setPostsError(null);
+      return result.items;
+    } catch (error) {
+      setPostsError(error instanceof Error ? error.message : 'Не вдалося завантажити новини Dragon House.');
+      throw error;
+    }
+  }
+
   useEffect(() => {
     void migrateDragonHouseAsyncData().catch(() => undefined);
   }, []);
@@ -707,6 +720,7 @@ export function FamilyHubApp() {
           setCurrentUser(user);
           setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
           void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
+          void refreshFamilyNewsPosts().catch(() => undefined);
           setAuthState(stateForAuthenticatedUser(user, 'discord'));
         })
         .catch((err) => {
@@ -752,6 +766,7 @@ export function FamilyHubApp() {
       setCurrentUser(user);
       setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
       void refreshFamilyUsers().catch(() => setFamilyUsers([user]));
+      void refreshFamilyNewsPosts().catch(() => undefined);
       setAuthState(stateForAuthenticatedUser(user, 'restore'));
     } catch (err) {
       const route = routeRestoreFailure(err);
@@ -779,7 +794,7 @@ export function FamilyHubApp() {
       const user = resolveBackendFamilyUser(result.user);
       setCurrentUser(user);
       await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
-      setPosts(readFamilyPosts());
+      await refreshFamilyNewsPosts().catch(() => undefined);
       setLoginPassword('');
       setCurrentPassword('');
       setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
@@ -883,7 +898,7 @@ export function FamilyHubApp() {
       setCurrentUser(user);
       setStaticIdDraft(user.onboarding?.requirements.staticId.value ?? '');
       await refreshFamilyUsers().catch(() => setFamilyUsers([user]));
-      setPosts(readFamilyPosts());
+      await refreshFamilyNewsPosts().catch(() => undefined);
       setAuthState(stateForAuthenticatedUser(user, 'discord'));
     } catch (err) {
       const route = routeDiscordLoginFailure(err);
@@ -1246,6 +1261,7 @@ export function FamilyHubApp() {
       currentUser={currentUser}
       familyUsers={familyUsers}
       posts={posts}
+      postsError={postsError}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onPostsChange={setPosts}
@@ -1261,5 +1277,3 @@ export function FamilyHubApp() {
     />
   ) : null;
 }
-
-
