@@ -5,6 +5,17 @@ import {
 } from '../../../lib/family-content-backend-client';
 import { canManageFamilyContent } from '../../../lib/family-permissions';
 import type { FamilyUser, RecruitmentSettings } from '../../../lib/family-types';
+import {
+  DragonBadge,
+  DragonButton,
+  DragonCard,
+  DragonCheckbox,
+  DragonHero,
+  DragonInput,
+  DragonPanel,
+  DragonStatusMessage,
+  DragonTextarea
+} from '../dragon-ui/dragon-ui';
 
 const EMPTY_RECRUITMENT: RecruitmentSettings = {
   isOpen: false,
@@ -56,116 +67,138 @@ export function RecruitmentPanel({ currentUser }: { currentUser: FamilyUser }) {
   }
 
   const active = draft ?? settings;
+  const hasUsableDraft = active.text.trim() && active.contact.trim() && active.requirements.some((item) => item.trim());
 
   return (
-    <section className="rounded-2xl border border-red-950/70 bg-slate-950/75 p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Набір у Dragon House</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Статус, опис, вимоги й контакт зберігаються в backend, тому всі учасники бачать одну версію.
-          </p>
+    <section className="space-y-4">
+      <DragonHero
+        eyebrow="Recruitment"
+        title="Набір у Dragon House"
+        description="Статус, опис, вимоги й контакт зберігаються в backend, тому всі учасники бачать одну версію."
+        className="dh-command-hero"
+      >
+        <div className={settings.isOpen ? 'dh-status-pill is-open' : 'dh-status-pill is-closed'}>
+          {settings.isOpen ? 'Набір відкритий' : 'Набір закритий'}
         </div>
-        {canManage ? (
-          <div className="flex flex-wrap gap-2">
-            {draft ? (
-              <>
-                <button type="button" onClick={() => setDraft(null)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-100">
-                  Скасувати
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void saveDraft()}
-                  disabled={saving || !active.text.trim() || !active.contact.trim() || active.requirements.every((item) => !item.trim())}
-                  className="rounded-lg border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 disabled:opacity-50"
-                >
-                  Зберегти
-                </button>
-              </>
-            ) : (
-              <button type="button" onClick={() => setDraft(settings)} className="rounded-lg border border-amber-500/60 px-3 py-2 text-xs text-amber-100">
-                Редагувати
-              </button>
-            )}
-            <button type="button" onClick={() => void refresh()} className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-100">
-              Оновити дані
-            </button>
-          </div>
-        ) : null}
-      </div>
+      </DragonHero>
 
       {error ? (
-        <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+        <DragonStatusMessage tone="error" title="Набір не синхронізовано">
           {error}
-        </div>
+        </DragonStatusMessage>
       ) : null}
 
-      <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-        <div className="text-xs uppercase tracking-[0.22em] text-amber-300">Статус</div>
-        {draft ? (
-          <label className="mt-2 flex items-center gap-2 text-sm text-slate-200">
-            <input
-              type="checkbox"
-              checked={active.isOpen}
-              onChange={(event) => setDraft({ ...active, isOpen: event.target.checked })}
-            />
-            Набір відкритий
-          </label>
-        ) : (
-          <div className="mt-1 text-2xl font-semibold text-white">
-            {settings.isOpen ? 'Набір відкритий' : 'Набір закритий'}
+      <DragonPanel variant="raised" className="p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="dh-command-kicker">Поточний статус</p>
+            <h3 className="mt-1 text-2xl font-semibold text-white">
+              {active.isOpen ? 'Ворота відкриті для кандидатів' : 'Набір поставлено на паузу'}
+            </h3>
+            <p className="dh-command-copy mt-2">
+              {active.isOpen
+                ? 'Кандидати можуть звертатись до контактної особи та проходити вимоги.'
+                : 'Зовнішній набір зараз неактивний. Інформація лишається видимою для сім’ї.'}
+            </p>
           </div>
-        )}
+          {canManage ? (
+            <div className="flex flex-wrap gap-2">
+              {draft ? (
+                <>
+                  <DragonButton type="button" variant="quiet" onClick={() => setDraft(null)}>
+                    Скасувати
+                  </DragonButton>
+                  <DragonButton
+                    type="button"
+                    onClick={() => void saveDraft()}
+                    loading={saving}
+                    disabled={saving || !hasUsableDraft}
+                  >
+                    Зберегти
+                  </DragonButton>
+                </>
+              ) : (
+                <DragonButton type="button" onClick={() => setDraft(settings)}>
+                  Редагувати
+                </DragonButton>
+              )}
+              <DragonButton type="button" variant="secondary" onClick={() => void refresh()}>
+                Оновити дані
+              </DragonButton>
+            </div>
+          ) : null}
+        </div>
 
         {draft ? (
-          <div className="mt-4 grid gap-3">
-            <textarea
+          <div className="mt-5 grid gap-4">
+            <DragonCheckbox
+              checked={active.isOpen}
+              onCheckedChange={(checked) => setDraft({ ...active, isOpen: checked })}
+              label="Набір відкритий"
+              description="Перемикач змінює спільний backend-статус після збереження."
+            />
+            <DragonTextarea
               rows={5}
               value={active.text}
               onChange={(event) => setDraft({ ...active, text: event.target.value })}
-              className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm leading-6 text-slate-100"
               aria-label="Опис набору"
+              placeholder="Коротко поясни, кого шукає Dragon House."
             />
-            <textarea
+            <DragonTextarea
               rows={5}
               value={active.requirements.join('\n')}
               onChange={(event) => setDraft({ ...active, requirements: event.target.value.split('\n') })}
-              className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm leading-6 text-slate-100"
               aria-label="Вимоги набору"
+              placeholder="Кожна вимога з нового рядка"
             />
-            <input
+            <DragonInput
               value={active.contact}
               onChange={(event) => setDraft({ ...active, contact: event.target.value })}
-              className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              label="Контакт"
               aria-label="Контакт набору"
+              placeholder="Хто відповідає за кандидатів"
             />
           </div>
         ) : (
-          <>
-            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-300">{settings.text}</p>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
-                <h3 className="font-semibold text-white">Вимоги</h3>
-                <ul className="mt-2 space-y-2 text-sm text-slate-300">
-                  {settings.requirements.map((item) => (
-                    <li key={item} className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2">
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <DragonCard className="p-4">
+              <DragonBadge tone={settings.isOpen ? 'success' : 'muted'}>{settings.isOpen ? 'Відкрито' : 'Закрито'}</DragonBadge>
+              <p className="mt-4 whitespace-pre-line text-sm leading-7 text-stone-200">{settings.text || 'Опис набору ще не заповнений.'}</p>
+              <div className="mt-5">
+                <h4 className="text-base font-semibold text-white">Вимоги</h4>
+                {settings.requirements.length ? (
+                  <ul className="mt-3 grid gap-2">
+                    {settings.requirements.map((item) => (
+                      <li key={item} className="dh-command-list-item px-3 py-2 text-sm text-stone-200">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="dh-command-empty mt-3 text-sm">Вимоги ще не заповнені.</p>
+                )}
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-sm">
-                <div className="text-slate-500">Контакт</div>
-                <div className="mt-1 text-slate-100">{settings.contact}</div>
-                <div className="mt-3 text-slate-500">Оновлено</div>
-                <div className="mt-1 text-slate-100">{new Date(settings.updatedAt).toLocaleString('uk-UA')}</div>
-                <div className="mt-3 text-slate-500">Версія</div>
-                <div className="mt-1 text-slate-100">{settings.version ?? 1}</div>
-              </div>
-            </div>
-          </>
+            </DragonCard>
+
+            <DragonCard className="p-4">
+              <dl className="grid gap-4 text-sm">
+                <div>
+                  <dt className="dh-command-label">Контакт</dt>
+                  <dd className="mt-1 text-stone-100">{settings.contact || 'Не вказано'}</dd>
+                </div>
+                <div>
+                  <dt className="dh-command-label">Оновлено</dt>
+                  <dd className="mt-1 text-stone-100">{new Date(settings.updatedAt).toLocaleString('uk-UA')}</dd>
+                </div>
+              </dl>
+              <details className="dh-technical-details">
+                <summary>Технічні деталі</summary>
+                <p className="mt-2 text-sm">Версія backend-запису: {settings.version ?? 1}</p>
+              </details>
+            </DragonCard>
+          </div>
         )}
-      </div>
+      </DragonPanel>
     </section>
   );
 }

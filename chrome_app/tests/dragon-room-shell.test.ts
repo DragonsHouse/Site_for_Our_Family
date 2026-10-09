@@ -113,7 +113,7 @@ describe('Dragon Room Shell and navigation foundation', () => {
     assert.match(html, /<nav/);
     assert.match(html, /aria-current="page"/);
     assert.match(html, /aria-disabled="true"/);
-    assert.match(html, /Locked/);
+    assert.match(html, /Закрито/);
     assert.doesNotMatch(html, /Hidden/);
   });
 

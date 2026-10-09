@@ -73,22 +73,22 @@ export function FamilyHome({
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
-          <article className="dh-panel relative overflow-hidden rounded-3xl p-5">
+          <article className="dh-panel dh-command-hero relative overflow-hidden rounded-3xl p-5">
             <div className="pointer-events-none absolute right-4 top-4 h-32 w-32 rounded-full bg-orange-500/10 blur-3xl" />
             <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-4">
                 <DragonHouseCrest />
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">
+                  <p className="dh-command-kicker">
                     Dragon House
                   </p>
-                  <h2 className="mt-1 text-2xl font-semibold text-white">Внутрішній штаб сім’ї</h2>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <h2 className="dh-command-title mt-1">Внутрішній штаб сім’ї</h2>
+                  <p className="dh-command-copy mt-1 text-sm">
                     Лігво, новини, квести, скарбниця і доступи.
                   </p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              <div className="dh-command-note px-4 py-3 text-sm text-amber-100">
                 Важливе: сімейні квести тепер мають набір, учасників і звіти для бухгалтерії.
               </div>
             </div>
@@ -101,7 +101,7 @@ export function FamilyHome({
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {[introBlock, alertBlock].filter(isContentBlock).map((block) => (
-                <div key={block.id} className="rounded-xl border border-slate-800 bg-black/30 p-3">
+                <div key={block.id} className="dh-command-list-item p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-semibold text-white">{block.title}</div>
@@ -126,21 +126,21 @@ export function FamilyHome({
             </div>
 
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-slate-800 bg-black/30 p-3">
-                <div className="text-sm text-slate-500">Учасників</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{users.length}</div>
+              <div className="dh-command-stat">
+                <span>Учасників</span>
+                <strong>{users.length}</strong>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-black/30 p-3">
-                <div className="text-sm text-slate-500">У мережі</div>
-                <div className="mt-1 text-2xl font-semibold text-emerald-100">{onlineUsers.length}</div>
+              <div className="dh-command-stat">
+                <span>У мережі</span>
+                <strong>{onlineUsers.length}</strong>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-black/30 p-3">
-                <div className="text-sm text-slate-500">Статус сімʼї</div>
-                <div className="mt-1 font-semibold text-amber-100">Внутрішній Hub</div>
+              <div className="dh-command-stat">
+                <span>Статус сімʼї</span>
+                <strong>Внутрішній Hub</strong>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-black/30 p-3">
-                <div className="text-sm text-slate-500">Осередок</div>
-                <div className="mt-1 font-semibold text-amber-100">922 будинок</div>
+              <div className="dh-command-stat">
+                <span>Осередок</span>
+                <strong>922 будинок</strong>
               </div>
             </div>
 

@@ -99,6 +99,18 @@ const STATUS_LABELS: Record<FamilyQuestStatus, string> = {
 };
 
 const REWARD_MODES: FamilyQuestRewardMode[] = ['equal', 'percentage', 'fixed', 'mixed', 'manual'];
+const REWARD_MODE_LABELS: Record<FamilyQuestRewardMode, string> = {
+  equal: 'Порівну',
+  percentage: 'За відсотками',
+  fixed: 'Фіксовані суми',
+  mixed: 'Змішаний',
+  manual: 'Ручний'
+};
+const PAYOUT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Очікує виплати',
+  paid: 'Виплачено',
+  unpaid: 'Не виплачено'
+};
 const QUEST_ASSET_SLOTS = FAMILY_ASSET_DEFINITIONS.filter((definition) => definition.slot.startsWith('quest_'));
 const CATEGORY_STYLES = [
   'border-emerald-500/40 bg-emerald-500/10 text-emerald-100',
@@ -112,6 +124,14 @@ function money(value: number | null | undefined, fallback = '-') {
 
 function date(value: string | null | undefined) {
   return value ? new Date(value).toLocaleString('uk-UA') : '-';
+}
+
+function rewardModeLabel(value: FamilyQuestRewardMode | undefined) {
+  return value ? REWARD_MODE_LABELS[value] : 'Не вказано';
+}
+
+function payoutStatusLabel(value: string | undefined) {
+  return PAYOUT_STATUS_LABELS[value ?? 'pending'] ?? 'Очікує виплати';
 }
 
 function formatCooldown(until: string | null | undefined) {
@@ -582,7 +602,7 @@ function RewardManager({
                   </div>
                   <div>
                     <div className="text-amber-100">{money(payout?.amount ?? 0)}</div>
-                    <div className="text-xs text-slate-400">{payout?.status ?? 'pending'}</div>
+                    <div className="text-xs text-slate-400">{payoutStatusLabel(payout?.status)}</div>
                     <button type="button" onClick={() => void onIssueOne(quest.id, person.userId)} disabled={isIssuing || payout?.status === 'paid' || !plan.isComplete || plan.errors.length > 0} className="mt-2 rounded-lg border border-emerald-500/40 px-2 py-1 text-xs text-emerald-100 disabled:opacity-50">{isIssuing ? 'Обробка...' : 'Видати'}</button>
                     {feedback ? (
                       <div className={feedback.status === 'error' ? 'mt-2 text-xs text-red-200' : 'mt-2 text-xs text-emerald-100'}>
@@ -797,7 +817,9 @@ function QuestCard({
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${categoryStyle(template.category, categories)}`}>{template.category}</span>
               <span className="rounded-full border border-slate-700 bg-black/25 px-3 py-1 text-xs text-slate-200">Команда: {totalPeople}/{template.recommendedTeamSize}</span>
               <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-100">{status}</span>
-              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs text-slate-300">Режим: {quest?.rewardMode ?? template.rewardMode ?? template.splitMode}</span>
+              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs text-slate-300">
+                Режим: {rewardModeLabel(quest?.rewardMode ?? template.rewardMode ?? template.splitMode)}
+              </span>
             </div>
             <h3 className="mt-3 text-2xl font-semibold text-white">{template.title}</h3>
             <p className="mt-2 text-sm text-slate-300">{quest?.description ?? template.hint ?? template.steps[0]}</p>

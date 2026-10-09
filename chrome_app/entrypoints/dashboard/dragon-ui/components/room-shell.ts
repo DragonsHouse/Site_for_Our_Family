@@ -131,7 +131,7 @@ export function DragonRoomRail<T extends string>({
   items,
   activeItem,
   onItemSelect,
-  label = 'Dragon House rooms',
+  label = 'Кімнати Dragon House',
   compact = false,
   className,
   ...props
@@ -193,7 +193,7 @@ export function DragonRoomRail<T extends string>({
         item.icon ? h('span', { className: 'dh-dragon-room-rail-icon', 'aria-hidden': 'true' }, item.icon) : null,
         h('span', { className: 'dh-dragon-room-rail-label' }, item.label),
         item.room ? h('small', null, item.room) : null,
-        item.locked ? h('span', { className: 'dh-dragon-room-rail-lock' }, 'Locked') : null
+        item.locked ? h('span', { className: 'dh-dragon-room-rail-lock' }, 'Закрито') : null
       );
     })
   );

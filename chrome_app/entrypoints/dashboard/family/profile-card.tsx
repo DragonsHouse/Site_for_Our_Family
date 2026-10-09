@@ -150,7 +150,7 @@ export function ProfileCard({
 
       <div className="relative z-10 mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
         <div className="dh-card rounded-xl p-3">
-          <div className="text-slate-500">Static ID</div>
+          <div className="text-slate-500">Статичний ID</div>
           <div className="mt-1 font-medium text-slate-100">#{user.staticId}</div>
         </div>
         <div className="dh-card rounded-xl p-3">

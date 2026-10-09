@@ -48,12 +48,12 @@ export function discordSyncActionLabel(action: DiscordSyncPlanItem['action']) {
 
 export function discordSyncMethodLabel(method: DiscordSyncPlanItem['match']['method']) {
   const labels: Record<DiscordSyncPlanItem['match']['method'], string> = {
-    'account-link': 'Account link',
-    'stored-discord-id': 'Stored Discord ID',
-    'static-id': 'Static ID',
-    'nickname-suggestion': 'Manual suggestion',
-    none: 'No match',
-    'not-applicable': 'Not applicable'
+    'account-link': 'Прив’язаний акаунт',
+    'stored-discord-id': 'Збережений Discord ID',
+    'static-id': 'Статичний ID',
+    'nickname-suggestion': 'Ручна підказка',
+    none: 'Немає збігу',
+    'not-applicable': 'Не застосовується'
   };
   return labels[method];
 }

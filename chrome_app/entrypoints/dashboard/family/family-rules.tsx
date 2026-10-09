@@ -5,6 +5,7 @@ import {
 } from '../../../lib/family-content-backend-client';
 import { canManageFamilyContent } from '../../../lib/family-permissions';
 import type { FamilyEditableContentBlock, FamilyUser } from '../../../lib/family-types';
+import { DragonBadge, DragonButton, DragonEmptyState, DragonHero, DragonPanel, DragonStatusMessage } from '../dragon-ui/dragon-ui';
 import { FamilyContentEditor } from './family-content-editor';
 
 function getRuleBlocks(blocks: FamilyEditableContentBlock[]) {
@@ -36,48 +37,62 @@ export function FamilyRules({ currentUser }: { currentUser: FamilyUser }) {
   }
 
   return (
-    <section className="rounded-2xl border border-red-950/70 bg-slate-950/75 p-5">
-      <h2 className="text-lg font-semibold text-white">Правила сім’ї</h2>
-      <p className="mt-1 text-sm text-slate-400">
-        Єдина shared-версія правил Dragon House зберігається в backend і видима всім учасникам.
-      </p>
+    <section className="space-y-4">
+      <DragonHero
+        eyebrow="Family code"
+        title="Правила сім’ї"
+        description="Єдина shared-версія правил Dragon House зберігається в backend і видима всім учасникам."
+        className="dh-command-hero"
+      >
+        <DragonBadge tone="gold">{rules.length || 0} розділів</DragonBadge>
+      </DragonHero>
+
       {contentError ? (
-        <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+        <DragonStatusMessage tone="error" title="Правила не завантажились">
           {contentError}
-        </div>
+        </DragonStatusMessage>
       ) : null}
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        {rules.map((rule) => (
-          <article key={rule.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {rules.map((rule, index) => (
+          <DragonPanel key={rule.id} variant="raised" className="p-4">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="font-semibold text-amber-100">{rule.title}</h3>
+              <div>
+                <p className="dh-command-kicker">Розділ {index + 1}</p>
+                <h3 className="mt-1 text-xl font-semibold text-amber-100">{rule.title}</h3>
+              </div>
               {canEditContent ? (
-                <button
-                  type="button"
-                  onClick={() => setEditingBlock(rule)}
-                  className="shrink-0 rounded-lg border border-amber-500/50 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/10"
-                >
+                <DragonButton type="button" variant="secondary" onClick={() => setEditingBlock(rule)}>
                   Редагувати
-                </button>
+                </DragonButton>
               ) : null}
             </div>
-            <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
+            <ul className="mt-4 grid gap-2 text-sm leading-6 text-stone-200">
               {rule.body
                 .split('\n')
                 .map((item) => item.trim())
                 .filter(Boolean)
                 .map((item) => (
-                  <li key={item}>{item}</li>
+                  <li key={item} className="dh-command-list-item px-3 py-2">
+                    {item}
+                  </li>
                 ))}
             </ul>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+            <div className="mt-4 flex flex-wrap gap-3 text-xs text-stone-400">
               {rule.contact ? <span>Контакт / автор: {rule.contact}</span> : null}
               <span>Оновлено: {new Date(rule.updatedAt).toLocaleString('uk-UA')}</span>
-              <span>Версія: {rule.version ?? 1}</span>
             </div>
-          </article>
+            <details className="dh-technical-details">
+              <summary>Технічні деталі</summary>
+              <p className="mt-2 text-sm">Версія: {rule.version ?? 1}</p>
+            </details>
+          </DragonPanel>
         ))}
       </div>
+
+      {!rules.length && !contentError ? (
+        <DragonEmptyState title="Правила ще не заповнені" description="Коли керівництво додасть розділи, вони з’являться тут." />
+      ) : null}
 
       {editingBlock ? (
         <FamilyContentEditor

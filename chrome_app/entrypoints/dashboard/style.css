@@ -22,9 +22,252 @@ body {
   overflow-y: auto;
 }
 
+.dh-shell,
+.dh-dragon-room-shell {
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.dh-shell :is(h1, h2, h3, .dh-dragon-panel-title, .dh-dragon-hero h1) {
+  font-family: 'Dragon Cinzel', Cinzel, 'Palatino Linotype', Georgia, serif;
+  letter-spacing: 0;
+}
+
+.dh-shell :is(h1, h2) {
+  text-wrap: balance;
+}
+
+.dh-command-surface,
+.dh-panel,
+.dh-card,
+.dh-news-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 157, 74, 0.18);
+  background:
+    radial-gradient(ellipse at 10% 0%, rgba(255, 91, 27, 0.12), transparent 15rem),
+    radial-gradient(ellipse at 92% 105%, rgba(212, 175, 55, 0.08), transparent 16rem),
+    linear-gradient(145deg, rgba(24, 15, 10, 0.9), rgba(5, 4, 3, 0.9));
+  box-shadow:
+    0 24px 74px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 226, 180, 0.07);
+  backdrop-filter: blur(16px);
+}
+
+.dh-command-surface::before,
+.dh-panel::before,
+.dh-card::before,
+.dh-news-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 122, 42, 0.08), transparent 22%, transparent 78%, rgba(255, 184, 72, 0.06)),
+    radial-gradient(circle at 16% 88%, rgba(255, 91, 27, 0.1), transparent 10rem);
+  opacity: 0.92;
+}
+
+.dh-command-surface > *,
+.dh-panel > *,
+.dh-card > *,
+.dh-news-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dh-command-hero {
+  border-color: rgba(255, 184, 72, 0.34);
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(255, 139, 0, 0.22), transparent 24rem),
+    radial-gradient(ellipse at 78% 35%, rgba(139, 0, 0, 0.24), transparent 18rem),
+    linear-gradient(145deg, rgba(38, 24, 14, 0.94), rgba(5, 4, 3, 0.96));
+  box-shadow:
+    0 30px 100px rgba(0, 0, 0, 0.55),
+    0 0 54px rgba(255, 91, 27, 0.14),
+    inset 0 1px 0 rgba(255, 226, 180, 0.1);
+}
+
+.dh-command-kicker,
+.dh-dragon-eyebrow {
+  color: #ffcf94;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dh-command-title {
+  color: #fff4df;
+  font-size: clamp(1.45rem, 3vw, 2.45rem);
+  font-weight: 800;
+  line-height: 1.06;
+  text-shadow: 0 0 26px rgba(255, 91, 27, 0.2);
+}
+
+.dh-command-copy {
+  color: #d8c4a7;
+  line-height: 1.65;
+}
+
+.dh-command-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+
+.dh-command-stat,
+.dh-command-list-item,
+.dh-command-note {
+  border: 1px solid rgba(255, 157, 74, 0.16);
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 226, 180, 0.05);
+}
+
+.dh-command-stat {
+  padding: 0.85rem;
+}
+
+.dh-command-stat span,
+.dh-command-meta,
+.dh-command-label {
+  color: #9d8763;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dh-command-stat strong,
+.dh-command-value {
+  display: block;
+  margin-top: 0.2rem;
+  color: #fff4df;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.dh-fire-button,
+.dh-dragon-button-primary {
+  border-color: rgba(255, 190, 104, 0.5);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 226, 180, 0.28), transparent 9rem),
+    linear-gradient(135deg, #7b1608, #c63b12 52%, #ff8b00);
+  box-shadow: 0 18px 42px rgba(139, 0, 0, 0.28), 0 0 26px rgba(255, 91, 27, 0.16);
+}
+
+.dh-tab,
+.dh-tab-active {
+  border: 1px solid rgba(255, 157, 74, 0.18);
+  background: rgba(0, 0, 0, 0.22);
+  color: #d8c4a7;
+}
+
+.dh-tab:hover {
+  border-color: rgba(255, 184, 72, 0.42);
+  color: #fff4df;
+}
+
+.dh-tab-active {
+  border-color: rgba(255, 184, 72, 0.58);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 184, 72, 0.18), transparent 7rem),
+    rgba(92, 36, 10, 0.42);
+  color: #fff4df;
+  box-shadow: inset 0 0 0 1px rgba(255, 184, 72, 0.12), 0 0 22px rgba(255, 91, 27, 0.1);
+}
+
+.dh-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: fit-content;
+  border: 1px solid rgba(255, 157, 74, 0.22);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0.35rem 0.65rem;
+  color: #e9d4b5;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.dh-status-pill::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #ff9b45;
+  box-shadow: 0 0 14px rgba(255, 155, 69, 0.55);
+}
+
+.dh-status-pill.is-open::before,
+.dh-status-pill.is-active::before,
+.dh-status-pill.is-success::before {
+  background: #8fa66a;
+  box-shadow: 0 0 14px rgba(143, 166, 106, 0.55);
+}
+
+.dh-status-pill.is-closed::before,
+.dh-status-pill.is-muted::before {
+  background: #9d8763;
+  box-shadow: none;
+}
+
+.dh-status-pill.is-danger::before,
+.dh-status-pill.is-conflict::before {
+  background: #f87171;
+  box-shadow: 0 0 14px rgba(248, 113, 113, 0.42);
+}
+
+.dh-technical-details {
+  margin-top: 1rem;
+  border: 1px solid rgba(255, 157, 74, 0.16);
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.85rem;
+  color: #c9b7a2;
+}
+
+.dh-technical-details summary {
+  cursor: pointer;
+  color: #ffcf94;
+  font-weight: 800;
+}
+
+.dh-scroll-table {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dh-scroll-table table {
+  min-width: 44rem;
+}
+
+.dh-command-empty,
+.dh-command-error {
+  border: 1px solid rgba(255, 157, 74, 0.2);
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 1rem;
+  color: #d8c4a7;
+}
+
+.dh-command-error {
+  border-color: rgba(248, 113, 113, 0.42);
+  color: #ffd2c9;
+}
+
 .dh-discord-sync {
   display: grid;
   gap: 1rem;
+}
+
+.dh-discord-sync .dh-dragon-panel,
+.dh-discord-sync .dh-dragon-card {
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.35rem);
 }
 
 .dh-discord-sync-hero,

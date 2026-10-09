@@ -52,12 +52,38 @@ type ProofViewerState =
 
 const ACCOUNTING_REFRESH_INTERVAL_MS = 30_000;
 
+const salaryRuleTypeLabels: Record<string, string> = {
+  base_salary: 'Базова зарплата',
+  premium: 'Премія',
+  reward: 'Нагорода',
+  correction: 'Корекція'
+};
+
+const salaryRuleBasisLabels: Record<string, string> = {
+  rank: 'Ранг',
+  activity: 'Активність',
+  quest_activity: 'Квестова активність',
+  combat: 'Вишки / стаки',
+  leadership: 'Лідерство',
+  top3: 'TOP-3',
+  special: 'Рекрутери / HR',
+  manual: 'Ручне правило'
+};
+
 function money(value: number | null | undefined, currency = 'USD') {
   return value == null ? '-' : `${value.toLocaleString('uk-UA')} ${currency}`;
 }
 
 function date(value: string | null | undefined) {
   return value ? new Date(value).toLocaleDateString('uk-UA') : '-';
+}
+
+function salaryRuleTypeLabel(value: string) {
+  return salaryRuleTypeLabels[value] ?? value.replace(/_/g, ' ');
+}
+
+function salaryRuleBasisLabel(value: string) {
+  return salaryRuleBasisLabels[value] ?? value.replace(/_/g, ' ');
 }
 
 function currentUserAvatarSrc(user: FamilyUser) {
@@ -488,7 +514,9 @@ export function FamilyAccounting({ currentUser, users }: { currentUser: FamilyUs
                     <div key={rule.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 p-3 text-sm">
                       <span>
                         <span className="block font-medium text-white">{rule.name}</span>
-                        <span className="block text-slate-400">{rule.ruleType} - {rule.basis} - v{rule.version} - {money(rule.amount, rule.currency)}</span>
+                        <span className="block text-slate-400">
+                          {salaryRuleTypeLabel(rule.ruleType)} - {salaryRuleBasisLabel(rule.basis)} - v{rule.version} - {money(rule.amount, rule.currency)}
+                        </span>
                       </span>
                       <button type="button" disabled={Boolean(mutatingKey)} onClick={() => void mutate(`rule-${rule.id}`, () => setBackendSalaryRuleActive(rule.id, !rule.active))} className="rounded-lg border border-white/10 px-3 py-1 text-xs text-slate-200 disabled:opacity-50">
                         {rule.active ? 'Вимкнути' : 'Увімкнути'}
@@ -803,7 +831,7 @@ function DiscordAccountingFeedPanel({ feed }: { feed: BackendDiscordAccountingFe
     <section className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="font-semibold text-white">Discord accounting feed</h3>
+          <h3 className="font-semibold text-white">Discord-стрічка обліку</h3>
           <p className="mt-1 text-xs text-sky-100/80">{discordFeedStatusLabel(feed)}</p>
         </div>
         <span className="rounded-full border border-sky-300/30 px-3 py-1 text-xs text-sky-100">
@@ -839,8 +867,8 @@ function DiscordAccountingFeedPanel({ feed }: { feed: BackendDiscordAccountingFe
             ) : null}
           </article>
         ))}
-        {feed && feed.items.length === 0 ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-400">No Discord accounting messages yet.</div> : null}
-        {!feed ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-400">Discord accounting feed did not load.</div> : null}
+        {feed && feed.items.length === 0 ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-400">Повідомлень Discord для обліку ще немає.</div> : null}
+        {!feed ? <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-400">Discord-стрічка обліку не завантажилась.</div> : null}
       </div>
     </section>
   );

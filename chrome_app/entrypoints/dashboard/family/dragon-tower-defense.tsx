@@ -809,7 +809,7 @@ function DragonTowerCooldownCard({
         <div><dt className="text-slate-400">Діє до</dt><dd>{state?.cooldownAt ? formatDragonDefenseDateTime(state.cooldownAt) : 'КД немає'}</dd></div>
         <div><dt className="text-slate-400">Джерело</dt><dd>{sourceLabel}</dd></div>
         <div><dt className="text-slate-400">Оновлено</dt><dd>{state?.lastUpdatedAt ? formatDragonDefenseDateTime(state.lastUpdatedAt) : 'ще ні'}</dd></div>
-        <div><dt className="text-slate-400">Reminder</dt><dd>{reminderResult}</dd></div>
+        <div><dt className="text-slate-400">Нагадування</dt><dd>{reminderResult}</dd></div>
         <div><dt className="text-slate-400">Останнє нагадування</dt><dd>{state?.lastReminderAt ? formatDragonDefenseDateTime(state.lastReminderAt) : 'не було'}</dd></div>
         <div><dt className="text-slate-400">Кому</dt><dd>{state?.reminderTarget ?? 'роль каптьорів'}</dd></div>
       </dl>
