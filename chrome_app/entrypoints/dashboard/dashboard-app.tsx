@@ -63,6 +63,22 @@ type BackgroundStatusData = Extract<BackgroundStatusResponse, { ok: true }>['dat
 
 type BackgroundStatusView = BackgroundStatusData | null;
 
+type DashboardRuntimeMessage =
+  | { type: 'QUANT_GET_BACKGROUND_STATUS' }
+  | { type: 'QUANT_RUN_BUYER_POLL_NOW' }
+  | { type: 'QUANT_SYNC_EVENTS_SCHEDULE' };
+
+function canUseRuntimeMessaging() {
+  return typeof chrome !== 'undefined' && typeof chrome.runtime?.sendMessage === 'function';
+}
+
+async function sendRuntimeMessage<T>(message: DashboardRuntimeMessage): Promise<T> {
+  if (!canUseRuntimeMessaging()) {
+    throw new Error('Фонова служба розширення недоступна у цьому режимі перегляду.');
+  }
+  return (await chrome.runtime.sendMessage(message)) as T;
+}
+
 function fmtDateTime(value: string | null | undefined) {
   if (!value) return '—';
   return new Date(value).toLocaleString('uk-UA');
@@ -418,9 +434,10 @@ export function DashboardApp({ familyTab }: DashboardAppProps = {}) {
   }, [backgroundServiceExpanded]);
 
   async function loadBackgroundStatus() {
-    const response = (await chrome.runtime.sendMessage({
+    if (!canUseRuntimeMessaging()) return;
+    const response = await sendRuntimeMessage<BackgroundStatusResponse>({
       type: 'QUANT_GET_BACKGROUND_STATUS'
-    })) as BackgroundStatusResponse;
+    });
     if (!response.ok) {
       throw new Error(response.error);
     }
@@ -554,7 +571,7 @@ export function DashboardApp({ familyTab }: DashboardAppProps = {}) {
     setLoading(true);
     setError(null);
     try {
-      await chrome.runtime.sendMessage({ type: 'QUANT_RUN_BUYER_POLL_NOW' });
+      await sendRuntimeMessage({ type: 'QUANT_RUN_BUYER_POLL_NOW' });
       window.setTimeout(() => {
         void loadDashboardData().catch((err) =>
           setError(err instanceof Error ? err.message : t('error_refresh'))
@@ -571,7 +588,7 @@ export function DashboardApp({ familyTab }: DashboardAppProps = {}) {
     setLoading(true);
     setError(null);
     try {
-      await chrome.runtime.sendMessage({ type: 'QUANT_SYNC_EVENTS_SCHEDULE' });
+      await sendRuntimeMessage({ type: 'QUANT_SYNC_EVENTS_SCHEDULE' });
       await loadDashboardData();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('error_events_schedule_refresh'));

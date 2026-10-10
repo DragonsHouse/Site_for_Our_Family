@@ -81,11 +81,12 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
       <DragonHero
         eyebrow="Хроніки Dragon House"
         title="Календар"
-        description="Зал хронік Dragon House: сімейні дати, ради, квести, ритуали, ресурси й особисті печаті в одному живому календарі."
+        description="Зал хронік Dragon House: сімейні події, квести, оборона вишок, дні народження й операційні дедлайни в одному календарі."
       >
         <div className="dh-calendar-hero-seals" aria-label="Поточний стан календаря">
           <DragonBadge tone="gold">Сімейний календар</DragonBadge>
           <DragonBadge tone="success">{currentUser.nickname}</DragonBadge>
+          <DragonBadge tone="muted">Europe/Kyiv</DragonBadge>
         </div>
       </DragonHero>
 
@@ -323,7 +324,7 @@ export function DragonCalendar({ currentUser, dependencies }: { currentUser: Fam
         </DragonPanel>
       </div>
 
-      <DragonDivider label="Category Seals" />
+      <DragonDivider label="Печаті категорій" />
 
       <section className="dh-calendar-category-strip" aria-label="Категорії Dragon Calendar">
         {Object.entries(DRAGON_CALENDAR_CATEGORY_META).map(([category, meta]) => (

@@ -45,6 +45,17 @@ function ModuleIntro({
   );
 }
 
+function mapZoneTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    ally: 'Союзна зона',
+    family: 'Сімейна зона',
+    neutral: 'Нейтральна зона',
+    risk: 'Зона ризику',
+    enemy: 'Ворожа зона'
+  };
+  return labels[type] ?? type.replace(/_/g, ' ');
+}
+
 export function FamilyShell({
   currentUser,
   familyUsers,
@@ -225,16 +236,18 @@ export function FamilyShell({
 
         {activeTab === 'map' ? (
           <>
-            <ModuleIntro title="Мапа" description="Території, зони й редактор сімейної карти.">
+            <ModuleIntro title="Мапа" description="Території, зони й редактор сімейної карти. Легенда нижче є довідковою; інтерактивні точки карти зберігаються локально на цьому пристрої.">
               <div className="grid gap-3 md:grid-cols-2">
                 {FAMILY_MAP_ZONES.map((zone) => (
                   <div key={zone.id} className="dh-card rounded-xl p-3">
-                    <div className="flex items-center gap-2">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: zone.color }} />
-                      <span className="font-medium text-white">{zone.name}</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: zone.color }} />
+                        <span className="font-medium text-white">{zone.name}</span>
+                      </div>
+                      <DragonBadge tone="muted">{mapZoneTypeLabel(zone.type)}</DragonBadge>
                     </div>
                     <p className="mt-2 text-sm text-slate-300">{zone.description}</p>
-                    <div className="mt-2 text-xs text-slate-400">{zone.type}</div>
                   </div>
                 ))}
               </div>
@@ -247,22 +260,16 @@ export function FamilyShell({
                       {reference.version} · {reference.date} · {reference.fileDescription}
                     </div>
                     <p className="mt-2 text-sm text-amber-50">{reference.notes}</p>
-                    <a
-                      href={reference.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-3 inline-flex rounded-lg border border-amber-500/60 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/10"
-                    >
+                    <DragonButton href={reference.url} target="_blank" rel="noreferrer" variant="secondary" className="mt-3">
                       Відкрити посилання
-                    </a>
+                    </DragonButton>
                   </div>
                 ))}
               </div>
 
               {canManageFamilyMap(currentUser) ? (
-                <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                  Керування зонами активне нижче: створюй і редагуй полігони, маркери, примітки,
-                  іконки та посилання прямо в модулі мапи.
+                <div className="dh-command-note mt-3 px-3 py-2 text-xs text-amber-100">
+                  Керування зонами активне нижче: створюй і редагуй полігони, маркери, примітки, іконки та посилання прямо в модулі мапи.
                 </div>
               ) : null}
             </ModuleIntro>

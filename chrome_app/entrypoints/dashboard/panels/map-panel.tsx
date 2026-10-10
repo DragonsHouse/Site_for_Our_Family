@@ -1462,15 +1462,26 @@ export function MapPanel() {
 
   return (
     <section
-      className={`rounded-2xl border border-slate-800 bg-slate-900 p-4 ${
+      className={`dh-map-room dh-panel rounded-3xl p-4 ${
         isPageExpanded ? 'fixed inset-2 z-50 overflow-auto' : ''
       }`}
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-slate-100">Офлайн карта</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-300">
-            Zoom: {zoom.toFixed(1)}
+      <div className="dh-map-command mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="dh-command-kicker">Тактична карта</p>
+          <h2 className="dh-command-title mt-1">Тактична карта Dragon House</h2>
+          <p className="dh-command-copy mt-2 max-w-3xl">
+            Локальні шари, сімейні точки й зони для оперативної навігації. Дані карти зберігаються на цьому пристрої, не в backend.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="dh-status-pill is-active">Системні точки: {visibleDefaultMarkers.length}/{defaultMarkers.length}</span>
+            <span className="dh-status-pill">Мої точки: {filteredCustomPoints.length}</span>
+            <span className="dh-status-pill">Зони: {zones.length}</span>
+          </div>
+        </div>
+        <div className="dh-map-toolbar flex flex-wrap items-center gap-2">
+          <span className="dh-map-zoom-pill">
+            Масштаб: {zoom.toFixed(1)}
           </span>
           <button
             type="button"
@@ -1492,7 +1503,7 @@ export function MapPanel() {
             className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800"
             title="Налаштування карти"
           >
-            ?
+            Налаштування
           </button>
           <button
             type="button"
@@ -1503,7 +1514,7 @@ export function MapPanel() {
                 : 'border-slate-700 text-slate-200 hover:bg-slate-800'
             }`}
           >
-            Фільтр
+            Фільтри
           </button>
           <button
             type="button"
@@ -1515,7 +1526,7 @@ export function MapPanel() {
             }`}
             title="Змінити вигляд карти"
           >
-            Вид: {mapVariant === 'mapg' ? 'альт.' : 'норм.'}
+            Карта: {mapVariant === 'mapg' ? 'альтернативна' : 'звичайна'}
           </button>
           <button
             type="button"
@@ -1574,7 +1585,7 @@ export function MapPanel() {
             }`}
             title="На весь екран"
           >
-            {isFullscreen ? 'Вийти з fullscreen' : 'Fullscreen'}
+            {isFullscreen ? 'Вийти з повного екрана' : 'На весь екран'}
           </button>
           <button
             type="button"
@@ -1590,6 +1601,18 @@ export function MapPanel() {
           </button>
         </div>
       </div>
+
+      {error ? (
+        <div className="dh-command-error mb-4 text-sm" role="alert">
+          {error}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div className="dh-command-empty mb-4 text-sm">
+          Завантажуємо карту, системні точки та локальні зони...
+        </div>
+      ) : null}
 
       {layerFilterOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3">
@@ -2075,7 +2098,7 @@ export function MapPanel() {
 
       <div
         ref={mapRef}
-        className={`map-scroll-hidden relative overflow-auto rounded-xl border border-slate-800 bg-slate-950 ${
+        className={`dh-map-canvas map-scroll-hidden relative overflow-auto rounded-2xl border border-amber-500/20 bg-slate-950 ${
           addMode || (zoneDraftMode !== 'none' && zonePointPickMode) || pointEditorPickMode
             ? 'cursor-crosshair'
             : dragRef.current.active
@@ -2393,7 +2416,7 @@ export function MapPanel() {
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="text-slate-400">
-          Default точки: {visibleDefaultMarkers.length}/{defaultMarkers.length} • Мої точки:{' '}
+          Системні точки: {visibleDefaultMarkers.length}/{defaultMarkers.length} • Мої точки:{' '}
           {showUserPoints
             ? filteredCustomPoints.length
             : 0}
@@ -2932,7 +2955,7 @@ export function MapPanel() {
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="text-xs text-slate-300">
-                        Crop top %
+                        Обрізати зверху %
                         <input
                           type="number"
                           min={0}
@@ -2945,7 +2968,7 @@ export function MapPanel() {
                         />
                       </label>
                       <label className="text-xs text-slate-300">
-                        Crop right %
+                        Обрізати праворуч %
                         <input
                           type="number"
                           min={0}
@@ -2958,7 +2981,7 @@ export function MapPanel() {
                         />
                       </label>
                       <label className="text-xs text-slate-300">
-                        Crop bottom %
+                        Обрізати знизу %
                         <input
                           type="number"
                           min={0}
@@ -2971,7 +2994,7 @@ export function MapPanel() {
                         />
                       </label>
                       <label className="text-xs text-slate-300">
-                        Crop left %
+                        Обрізати ліворуч %
                         <input
                           type="number"
                           min={0}
@@ -3182,7 +3205,7 @@ export function MapPanel() {
                         : 'border-slate-700 text-slate-400 hover:bg-slate-800'
                     }`}
                   >
-                    none
+                    Без іконки
                   </button>
                   {allPresetIconUrls.map((iconUrl) => (
                     <button
@@ -3238,7 +3261,7 @@ export function MapPanel() {
                 <div className="mt-2">
                   <img
                     src={pointEditor.detailImageDataUrl}
-                    alt="Preview"
+                    alt="Перегляд"
                     className="max-h-24 rounded border border-slate-700 bg-slate-950 object-contain"
                   />
                   <button

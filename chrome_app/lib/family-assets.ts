@@ -27,110 +27,110 @@ export function questImagePath(fileName: string) {
 export const FAMILY_ASSET_DEFINITIONS: FamilyAssetDefinition[] = [
   {
     slot: 'dragon_house_logo',
-    title: 'Dragon House logo',
-    usedIn: 'Family Hub logo, family cards, shared crest fallback',
+    title: 'Герб Dragon House',
+    usedIn: 'Логотип Family Hub, сімейні картки та резервний герб.',
     defaultUrl: DRAGON_HOUSE_ASSETS.crest
   },
   {
     slot: 'header_logo',
-    title: 'Header logo',
-    usedIn: 'Top header crest in Family Hub',
+    title: 'Герб у шапці',
+    usedIn: 'Верхня шапка Family Hub.',
     defaultUrl: DRAGON_HOUSE_ASSETS.crest
   },
   {
     slot: 'family_hub_background',
-    title: 'Family Hub background',
-    usedIn: 'Main Dragon House shell background',
+    title: 'Фон Family Hub',
+    usedIn: 'Основний фон оболонки Dragon House.',
     defaultUrl: DRAGON_HOUSE_ASSETS.hallBackground
   },
   {
     slot: 'login_background',
-    title: 'Login background',
-    usedIn: 'Full-screen Dragon House Ember Gate login background. Recommended: 3840x2160 or 2560x1440, wide 16:9.',
+    title: 'Фон входу',
+    usedIn: 'Повноекранний фон входу Dragon House Ember Gate. Рекомендовано: 3840x2160 або 2560x1440, wide 16:9.',
     defaultUrl: DRAGON_HOUSE_ASSETS.emberGateBackground
   },
   {
     slot: 'login_portal_background',
-    title: 'Login portal background',
-    usedIn: 'Optional texture/image layer inside the transparent login arch. Replace backgrounds/login-portal-background.png to customize it.',
+    title: 'Фон порталу входу',
+    usedIn: 'Додатковий шар текстури або картинки всередині прозорої арки входу.',
     defaultUrl: DRAGON_HOUSE_ASSETS.loginPortalBackground
   },
   {
     slot: 'post_login_background',
-    title: 'Post-login background',
-    usedIn: 'Main Family Hub background asset after authentication. Replace backgrounds/post-login-background.png to customize it.',
+    title: 'Фон після входу',
+    usedIn: 'Основний фон Family Hub після авторизації.',
     defaultUrl: DRAGON_HOUSE_ASSETS.postLoginBackground
   },
   {
     slot: 'background_dragon',
-    title: 'Background dragon',
-    usedIn: 'Decorative dragon layer behind Hub content',
+    title: 'Дракон на фоні',
+    usedIn: 'Декоративний шар дракона позаду вмісту Hub.',
     defaultUrl: DRAGON_HOUSE_ASSETS.futureDragonLayer
   },
   {
     slot: 'quest_help_citizens',
     title: 'Допомога громадянам',
-    usedIn: 'Quest image: Допомога громадянам',
+    usedIn: 'Зображення квесту: допомога громадянам.',
     defaultUrl: questImagePath('dopomoga-gromadyanam.png')
   },
   {
     slot: 'quest_cleanup',
     title: 'Суботник',
-    usedIn: 'Quest image: Суботник',
+    usedIn: 'Зображення квесту: суботник.',
     defaultUrl: questImagePath('subotnyk.png')
   },
   {
     slot: 'quest_hunting',
     title: 'Мисливський сезон',
-    usedIn: 'Quest image: Мисливський сезон',
+    usedIn: 'Зображення квесту: мисливський сезон.',
     defaultUrl: questImagePath('myslyvskyi-sezon.png')
   },
   {
     slot: 'quest_forest_trophies',
     title: 'Лісові трофеї',
-    usedIn: 'Quest image: Лісові трофеї',
+    usedIn: 'Зображення квесту: лісові трофеї.',
     defaultUrl: questImagePath('lisovi-trofei.png')
   },
   {
     slot: 'quest_lumberjack',
     title: 'Заклик лісоруба',
-    usedIn: 'Quest image: Заклик лісоруба',
+    usedIn: 'Зображення квесту: заклик лісоруба.',
     defaultUrl: questImagePath('zaklyk-lisoruba.png')
   },
   {
     slot: 'quest_goods_explosion',
     title: 'Товарний вибух',
-    usedIn: 'Quest image: Товарний вибух',
+    usedIn: 'Зображення квесту: товарний вибух.',
     defaultUrl: questImagePath('tovarnyi-vybukh.png')
   },
   {
     slot: 'quest_fishing',
     title: 'Рибний день',
-    usedIn: 'Quest image: Рибний день',
+    usedIn: 'Зображення квесту: рибний день.',
     defaultUrl: questImagePath('rybnyi-den.png')
   },
   {
     slot: 'quest_guardians',
     title: 'Вартові свого',
-    usedIn: 'Quest image: Вартові свого',
+    usedIn: 'Зображення квесту: вартові свого.',
     defaultUrl: questImagePath('vartovi-svogo.png')
   },
   {
     slot: 'quest_blood_power',
     title: 'Влада через кров',
-    usedIn: 'Quest image: Влада через кров',
+    usedIn: 'Зображення квесту: влада через кров.',
     defaultUrl: questImagePath('vlada-cherez-krov.png')
   },
   {
     slot: 'quest_fuel_progress',
     title: 'Паливо прогресу',
-    usedIn: 'Quest image: Паливо прогресу',
+    usedIn: 'Зображення квесту: паливо прогресу.',
     defaultUrl: questImagePath('palyvo-progresu.png')
   },
   {
     slot: 'quest_mining',
     title: 'Шахтарська справа',
-    usedIn: 'Quest image: Шахтарська справа',
+    usedIn: 'Зображення квесту: шахтарська справа.',
     defaultUrl: questImagePath('shahtarska-sprava.png')
   }
 ];
