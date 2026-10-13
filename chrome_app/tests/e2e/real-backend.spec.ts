@@ -141,6 +141,73 @@ test('TREASURY: create/update/archive, price fields, version increment, stale 40
   expect(archived.isActive).toBe(false);
 });
 
+test('MAP: shared backend snapshot, cross-account read, conflict and permission guard', async ({ browser, page }) => {
+  await loginAs(page, 'owner');
+  const initial = await api(page, '/api/family/map/state');
+  const unique = Date.now();
+  const saved = await api(page, '/api/family/map/state', {
+    method: 'PUT',
+    body: JSON.stringify({
+      expectedVersion: initial.version,
+      points: [{
+        id: unique,
+        x: 1200,
+        y: 2400,
+        title: `E2E Map Point ${unique}`,
+        icon: 'pin',
+        iconUrl: null,
+        customIconDataUrl: 'data:image/png;base64,local-only',
+        detailImageDataUrl: 'data:image/png;base64,local-only',
+        zoneId: null,
+        filterLabel: 'E2E',
+        color: '#f59e0b',
+        note: 'shared map backend e2e',
+        sourceMarkerId: null,
+        hidden: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }],
+      zones: [],
+    }),
+  });
+  expect(saved.version).toBe(initial.version + 1);
+  expect(saved.points[0].title).toContain('E2E Map Point');
+  expect(saved.points[0].customIconDataUrl).toBeNull();
+  expect(saved.points[0].detailImageDataUrl).toBeNull();
+
+  const memberContext = await browser.newContext();
+  const memberPage = await memberContext.newPage();
+  await installChromeShim(memberPage);
+  await loginAs(memberPage, 'member');
+  const memberRead = await api(memberPage, '/api/family/map/state');
+  expect(memberRead.points.some((point: any) => point.title === saved.points[0].title)).toBe(true);
+  const memberWrite = await rawApi(memberPage, '/api/family/map/state', {
+    method: 'PUT',
+    body: JSON.stringify({ expectedVersion: memberRead.version, points: [], zones: [] }),
+  });
+  expect(memberWrite.status).toBe(403);
+  await memberContext.close();
+
+  const deputyContext = await browser.newContext();
+  const deputyPage = await deputyContext.newPage();
+  await installChromeShim(deputyPage);
+  await loginAs(deputyPage, 'deputy');
+  const deputyRead = await api(deputyPage, '/api/family/map/state');
+  expect(deputyRead.points.some((point: any) => point.title === saved.points[0].title)).toBe(true);
+  const deputyWrite = await rawApi(deputyPage, '/api/family/map/state', {
+    method: 'PUT',
+    body: JSON.stringify({ expectedVersion: deputyRead.version, points: [], zones: [] }),
+  });
+  expect(deputyWrite.status).toBe(403);
+  await deputyContext.close();
+
+  const stale = await rawApi(page, '/api/family/map/state', {
+    method: 'PUT',
+    body: JSON.stringify({ expectedVersion: initial.version, points: [], zones: [] }),
+  });
+  expect(stale.status).toBe(409);
+});
+
 test('CONTENT: News, Home, Rules and Recruitment are shared backend state across accounts', async ({ page }) => {
   await loginAs(page, 'owner');
   const marker = Date.now();

@@ -50,6 +50,7 @@ const requiredTables = [
   'family_member_reward_grants',
   'family_reward_allocations',
   'family_treasury_entries',
+  'family_map_state',
   'family_content_blocks',
   'family_recruitment_settings',
   'family_news_posts',
@@ -219,6 +220,16 @@ async function runChecks() {
       ok: await foreignKeyTargets(pool, 'family_audit_log', 'actor_family_member_id', 'family_members', 'id'),
     });
     checks.push({ name: 'family_audit_log.actor_type column', ok: await columnExists(pool, 'family_audit_log', 'actor_type') });
+    checks.push({ name: 'family_map_state.id primary key', ok: await constraintExists(pool, 'family_map_state', 'p', 'id') });
+    checks.push({ name: 'family_map_state.points column', ok: await columnExists(pool, 'family_map_state', 'points') });
+    checks.push({ name: 'family_map_state.zones column', ok: await columnExists(pool, 'family_map_state', 'zones') });
+    checks.push({ name: 'family_map_state.version column', ok: await columnExists(pool, 'family_map_state', 'version') });
+    checks.push({ name: 'family_map_state.version positive check', ok: await constraintExists(pool, 'family_map_state', 'c', 'version') });
+    checks.push({
+      name: 'family_map_state.updated_by_family_member_id -> family_members.id',
+      ok: await foreignKeyTargets(pool, 'family_map_state', 'updated_by_family_member_id', 'family_members', 'id'),
+    });
+    checks.push({ name: 'family_map_state updated_at index', ok: await indexExists(pool, 'idx_family_map_state_updated_at') });
     checks.push({ name: 'discord_sync_reports.id primary key', ok: await constraintExists(pool, 'discord_sync_reports', 'p', 'id') });
     checks.push({ name: 'discord_sync_reports.created_at index', ok: await indexExists(pool, 'idx_discord_sync_reports_created_at') });
     checks.push({ name: 'discord_sync_reports.idempotency_key column', ok: await columnExists(pool, 'discord_sync_reports', 'idempotency_key') });

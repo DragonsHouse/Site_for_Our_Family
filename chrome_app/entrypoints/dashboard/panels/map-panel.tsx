@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type WheelEvent } from 'react';
 import { QUANTFUN_MAP_URL } from '../../../lib/constants';
 import {
-  deleteMapZone,
-  deleteMapUserPoint,
   getMapUserPoints,
-  getMapZones,
-  saveMapUserPoint,
-  saveMapZone
+  getMapZones
 } from '../../../lib/db';
+import {
+  FamilyMapApiError,
+  getFamilyMapState,
+  stripPointBinaryFields,
+  stripZoneBinaryFields,
+  updateFamilyMapState,
+  type FamilyMapState
+} from '../../../lib/family-map-backend-client';
 import type { MapUserPoint, MapZone } from '../../../lib/types';
+
+const MAP_IMPORT_DECISION_KEY = 'quant_map_backend_import_decision_v1';
 
 function catmullRomPath(points: Array<{ x: number; y: number }>, scale: number): string {
   if (points.length < 2) return '';
@@ -199,6 +205,9 @@ export function MapPanel() {
   });
   const [zoneModalOpen, setZoneModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sharedMapState, setSharedMapState] = useState<FamilyMapState | null>(null);
+  const [savingSharedMap, setSavingSharedMap] = useState(false);
+  const [localImportState, setLocalImportState] = useState<{ points: MapUserPoint[]; zones: MapZone[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewport, setViewport] = useState({
     scrollLeft: 0,
@@ -408,10 +417,11 @@ export function MapPanel() {
     void (async () => {
       setLoading(true);
       try {
-        const [pointsRes, markerRes, zonesRes] = await Promise.all([
+        const [localPointsRes, markerRes, localZonesRes, sharedState] = await Promise.all([
           getMapUserPoints(),
           fetch(chrome.runtime.getURL('map/default-markers.json')),
-          getMapZones()
+          getMapZones(),
+          getFamilyMapState()
         ]);
 
         if (!markerRes.ok) {
@@ -430,8 +440,12 @@ export function MapPanel() {
           }
           return nextLayerNames.filter((name) => isLayerEnabledByDefault(name));
         });
-        setUserPoints(pointsRes);
-        setZones(zonesRes);
+        setSharedMapState(sharedState);
+        setUserPoints(sharedState.points);
+        setZones(sharedState.zones);
+        const hasLocalMap = localPointsRes.length > 0 || localZonesRes.length > 0;
+        const importDecision = window.localStorage.getItem(MAP_IMPORT_DECISION_KEY);
+        setLocalImportState(hasLocalMap && !importDecision ? { points: localPointsRes, zones: localZonesRes } : null);
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Помилка завантаження офлайн карти');
@@ -627,13 +641,65 @@ export function MapPanel() {
   }, [tileRange, sourceZoom, mapVariant]);
 
   async function reloadUserPoints() {
-    const points = await getMapUserPoints();
-    setUserPoints(points);
+    const state = await getFamilyMapState();
+    setSharedMapState(state);
+    setUserPoints(state.points);
+    setZones(state.zones);
   }
 
   async function reloadZones() {
-    const list = await getMapZones();
-    setZones(list);
+    const state = await getFamilyMapState();
+    setSharedMapState(state);
+    setUserPoints(state.points);
+    setZones(state.zones);
+  }
+
+  async function saveSharedMap(nextPoints: MapUserPoint[], nextZones: MapZone[]) {
+    if (!sharedMapState) {
+      setError('Спільна карта ще не завантажена з backend.');
+      return null;
+    }
+    setSavingSharedMap(true);
+    try {
+      const saved = await updateFamilyMapState({
+        expectedVersion: sharedMapState.version,
+        points: nextPoints.map(stripPointBinaryFields),
+        zones: nextZones.map(stripZoneBinaryFields)
+      });
+      setSharedMapState(saved);
+      setUserPoints(saved.points);
+      setZones(saved.zones);
+      setError(null);
+      return saved;
+    } catch (e) {
+      if (e instanceof FamilyMapApiError && e.status === 409) {
+        const latest = await getFamilyMapState();
+        setSharedMapState(latest);
+        setUserPoints(latest.points);
+        setZones(latest.zones);
+        setError('Карту вже змінили в іншому вікні. Я оновив спільну версію, повторіть зміну після перегляду.');
+        return null;
+      }
+      setError(e instanceof Error ? e.message : 'Не вдалося зберегти спільну карту.');
+      return null;
+    } finally {
+      setSavingSharedMap(false);
+    }
+  }
+
+  async function importLocalMapToShared() {
+    if (!localImportState || !sharedMapState) return;
+    const saved = await saveSharedMap(localImportState.points, localImportState.zones);
+    if (saved) rememberLocalImportDecision('imported');
+  }
+
+  function rememberLocalImportDecision(decision: 'imported' | 'kept-shared' | 'cancelled') {
+    try {
+      window.localStorage.setItem(MAP_IMPORT_DECISION_KEY, decision);
+    } catch {
+      // Ignore storage errors; hiding the prompt for this render is still useful.
+    }
+    setLocalImportState(null);
   }
 
   function resolveIconSource(iconUrl: string | null | undefined): string | null {
@@ -758,8 +824,9 @@ export function MapPanel() {
     const nowMeta = zoneDraftMeta.name.trim()
       ? zoneDraftMeta
       : { ...zoneDraftMeta, name: `Зона ${zones.length + 1}` };
-    const saved = await saveMapZone({
-      id: nowMeta.id,
+    const now = new Date().toISOString();
+    const nextZone: MapZone = {
+      id: nowMeta.id ?? `zone-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       name: nowMeta.name.trim(),
       color: nowMeta.color,
       opacity: nowMeta.opacity,
@@ -774,9 +841,15 @@ export function MapPanel() {
       cropTop: nowMeta.cropTop,
       cropRight: nowMeta.cropRight,
       cropBottom: nowMeta.cropBottom,
-      cropLeft: nowMeta.cropLeft
-    });
-    await reloadZones();
+      cropLeft: nowMeta.cropLeft,
+      createdAt: now,
+      updatedAt: now
+    };
+    const nextZones = nowMeta.id
+      ? zones.map((zone) => (zone.id === nowMeta.id ? { ...nextZone, createdAt: zone.createdAt } : zone))
+      : [...zones, nextZone];
+    const saved = await saveSharedMap(userPoints, nextZones);
+    if (!saved) return;
     setShowZones(true);
     setZoneFilter('all');
     setZoneDraftMode('none');
@@ -817,7 +890,8 @@ export function MapPanel() {
         ? markerOverrides.get(pointEditor.sourceMarkerId) ?? null
         : null;
 
-    await saveMapUserPoint({
+    const now = new Date().toISOString();
+    const nextPoint: MapUserPoint = {
       id: pointEditor.id,
       x: pointEditor.x,
       y: pointEditor.y,
@@ -831,13 +905,19 @@ export function MapPanel() {
       color: pointEditor.color || '#f59e0b',
       note: pointEditor.note.trim() || null,
       sourceMarkerId: pointEditor.mode === 'edit-default' ? pointEditor.sourceMarkerId ?? null : null,
-      hidden: existingDefaultOverride?.hidden ?? false
-    });
+      hidden: existingDefaultOverride?.hidden ?? false,
+      createdAt: now,
+      updatedAt: now
+    };
+    const nextPoints = pointEditor.id
+      ? userPoints.map((point) => (point.id === pointEditor.id ? { ...nextPoint, createdAt: point.createdAt } : point))
+      : [...userPoints, { ...nextPoint, id: Date.now() }];
+    const saved = await saveSharedMap(nextPoints, zones);
+    if (!saved) return;
 
     setPointEditor(null);
     setPointEditorPickMode(false);
     setError(null);
-    await reloadUserPoints();
   }
 
   async function handleCustomIconUpload(file: File | null) {
@@ -903,15 +983,17 @@ export function MapPanel() {
   async function removePoint(point: MapUserPoint) {
     if (!point.id) return;
     if (!window.confirm(`Видалити точку "${point.title}"?`)) return;
-    await deleteMapUserPoint(point.id);
-    await reloadUserPoints();
+    await saveSharedMap(userPoints.filter((item) => item.id !== point.id), zones);
   }
 
   async function removeZone(zone: MapZone) {
     if (!allowZoneEdit) return;
     if (!window.confirm(`Видалити зону "${zone.name}"?`)) return;
-    await deleteMapZone(zone.id);
-    await reloadZones();
+    const now = new Date().toISOString();
+    await saveSharedMap(
+      userPoints.map((point) => (point.zoneId === zone.id ? { ...point, zoneId: null, updatedAt: now } : point)),
+      zones.filter((item) => item.id !== zone.id)
+    );
     if (zoneFilter === zone.id) setZoneFilter('all');
     if (zoneDraftMeta.id === zone.id) {
       setZoneDraftMode('none');
@@ -940,25 +1022,21 @@ export function MapPanel() {
   async function clearDefaultMarkerOverride(sourceMarkerId: string) {
     const override = userPoints.find((point) => point.sourceMarkerId === sourceMarkerId);
     if (!override?.id) return;
-    await deleteMapUserPoint(override.id);
-    await reloadUserPoints();
+    await saveSharedMap(userPoints.filter((point) => point.id !== override.id), zones);
   }
 
   async function hideDefaultMarker(marker: DefaultMapMarker) {
     const relatedOverrides = userPoints.filter((point) => point.sourceMarkerId === marker.id);
+    const now = new Date().toISOString();
     if (relatedOverrides.length > 0) {
-      await Promise.all(
-        relatedOverrides.map((point) =>
-          saveMapUserPoint({
-            ...point,
-            hidden: true
-          })
-        )
+      await saveSharedMap(
+        userPoints.map((point) => (point.sourceMarkerId === marker.id ? { ...point, hidden: true, updatedAt: now } : point)),
+        zones
       );
-      await reloadUserPoints();
       return;
     }
-    await saveMapUserPoint({
+    await saveSharedMap([...userPoints, {
+      id: Date.now(),
       x: marker.x,
       y: marker.y,
       title: marker.title,
@@ -971,9 +1049,10 @@ export function MapPanel() {
       color: '#f59e0b',
       note: null,
       sourceMarkerId: marker.id,
-      hidden: true
-    });
-    await reloadUserPoints();
+      hidden: true,
+      createdAt: now,
+      updatedAt: now
+    }], zones);
   }
 
   async function setDefaultMarkerVisibility(marker: DefaultMapMarker, visible: boolean) {
@@ -984,15 +1063,11 @@ export function MapPanel() {
     try {
       if (visible) {
         if (!relatedOverrides.some((point) => point.hidden)) return;
-        await Promise.all(
-          relatedOverrides.map((point) =>
-            saveMapUserPoint({
-              ...point,
-              hidden: false
-            })
-          )
+        const now = new Date().toISOString();
+        await saveSharedMap(
+          userPoints.map((point) => (point.sourceMarkerId === marker.id ? { ...point, hidden: false, updatedAt: now } : point)),
+          zones
         );
-        await reloadUserPoints();
         return;
       }
       await hideDefaultMarker(marker);
@@ -1014,15 +1089,12 @@ export function MapPanel() {
 
   async function unhideAllDefaultMarkers() {
     const hiddenOverrides = userPoints.filter((point) => point.sourceMarkerId && point.hidden);
-    await Promise.all(
-      hiddenOverrides.map((point) =>
-        saveMapUserPoint({
-          ...point,
-          hidden: false
-        })
-      )
+    const hiddenIds = new Set(hiddenOverrides.map((point) => point.id));
+    const now = new Date().toISOString();
+    await saveSharedMap(
+      userPoints.map((point) => (hiddenIds.has(point.id) ? { ...point, hidden: false, updatedAt: now } : point)),
+      zones
     );
-    await reloadUserPoints();
   }
 
   async function setCategoryMarkersVisibility(layers: string[], visible: boolean) {
@@ -1042,38 +1114,27 @@ export function MapPanel() {
     });
 
     try {
+      const now = new Date().toISOString();
+      let nextPoints = [...userPoints];
       if (visible) {
-        const updates: Promise<unknown>[] = [];
         for (const marker of markers) {
-          const relatedOverrides = userPoints.filter((point) => point.sourceMarkerId === marker.id);
+          const relatedOverrides = nextPoints.filter((point) => point.sourceMarkerId === marker.id);
           if (!relatedOverrides.some((point) => point.hidden)) continue;
-          for (const point of relatedOverrides) {
-            updates.push(
-              saveMapUserPoint({
-                ...point,
-                hidden: false
-              })
-            );
-          }
+          nextPoints = nextPoints.map((point) =>
+            point.sourceMarkerId === marker.id ? { ...point, hidden: false, updatedAt: now } : point
+          );
         }
-        await Promise.all(updates);
       } else {
-        const updates: Promise<unknown>[] = [];
         for (const marker of markers) {
-          const relatedOverrides = userPoints.filter((point) => point.sourceMarkerId === marker.id);
+          const relatedOverrides = nextPoints.filter((point) => point.sourceMarkerId === marker.id);
           if (relatedOverrides.length > 0) {
-            for (const point of relatedOverrides) {
-              updates.push(
-                saveMapUserPoint({
-                  ...point,
-                  hidden: true
-                })
-              );
-            }
+            nextPoints = nextPoints.map((point) =>
+              point.sourceMarkerId === marker.id ? { ...point, hidden: true, updatedAt: now } : point
+            );
             continue;
           }
-          updates.push(
-            saveMapUserPoint({
+          nextPoints.push({
+              id: Date.now() + nextPoints.length,
               x: marker.x,
               y: marker.y,
               title: marker.title,
@@ -1086,13 +1147,13 @@ export function MapPanel() {
               color: '#f59e0b',
               note: null,
               sourceMarkerId: marker.id,
-              hidden: true
-            })
-          );
+              hidden: true,
+              createdAt: now,
+              updatedAt: now
+            });
         }
-        await Promise.all(updates);
       }
-      await reloadUserPoints();
+      await saveSharedMap(nextPoints, zones);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не вдалося змінити видимість категорії');
     } finally {
@@ -1471,13 +1532,48 @@ export function MapPanel() {
           <p className="dh-command-kicker">Тактична карта</p>
           <h2 className="dh-command-title mt-1">Тактична карта Dragon House</h2>
           <p className="dh-command-copy mt-2 max-w-3xl">
-            Локальні шари, сімейні точки й зони для оперативної навігації. Дані карти зберігаються на цьому пристрої, не в backend.
+            Спільні точки й зони карти зберігаються в backend як сімейний snapshot з версією. Масштаб, фільтри, режим перегляду й локальні чернетки залишаються тільки на цьому пристрої.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
+            <span className="dh-status-pill is-active">
+              Backend map: {sharedMapState ? `v${sharedMapState.version}` : 'недоступна'}
+            </span>
             <span className="dh-status-pill is-active">Системні точки: {visibleDefaultMarkers.length}/{defaultMarkers.length}</span>
             <span className="dh-status-pill">Мої точки: {filteredCustomPoints.length}</span>
             <span className="dh-status-pill">Зони: {zones.length}</span>
           </div>
+          {localImportState ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              <span>
+                Знайдено локальну карту: {localImportState.points.length} точок, {localImportState.zones.length} зон.
+                {sharedMapState && (sharedMapState.points.length || sharedMapState.zones.length)
+                  ? ' У backend вже є спільна карта; імпорт замінить її тільки після натискання.'
+                  : ' Backend зараз порожній; можна імпортувати локальний набір або лишити спільний стан.'}
+              </span>
+              <button
+                type="button"
+                onClick={() => void importLocalMapToShared()}
+                disabled={savingSharedMap || !sharedMapState}
+                className="rounded-md border border-amber-300/50 px-2 py-1 text-amber-50 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Імпортувати у спільну
+              </button>
+              <button
+                type="button"
+                onClick={() => rememberLocalImportDecision('kept-shared')}
+                className="rounded-md border border-slate-600 px-2 py-1 text-slate-200 hover:bg-slate-800"
+              >
+                Лишити backend
+              </button>
+              <button
+                type="button"
+                onClick={() => rememberLocalImportDecision('cancelled')}
+                className="rounded-md border border-slate-600 px-2 py-1 text-slate-200 hover:bg-slate-800"
+              >
+                Скасувати
+              </button>
+            </div>
+          ) : null}
         </div>
         <div className="dh-map-toolbar flex flex-wrap items-center gap-2">
           <span className="dh-map-zoom-pill">

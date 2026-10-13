@@ -531,6 +531,7 @@ function friendlyEntity(entityType: string): string {
     family_quest: 'Квести',
     family_quest_template: 'Шаблони квестів',
     family_event: 'Події',
+    family_map_state: 'Карта сімʼї',
     family_tower: 'Вишки/KD',
     premium: 'Премії',
     payout_batch: 'Виплати',
@@ -559,6 +560,7 @@ function friendlyAction(action: string): string {
     treasury_entry_created: 'створено запис',
     treasury_entry_updated: 'змінено запис',
     treasury_entry_archived: 'архівовано запис',
+    family_map_updated: 'оновлено карту сімʼї',
     member_restored: 'учасника відновлено',
     member_updated: 'учасника змінено',
     quest_created: 'квест створено',
@@ -578,6 +580,7 @@ function friendlyAction(action: string): string {
 }
 
 function auditSummary(item: FamilyAuditLogRecord): string {
+  if (item.action === 'family_map_updated') return 'Оновлено карту сім’ї.';
   const before = summarizeAuditData(item.beforeData);
   const after = summarizeAuditData(item.afterData);
   if (before && after) return `Було: ${before}. Стало: ${after}.`;

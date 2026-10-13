@@ -105,6 +105,7 @@ function canViewAudit(auth: FamilyAuthContext): boolean {
     auth.permissions.includes('manage_events') ||
     auth.permissions.includes('manage_treasury') ||
     auth.permissions.includes('manage_family_economy') ||
+    auth.permissions.includes('manage_family_map') ||
     auth.permissions.includes('manage_accounting') ||
     auth.permissions.includes('manage_discord_integration');
 }

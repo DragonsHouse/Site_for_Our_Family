@@ -61,6 +61,10 @@ import { createFamilyAuditLogRouter } from './routes/family-audit-log.js';
 import { PgFamilyTreasuryRepository } from './treasury/pg-treasury-repository.js';
 import { MemoryFamilyTreasuryRepository, type FamilyTreasuryRepository } from './treasury/treasury-repository.js';
 import { FamilyTreasuryService } from './treasury/treasury-service.js';
+import { createFamilyMapRouter } from './routes/family-map.js';
+import { PgFamilyMapRepository } from './family-map/pg-family-map-repository.js';
+import { MemoryFamilyMapRepository, type FamilyMapRepository } from './family-map/family-map-repository.js';
+import { FamilyMapService } from './family-map/family-map-service.js';
 import { PgFamilyContentRepository } from './content/pg-content-repository.js';
 import { MemoryFamilyContentRepository, type FamilyContentRepository } from './content/content-repository.js';
 import { FamilyContentService } from './content/content-service.js';
@@ -120,6 +124,8 @@ export type AppDependencies = {
   questService?: FamilyQuestService | null;
   treasuryRepository?: FamilyTreasuryRepository;
   treasuryService?: FamilyTreasuryService | null;
+  mapRepository?: FamilyMapRepository;
+  mapService?: FamilyMapService | null;
   contentRepository?: FamilyContentRepository;
   contentService?: FamilyContentService | null;
   questPayoutService?: FamilyQuestPayoutService | null;
@@ -190,6 +196,15 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
       ? dependencies.treasuryService
       : treasuryRepository
         ? new FamilyTreasuryService(treasuryRepository)
+        : null;
+  const mapRepository =
+    dependencies.mapRepository ??
+    (pgPool ? new PgFamilyMapRepository(pgPool) : config.nodeEnv === 'test' ? new MemoryFamilyMapRepository() : null);
+  const mapService =
+    dependencies.mapService !== undefined
+      ? dependencies.mapService
+      : mapRepository
+        ? new FamilyMapService(mapRepository)
         : null;
   const contentRepository =
     dependencies.contentRepository ??
@@ -348,6 +363,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   app.use('/api', createFamilyCalendarRouter(config, authService, familyCalendarService));
   app.use('/api', createFamilyQuestsRouter(config, authService, questService, questPayoutService, discordService));
   app.use('/api', createFamilyTreasuryRouter(config, authService, treasuryService));
+  app.use('/api', createFamilyMapRouter(config, authService, mapService));
   app.use('/api', createFamilyContentRouter(config, authService, contentService));
   app.use('/api', createFamilyAuditLogRouter(config, authService, pgPool));
   app.use('/api', createFamilyTowerDefenseRouter(config, authService, towerDefenseService, rewardAllocationService, achievementService, discordOrchestrationService));
@@ -384,6 +400,8 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
     questService,
     treasuryRepository,
     treasuryService,
+    mapRepository,
+    mapService,
     contentRepository,
     contentService,
     questPayoutService,
