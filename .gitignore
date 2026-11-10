@@ -45,6 +45,8 @@ postgres_data/
 docker-data/
 docker-volumes/
 volumes/
+dragon-house-backend/data/family-assets/
+dragon-house-backend/data/family-assets-e2e/
 
 # Backups and temporary audit output
 .openclaw-backups/

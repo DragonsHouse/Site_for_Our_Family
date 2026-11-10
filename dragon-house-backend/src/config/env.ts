@@ -22,6 +22,8 @@ const EnvSchema = z.object({
   E2E_DATABASE_NAME: z.string().trim().optional().default('dragon_house_e2e'),
   FRONTEND_EXTENSION_ID: z.string().trim().optional().default(''),
   FRONTEND_ALLOWED_ORIGINS: z.string().trim().optional().default(''),
+  FAMILY_ASSET_STORAGE_PATH: z.string().trim().min(1).optional().default('./data/family-assets'),
+  FAMILY_ASSET_MAX_BYTES: z.coerce.number().int().positive().max(25 * 1024 * 1024).default(10 * 1024 * 1024),
   DISCORD_CLIENT_ID: z.string().trim().optional().default(''),
   DISCORD_CLIENT_SECRET: z.string().trim().optional().default(''),
   DISCORD_BOT_TOKEN: z.string().trim().optional().default(''),
@@ -105,6 +107,7 @@ export type AppConfig = {
   e2eDatabaseName: string;
   frontendExtensionId: string | null;
   frontendAllowedOrigins: string[];
+  familyAssets: { storagePath: string; maxBytes: number };
   discord: {
     clientId: string | null;
     clientSecret: string | null;
@@ -261,6 +264,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     e2eDatabaseName: env.E2E_DATABASE_NAME,
     frontendExtensionId: nullable(env.FRONTEND_EXTENSION_ID),
     frontendAllowedOrigins: csvList(env.FRONTEND_ALLOWED_ORIGINS),
+    familyAssets: { storagePath: env.FAMILY_ASSET_STORAGE_PATH, maxBytes: env.FAMILY_ASSET_MAX_BYTES },
     discord: {
       clientId: nullable(env.DISCORD_CLIENT_ID),
       clientSecret: nullable(env.DISCORD_CLIENT_SECRET),

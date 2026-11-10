@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { FAMILY_ASSET_DEFINITIONS } from '../../../lib/family-assets';
 import {
   readFamilyCustomAssets,
+  readFamilyAssetBlob,
   resetFamilyCustomAsset,
   saveFamilyCustomAsset
 } from '../../../lib/family-repositories';
 import type { FamilyAssetDefinition, FamilyUser } from '../../../lib/family-types';
 import { DragonBadge, DragonButton, DragonCard, DragonDialog, DragonEmptyState, DragonHero, DragonPanel } from '../dragon-ui/dragon-ui';
 import { useFamilyAssetUrl } from './use-family-asset-url';
+import { getSharedPilotState, SHARED_ASSET_UPDATED_EVENT, resetSharedPilotAsset, SHARED_ASSET_PILOT_SLOT, uploadSharedPilotAsset, type SharedAssetDto } from '../../../lib/family-shared-assets-backend-client';
 
 const MAX_FAMILY_ASSET_MB = 100;
 const MAX_FAMILY_ASSET_BYTES = MAX_FAMILY_ASSET_MB * 1024 * 1024;
@@ -58,13 +60,27 @@ function AssetSlotCard({
   const [status, setStatus] = useState<'saved' | 'error' | null>(null);
   const [customAsset, setCustomAsset] = useState(() => readFamilyCustomAssets()[definition.slot]);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
-  const canSave = Boolean(preview && selectedFile && fileName && mimeType);
+  const [sharedAsset, setSharedAsset] = useState<SharedAssetDto | null>(null);
+  const [slotVersion, setSlotVersion] = useState<number | null>(null);
+  const [localChoiceVisible, setLocalChoiceVisible] = useState(true);
+  const canSave = Boolean(preview && selectedFile && fileName && mimeType) && (definition.slot !== SHARED_ASSET_PILOT_SLOT || slotVersion !== null);
 
   useEffect(() => {
     return () => {
       if (preview) URL.revokeObjectURL(preview);
     };
   }, [preview]);
+
+  useEffect(() => {
+    if (definition.slot !== SHARED_ASSET_PILOT_SLOT) return;
+    void refreshShared().catch(() => setError('Не вдалося отримати стан слоту. Оновіть дані.'));
+  }, [definition.slot]);
+
+  async function refreshShared() {
+    const state = await getSharedPilotState();
+    setSharedAsset(state.asset); setSlotVersion(state.version); setError(null);
+    window.dispatchEvent(new Event(SHARED_ASSET_UPDATED_EVENT));
+  }
 
   function refreshCustomAsset() {
     setCustomAsset(readFamilyCustomAssets()[definition.slot]);
@@ -74,13 +90,14 @@ function AssetSlotCard({
     if (!file) return;
     setError(null);
     setStatus(null);
-    if (!file.type.startsWith('image/')) {
-      setError('Оберіть файл зображення.');
+    if (definition.slot === SHARED_ASSET_PILOT_SLOT ? !['image/png', 'image/jpeg', 'image/webp'].includes(file.type) : !file.type.startsWith('image/')) {
+      setError(definition.slot === SHARED_ASSET_PILOT_SLOT ? 'Оберіть PNG, JPEG або WebP.' : 'Оберіть файл зображення.');
       setStatus('error');
       return;
     }
-    if (file.size > MAX_FAMILY_ASSET_BYTES) {
-      setError(`Файл завеликий. Максимум ${MAX_FAMILY_ASSET_MB} MB.`);
+    const maximumBytes = definition.slot === SHARED_ASSET_PILOT_SLOT ? 10 * 1024 * 1024 : MAX_FAMILY_ASSET_BYTES;
+    if (file.size > maximumBytes) {
+      setError(`Файл завеликий. Максимум ${maximumBytes / (1024 * 1024)} MB.`);
       setStatus('error');
       return;
     }
@@ -102,6 +119,15 @@ function AssetSlotCard({
     setError(null);
     setStatus(null);
     try {
+      if (definition.slot === SHARED_ASSET_PILOT_SLOT) {
+        if (slotVersion === null) return;
+        await uploadSharedPilotAsset(selectedFile, fileName, slotVersion);
+        await refreshShared();
+        if (preview) URL.revokeObjectURL(preview);
+        setPreview(null); setSelectedFile(null); setFileName(null); setMimeType(null); setStatus('saved');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        onChanged(); return;
+      }
       const updatedAt = new Date().toISOString();
       await saveFamilyCustomAsset(
         {
@@ -125,9 +151,9 @@ function AssetSlotCard({
       if (fileInputRef.current) fileInputRef.current.value = '';
       refreshCustomAsset();
       onChanged();
-    } catch {
+    } catch (cause) {
       setStatus('error');
-      setError('Помилка збереження.');
+      setError(cause instanceof Error ? cause.message : 'Помилка збереження.');
     }
   }
 
@@ -135,6 +161,15 @@ function AssetSlotCard({
     setError(null);
     setStatus(null);
     try {
+      if (definition.slot === SHARED_ASSET_PILOT_SLOT) {
+        if (slotVersion === null) return;
+        await resetSharedPilotAsset(slotVersion);
+        await refreshShared();
+        if (preview) URL.revokeObjectURL(preview);
+        setPreview(null); setSelectedFile(null); setFileName(null); setMimeType(null); setStatus('saved');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        onChanged(); return;
+      }
       await resetFamilyCustomAsset(definition.slot);
       if (preview) URL.revokeObjectURL(preview);
       setPreview(null);
@@ -145,14 +180,15 @@ function AssetSlotCard({
       if (fileInputRef.current) fileInputRef.current.value = '';
       refreshCustomAsset();
       onChanged();
-    } catch {
+    } catch (cause) {
       setStatus('error');
-      setError('Помилка збереження.');
+      setError(cause instanceof Error ? cause.message : 'Помилка збереження.');
     }
   }
 
   return (
     <DragonCard className="dh-asset-slot-card p-4">
+      {definition.slot === SHARED_ASSET_PILOT_SLOT && error ? <DragonButton type="button" onClick={() => void refreshShared().then(() => { setPreview(null); setSelectedFile(null); setStatus(null); }).catch(() => setError('Не вдалося оновити дані.'))}>Оновити дані</DragonButton> : null}
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[220px_minmax(0,1fr)]">
         <div>
           <div className="dh-asset-preview">
@@ -170,7 +206,9 @@ function AssetSlotCard({
           </div>
           {preview ? (
             <DragonBadge tone="gold" className="mt-2">Перед збереженням</DragonBadge>
-          ) : customAsset ? (
+          ) : sharedAsset ? (
+            <DragonBadge tone="success" className="mt-2">Спільне зображення</DragonBadge>
+          ) : customAsset && definition.slot !== SHARED_ASSET_PILOT_SLOT ? (
             <DragonBadge tone="success" className="mt-2">Власне зображення</DragonBadge>
           ) : (
             <DragonBadge tone="muted" className="mt-2">Стандартне зображення</DragonBadge>
@@ -178,13 +216,23 @@ function AssetSlotCard({
         </div>
 
         <div className="min-w-0">
+          {definition.slot === SHARED_ASSET_PILOT_SLOT && customAsset && localChoiceVisible ? (
+            <div className="dh-command-note mb-3 px-3 py-3 text-sm text-stone-200">
+              <p>На цьому пристрої є локальне зображення. Воно не стане спільним автоматично.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <DragonButton type="button" onClick={() => void readFamilyAssetBlob(definition.slot).then((blob) => { if (!blob) throw new Error('Local image is missing'); return uploadSharedPilotAsset(blob, customAsset.fileName, slotVersion ?? 0); }).then(async () => { await refreshShared(); setStatus('saved'); setLocalChoiceVisible(false); onChanged(); }).catch((cause) => setError(cause instanceof Error ? cause.message : 'Не вдалося завантажити зображення.'))}>Завантажити у спільний Hub</DragonButton>
+                <DragonButton type="button" variant="secondary" onClick={() => setLocalChoiceVisible(false)}>Залишити локально</DragonButton>
+                <DragonButton type="button" variant="secondary" onClick={() => setLocalChoiceVisible(false)}>Не зараз</DragonButton>
+              </div>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="dh-command-kicker">{ASSET_SLOT_LABELS[definition.slot]}</p>
               <h3 className="mt-1 text-base font-semibold text-white">{definition.title}</h3>
               <p className="mt-2 text-sm leading-6 text-stone-300">{definition.usedIn}</p>
             </div>
-            {customAsset ? (
+            {customAsset && definition.slot !== SHARED_ASSET_PILOT_SLOT ? (
               <div className="dh-command-note px-3 py-2 text-xs text-stone-300">
                 <div>Оновлено: {new Date(customAsset.updatedAt).toLocaleString('uk-UA')}</div>
                 <div className="text-stone-500">Автор: {customAsset.updatedBy}</div>
@@ -195,15 +243,15 @@ function AssetSlotCard({
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
             <div className="dh-command-list-item px-3 py-2">
               <dt className="dh-command-label">Тип</dt>
-              <dd className="text-stone-100">{customAsset?.mimeType ?? mimeType ?? 'стандартний файл'}</dd>
+              <dd className="text-stone-100">{mimeType ?? (definition.slot === SHARED_ASSET_PILOT_SLOT ? sharedAsset?.contentType : customAsset?.mimeType) ?? 'стандартний файл'}</dd>
             </div>
             <div className="dh-command-list-item px-3 py-2">
               <dt className="dh-command-label">Розмір</dt>
-              <dd className="text-stone-100">{customAsset ? formatBytes(customAsset.size) : selectedFile ? formatBytes(selectedFile.size) : 'за замовчуванням'}</dd>
+              <dd className="text-stone-100">{selectedFile ? formatBytes(selectedFile.size) : definition.slot === SHARED_ASSET_PILOT_SLOT ? sharedAsset ? formatBytes(sharedAsset.sizeBytes) : 'за замовчуванням' : customAsset ? formatBytes(customAsset.size) : 'за замовчуванням'}</dd>
             </div>
             <div className="dh-command-list-item px-3 py-2">
               <dt className="dh-command-label">Обмеження</dt>
-              <dd className="text-stone-100">до {MAX_FAMILY_ASSET_MB} MB, image/*</dd>
+              <dd className="text-stone-100">{definition.slot === SHARED_ASSET_PILOT_SLOT ? 'до 10 MB, PNG / JPEG / WebP' : `до ${MAX_FAMILY_ASSET_MB} MB, image/*`}</dd>
             </div>
           </dl>
 
@@ -215,7 +263,7 @@ function AssetSlotCard({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept={definition.slot === SHARED_ASSET_PILOT_SLOT ? 'image/png,image/jpeg,image/webp' : 'image/*'}
                 className="hidden"
                 onChange={(event) => void chooseFile(event.target.files?.[0])}
               />
@@ -231,7 +279,7 @@ function AssetSlotCard({
               type="button"
               variant="danger"
               onClick={() => setConfirmResetOpen(true)}
-              disabled={!customAsset && !preview}
+              disabled={definition.slot === SHARED_ASSET_PILOT_SLOT ? !sharedAsset && !preview : !customAsset && !preview}
             >
               Повернути стандартне
             </DragonButton>
@@ -263,7 +311,7 @@ function AssetSlotCard({
               </div>
               <div>
                 <dt>Поточний файл</dt>
-                <dd>{customAsset?.fileName ?? 'стандартний файл'}</dd>
+                <dd>{(definition.slot === SHARED_ASSET_PILOT_SLOT ? sharedAsset?.originalFilename : customAsset?.fileName) ?? 'стандартний файл'}</dd>
               </div>
             </dl>
           </details>
@@ -274,7 +322,7 @@ function AssetSlotCard({
         <DragonDialog title="Повернути стандартне зображення?" onClose={() => setConfirmResetOpen(false)}>
           <div className="space-y-4">
             <p className="text-sm leading-6 text-stone-300">
-              Власне зображення для цього слота буде прибране з локального сховища цього пристрою. Якщо цей файл уже використовується в Hub, після підтвердження він повернеться до стандартної картинки.
+              {definition.slot === SHARED_ASSET_PILOT_SLOT ? 'Спільне зображення буде повернуто до стандартного для всіх учасників. Локальна копія на цьому пристрої збережеться.' : 'Власне зображення для цього слота буде прибране з локального сховища цього пристрою. Якщо цей файл уже використовується в Hub, після підтвердження він повернеться до стандартної картинки.'}
             </p>
             <div className="flex flex-wrap justify-end gap-2">
               <DragonButton type="button" variant="secondary" onClick={() => setConfirmResetOpen(false)}>
@@ -310,7 +358,7 @@ export function FamilyAssetManager({ currentUser }: { currentUser: FamilyUser })
       <DragonHero
         eyebrow="Арсенал зображень"
         title="Керування зображеннями"
-        description="Власні зображення Hub зберігаються локально на цьому пристрої. Якщо власного зображення немає, використовується стандартний файл."
+        description="Зображення «Суботник» спільне для всіх учасників. Інші власні зображення зберігаються локально на цьому пристрої. Якщо власного зображення немає, використовується стандартний файл."
         className="dh-command-hero"
       >
         <div className="grid gap-2 text-sm">

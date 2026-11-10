@@ -24,6 +24,7 @@ export function createTestConfig(overrides: TestConfigOverrides = {}): AppConfig
     e2eDatabaseName: overrides.e2eDatabaseName ?? 'dragon_house_e2e',
     frontendExtensionId: overrides.frontendExtensionId ?? null,
     frontendAllowedOrigins: overrides.frontendAllowedOrigins ?? [],
+    familyAssets: overrides.familyAssets ?? { storagePath: './data/family-assets-test', maxBytes: 10 * 1024 * 1024 },
     discord: {
       clientId: overrides.discord?.clientId ?? null,
       clientSecret: overrides.discord?.clientSecret ?? null,

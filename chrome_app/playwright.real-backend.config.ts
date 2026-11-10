@@ -24,6 +24,12 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'shared-assets-firefox',
+      testMatch: /real-backend\.spec\.ts/u,
+      grep: /SHARED ASSET:/u,
+      use: { ...devices['Desktop Firefox'], viewport: { width: 1366, height: 768 } },
+    },
+    {
       name: 'real-backend-chromium',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 768 } },
     },

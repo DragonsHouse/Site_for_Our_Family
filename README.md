@@ -210,6 +210,18 @@ The exact staging and production hosts must be replaced with the deployed HTTPS 
 - accounting: accounting feed/evidence channel.
 - family photos: reserved media/evidence channel.
 
+### Shared asset storage Phase 1
+
+Phase 1 connects exactly one safe Family Hub slot: `quest_cleanup` (the decorative quest image for «Суботник»). Its metadata and current slot reference live in PostgreSQL; image bytes are handled by `AssetStorageProvider` and the initial filesystem provider. `FAMILY_ASSET_STORAGE_PATH` must point to persistent storage outside the build output. E2E uses `./data/family-assets-e2e`, separate from the default development path `./data/family-assets`.
+
+Slot state includes a canonical monotonic `version`. PUT and DELETE require `X-Expected-Version`; stale writes return 409 without changing the reference or recording success audit. Migration 034 retains a nullable assignment row on reset, preventing ABA. Refresh is explicit in the Hub; no automatic retry overwrites another manager's image.
+
+Other Family asset slots, map images/icons, avatars, quest/tower asset IDs, payment proofs, and news/event attachments are intentionally outside Phase 1.
+
+Authenticated members read `GET /api/family/assets/slots/quest_cleanup` and `GET /api/family/assets/:assetId/content`. Owners or members with `manage_family_assets` upload a raw PNG/JPEG/WebP body with `PUT /api/family/assets/slots/quest_cleanup` and reset the shared reference with `DELETE` on that slot. Uploads require matching MIME/signature and successful decoding, default to a 10 MiB limit, and receive opaque storage keys and SHA-256 checksums. Replaced/reset assets are archived; their bytes are retained, not recursively deleted. Local legacy images are never published automatically.
+
+The real-backend suite checks the pilot in Chromium and Firefox, including cross-account reads, visible replacement/reset, permission checks and human audit. Install both engines with `npx playwright install chromium firefox`. Build Chrome before `npm test`, because its extension-shell contract checks the production manifest. E2E database reset does not delete asset directories.
+
 ### Migrations and CI
 
 Migrations are forward-only. Do not rewrite already-applied migrations; add a new migration for schema changes. CI runs backend typecheck, lint, tests, build, `db:migrate`, `db:verify`, and `db:migrate:status`, plus frontend typecheck, tests, lint, and `build:chrome`. The E2E CI job starts a fresh PostgreSQL service, prepares `dragon_house_e2e`, starts the real backend, builds the Chrome app, and runs Playwright against real browser -> backend HTTP -> PostgreSQL flows.
@@ -228,6 +240,7 @@ $env:E2E_TEST_MODE='true'
 $env:E2E_DATABASE_NAME='dragon_house_e2e'
 $env:DATABASE_URL='postgresql://dragon_house:dragon_house@127.0.0.1:5433/dragon_house_e2e'
 $env:PORT='8788'
+$env:FAMILY_ASSET_STORAGE_PATH='./data/family-assets-e2e'
 npm run e2e:db:reset
 npm run e2e:db:setup
 npm run db:verify

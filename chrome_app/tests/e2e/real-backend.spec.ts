@@ -208,6 +208,96 @@ test('MAP: shared backend snapshot, cross-account read, conflict and permission 
   expect(stale.status).toBe(409);
 });
 
+test('SHARED ASSET: quest cleanup image persists, crosses accounts, replaces and resets', async ({ browser, page }) => {
+  const first = [...Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwnwGM/zMwAAAf7gP9qS/A4gAAAABJRU5ErkJggg==', 'base64')];
+  const replacement = [...Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAD0lEQVQImWNgYPgPRmAKABf2A/38FIMyAAAAAElFTkSuQmCC', 'base64')];
+  await loginAs(page, 'owner');
+  const uploaded = await binaryAssetApi(page, 'PUT', first, 'phase1-first.png');
+  expect(uploaded.status).toBe(201);
+  const firstId = (uploaded.body as { id: string }).id;
+  expect(uploaded.body).not.toHaveProperty('storageKey');
+  expect((await page.request.get(`${apiBaseUrl}/api/family/assets/${firstId}/content`)).status()).toBe(401);
+  expect(await assetBytes(page, firstId)).toEqual(first);
+  await page.goto(`${dashboardUrl}?tab=family&section=management`);
+  const pilotCard = page.locator('.dh-asset-slot-card').filter({ has: page.getByRole('heading', { name: 'Суботник', exact: true }) });
+  await expect(pilotCard.getByText('Спільне зображення', { exact: true })).toBeVisible();
+  await expect.poll(() => pilotCard.locator('img').evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBe(2);
+
+  const memberContext = await browser.newContext();
+  const memberPage = await memberContext.newPage();
+  await installChromeShim(memberPage);
+  await loginAs(memberPage, 'member');
+  const memberCurrent = await api(memberPage, '/api/family/assets/slots/quest_cleanup');
+  expect(memberCurrent.asset.id).toBe(firstId);
+  expect(await assetBytes(memberPage, firstId)).toEqual(first);
+  await memberPage.reload();
+  expect((await api(memberPage, '/api/family/assets/slots/quest_cleanup')).asset.id).toBe(firstId);
+  expect((await binaryAssetApi(memberPage, 'PUT', replacement, 'denied.png')).status).toBe(403);
+
+  await pilotCard.locator('input[type="file"]').setInputFiles({ name: 'phase1-replacement.png', mimeType: 'image/png', buffer: Buffer.from(replacement) });
+  await pilotCard.getByRole('button', { name: 'Зберегти', exact: true }).click();
+  await expect(pilotCard.getByText('Збережено', { exact: true })).toBeVisible();
+  const replacementId = (await api(page, '/api/family/assets/slots/quest_cleanup')).asset.id;
+  expect(replacementId).not.toBe(firstId);
+  expect((await api(memberPage, '/api/family/assets/slots/quest_cleanup')).asset.id).toBe(replacementId);
+  expect(await assetBytes(memberPage, replacementId)).toEqual(replacement);
+  expect((await rawApi(memberPage, '/api/family/assets/slots/quest_cleanup', { method: 'DELETE' })).status).toBe(403);
+  await pilotCard.getByRole('button', { name: 'Повернути стандартне', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Повернути стандартне', exact: true }).click();
+  await expect(pilotCard.getByText('Стандартне зображення', { exact: true })).toBeVisible();
+  expect((await api(page, '/api/family/assets/slots/quest_cleanup')).asset).toBeNull();
+  expect((await api(memberPage, '/api/family/assets/slots/quest_cleanup')).asset).toBeNull();
+  const audit = await api(page, '/api/family/audit-log?entityType=family_asset');
+  expect(audit.items).toEqual(expect.arrayContaining([
+    expect.objectContaining({ action: 'shared_asset_uploaded', actorType: 'user', actorName: 'E2E_Owner' }),
+    expect.objectContaining({ action: 'shared_asset_slot_replaced', actorType: 'user' }),
+    expect.objectContaining({ action: 'shared_asset_slot_reset', metadata: expect.objectContaining({ label: 'Спільне зображення повернуто до стандартного' }) }),
+  ]));
+  await memberContext.close();
+});
+
+test('SHARED ASSET: stale manager refresh, audit, reset ABA and concurrent writes', async ({ browser, page }) => {
+  const first = [...Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwnwGM/zMwAAAf7gP9qS/A4gAAAABJRU5ErkJggg==', 'base64')];
+  const replacement = [...Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAD0lEQVQImWNgYPgPRmAKABf2A/38FIMyAAAAAElFTkSuQmCC', 'base64')];
+  await loginAs(page, 'owner');
+  expect((await binaryAssetApi(page, 'PUT', first, 'concurrency-initial.png')).status).toBe(201);
+  const managerContext = await browser.newContext();
+  const managerPage = await managerContext.newPage();
+  await installChromeShim(managerPage);
+  await loginAs(managerPage, 'owner');
+  await managerPage.goto(`${dashboardUrl}?tab=family&section=management`);
+  const staleCard = managerPage.locator('.dh-asset-slot-card').filter({ has: managerPage.getByRole('heading', { name: 'Суботник', exact: true }) });
+  await expect(staleCard.getByText('Спільне зображення', { exact: true })).toBeVisible();
+  const staleVersion = (await api(page, '/api/family/assets/slots/quest_cleanup')).version;
+  const replaced = await binaryAssetApi(page, 'PUT', replacement, 'concurrency-replacement.png', staleVersion);
+  expect(replaced.status).toBe(201);
+  const replacementId = (replaced.body as { id: string }).id;
+  await staleCard.locator('input[type="file"]').setInputFiles({ name: 'stale-ui.png', mimeType: 'image/png', buffer: Buffer.from(first) });
+  await staleCard.getByRole('button', { name: 'Зберегти', exact: true }).click();
+  await expect(staleCard.getByText(/Зображення вже змінено іншим учасником/u)).toBeVisible();
+  await staleCard.getByRole('button', { name: 'Оновити дані', exact: true }).click();
+  await expect(staleCard.getByRole('button', { name: 'Оновити дані', exact: true })).toHaveCount(0);
+  await expect.poll(() => staleCard.locator('img').evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBe(2);
+  await managerContext.close();
+  const auditBeforeConflict = await api(page, '/api/family/audit-log?entityType=family_asset');
+  expect((await binaryAssetApi(page, 'PUT', first, 'stale.png', staleVersion)).status).toBe(409);
+  expect((await rawApi(page, '/api/family/assets/slots/quest_cleanup', { method: 'DELETE', headers: { 'X-Expected-Version': String(staleVersion) } })).status).toBe(409);
+  expect((await api(page, '/api/family/assets/slots/quest_cleanup')).asset.id).toBe(replacementId);
+  expect(await api(page, '/api/family/audit-log?entityType=family_asset')).toEqual(auditBeforeConflict);
+  const resetVersion = (await api(page, '/api/family/assets/slots/quest_cleanup')).version;
+  expect((await rawApi(page, '/api/family/assets/slots/quest_cleanup', { method: 'DELETE', headers: { 'X-Expected-Version': String(resetVersion) } })).status).toBe(204);
+  const emptyState = await api(page, '/api/family/assets/slots/quest_cleanup');
+  expect(emptyState.version).toBe(staleVersion + 2);
+  expect((await binaryAssetApi(page, 'PUT', first, 'aba.png', staleVersion)).status).toBe(409);
+  const concurrent = await Promise.all([
+    binaryAssetApi(page, 'PUT', first, 'race-a.png', emptyState.version),
+    binaryAssetApi(page, 'PUT', replacement, 'race-b.png', emptyState.version),
+  ]);
+  expect(concurrent.map(result => result.status).sort()).toEqual([201, 409]);
+  expect((await api(page, '/api/family/assets/slots/quest_cleanup')).version).toBe(emptyState.version + 1);
+  expect(emptyState.asset).toBeNull();
+});
+
 test('CONTENT: News, Home, Rules and Recruitment are shared backend state across accounts', async ({ page }) => {
   await loginAs(page, 'owner');
   const marker = Date.now();
@@ -518,6 +608,35 @@ async function rawApi(page: Page, path: string, init: RequestInit = {}) {
     },
     { apiBaseUrlValue: apiBaseUrl, pathValue: path, initValue: init, tokenKeyValue: tokenKey },
   );
+}
+
+async function binaryAssetApi(page: Page, method: 'PUT', bytes: number[], filename: string, expectedVersion?: number) {
+  const version = expectedVersion ?? (await api(page, '/api/family/assets/slots/quest_cleanup')).version;
+  return page.evaluate(async ({ apiBaseUrlValue, tokenKeyValue, methodValue, bytesValue, filenameValue, versionValue }) => {
+    const response = await fetch(`${apiBaseUrlValue}/api/family/assets/slots/quest_cleanup`, {
+      method: methodValue,
+      headers: {
+        Authorization: `Bearer ${window.localStorage.getItem(tokenKeyValue) ?? ''}`,
+        'Content-Type': 'image/png',
+        'X-File-Name': filenameValue,
+        'X-Expected-Version': String(versionValue),
+      },
+      body: new Uint8Array(bytesValue),
+    });
+    let body: unknown = null;
+    try { body = await response.json(); } catch { body = null; }
+    return { status: response.status, body };
+  }, { apiBaseUrlValue: apiBaseUrl, tokenKeyValue: tokenKey, methodValue: method, bytesValue: bytes, filenameValue: filename, versionValue: version });
+}
+
+async function assetBytes(page: Page, assetId: string): Promise<number[]> {
+  return page.evaluate(async ({ apiBaseUrlValue, tokenKeyValue, assetIdValue }) => {
+    const response = await fetch(`${apiBaseUrlValue}/api/family/assets/${assetIdValue}/content`, {
+      headers: { Authorization: `Bearer ${window.localStorage.getItem(tokenKeyValue) ?? ''}` },
+    });
+    if (!response.ok) throw new Error(`asset content failed: ${response.status}`);
+    return [...new Uint8Array(await response.arrayBuffer())];
+  }, { apiBaseUrlValue: apiBaseUrl, tokenKeyValue: tokenKey, assetIdValue: assetId });
 }
 
 function friendlyConflictMessage(body: unknown): string {

@@ -35,6 +35,6 @@ export function createCorsOptions(config: AppConfig): CorsOptions {
       callback(null, false);
     },
     credentials: false,
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-File-Name', 'X-Expected-Version'],
   };
 }

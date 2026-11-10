@@ -100,6 +100,12 @@ import {
 } from './auth/discord-login-completion-repository.js';
 import { DiscordOAuthLoginService } from './auth/discord-oauth-login-service.js';
 import { createLogger } from './logging/logger.js';
+import { createFamilyAssetsRouter } from './routes/family-assets.js';
+import { PgFamilyAssetRepository } from './assets/pg-family-asset-repository.js';
+import type { FamilyAssetRepository } from './assets/family-asset-repository.js';
+import type { AssetStorageProvider } from './assets/asset-storage-provider.js';
+import { FilesystemAssetStorageProvider } from './assets/filesystem-asset-storage-provider.js';
+import { FamilyAssetService } from './assets/family-asset-service.js';
 
 export type AppDependencies = {
   discordService?: DiscordService;
@@ -143,12 +149,18 @@ export type AppDependencies = {
   rewardAllocationService?: RewardAllocationService | null;
   rewardFinanceService?: RewardFinanceHandoff | null;
   pgPool?: pg.Pool | null;
+  familyAssetRepository?: FamilyAssetRepository | null;
+  assetStorageProvider?: AssetStorageProvider | null;
+  familyAssetService?: FamilyAssetService | null;
 };
 
 export function createApp(config: AppConfig, dependencies: AppDependencies = {}) {
   const app = express();
   const discordService = dependencies.discordService ?? new DiscordService(config);
   const pgPool = dependencies.pgPool !== undefined ? dependencies.pgPool : createPgPool(config);
+  const familyAssetRepository = dependencies.familyAssetRepository !== undefined ? dependencies.familyAssetRepository : pgPool ? new PgFamilyAssetRepository(pgPool) : null;
+  const assetStorageProvider = dependencies.assetStorageProvider !== undefined ? dependencies.assetStorageProvider : new FilesystemAssetStorageProvider(config.familyAssets.storagePath);
+  const familyAssetService = dependencies.familyAssetService !== undefined ? dependencies.familyAssetService : familyAssetRepository && assetStorageProvider ? new FamilyAssetService(familyAssetRepository, assetStorageProvider, config.familyAssets.maxBytes) : null;
   const accountLinks =
     dependencies.accountLinks ??
     (pgPool ? new PgDiscordAccountLinkRepository(pgPool) : new InMemoryDiscordAccountLinkRepository());
@@ -364,6 +376,7 @@ export function createApp(config: AppConfig, dependencies: AppDependencies = {})
   app.use('/api', createFamilyQuestsRouter(config, authService, questService, questPayoutService, discordService));
   app.use('/api', createFamilyTreasuryRouter(config, authService, treasuryService));
   app.use('/api', createFamilyMapRouter(config, authService, mapService));
+  app.use('/api', createFamilyAssetsRouter(config, authService, familyAssetService));
   app.use('/api', createFamilyContentRouter(config, authService, contentService));
   app.use('/api', createFamilyAuditLogRouter(config, authService, pgPool));
   app.use('/api', createFamilyTowerDefenseRouter(config, authService, towerDefenseService, rewardAllocationService, achievementService, discordOrchestrationService));

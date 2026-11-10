@@ -5,6 +5,8 @@ type Check = { name: string; ok: boolean; details?: string };
 
 const requiredTables = [
   'schema_migrations',
+  'family_assets',
+  'family_asset_slot_assignments',
   'family_members',
   'family_auth_users',
   'family_sessions',
@@ -147,6 +149,22 @@ async function runChecks() {
     for (const tableName of requiredTables) {
       checks.push({ name: `table:${tableName}`, ok: await tableExists(pool, tableName) });
     }
+    for (const column of ['id', 'kind', 'status', 'storage_provider', 'storage_key', 'original_filename', 'content_type', 'size_bytes', 'checksum_sha256', 'width', 'height', 'created_by', 'created_at', 'updated_at', 'archived_at', 'version']) {
+      checks.push({ name: `family_assets.${column} column`, ok: await columnExists(pool, 'family_assets', column) });
+    }
+    checks.push({ name: 'family_assets.id primary key', ok: await constraintExists(pool, 'family_assets', 'p', 'id') });
+    checks.push({ name: 'family_assets.storage_key unique', ok: await constraintExists(pool, 'family_assets', 'u', 'storage_key') });
+    for (const column of ['status', 'content_type', 'size_bytes', 'checksum_sha256', 'version']) {
+      checks.push({ name: `family_assets.${column} check`, ok: await constraintExists(pool, 'family_assets', 'c', column) });
+    }
+    const slotState = await pool.query("select version from family_asset_slot_assignments where slot='quest_cleanup'");
+    checks.push({ name: 'canonical asset slot version exists', ok: Number(slotState.rows[0]?.version) >= 1 });
+    const nullableAsset = await pool.query("select is_nullable from information_schema.columns where table_schema='public' and table_name='family_asset_slot_assignments' and column_name='asset_id'");
+    checks.push({ name: 'asset slot supports persistent empty state', ok: nullableAsset.rows[0]?.is_nullable === 'YES' });
+    checks.push({ name: 'family_asset_slot_assignments.slot primary key', ok: await constraintExists(pool, 'family_asset_slot_assignments', 'p', 'slot') });
+    checks.push({ name: 'family_asset_slot_assignments.slot check', ok: await constraintExists(pool, 'family_asset_slot_assignments', 'c', 'slot') });
+    checks.push({ name: 'family_asset_slot_assignments.asset_id -> family_assets.id', ok: await foreignKeyTargets(pool, 'family_asset_slot_assignments', 'asset_id', 'family_assets', 'id') });
+    checks.push({ name: 'family_assets.created_by -> family_members.id', ok: await foreignKeyTargets(pool, 'family_assets', 'created_by', 'family_members', 'id') });
     checks.push({ name: 'family_members.id primary key', ok: await constraintExists(pool, 'family_members', 'p', 'id') });
     checks.push({ name: 'family_members.nickname is not primary key', ok: !(await constraintExists(pool, 'family_members', 'p', 'nickname')) });
     checks.push({ name: 'family_members.static_id unique', ok: await constraintExists(pool, 'family_members', 'u', 'static_id') });

@@ -96,6 +96,7 @@ jobs:
       E2E_DATABASE_NAME: dragon_house_e2e
       DATABASE_URL: postgresql://dragon_house:dragon_house@localhost:5432/dragon_house_e2e
       PORT: "8788"
+      FAMILY_ASSET_STORAGE_PATH: ./data/family-assets-e2e
       LOG_LEVEL: silent
       DISCORD_SYNC_AUTO_ENABLED: "false"
       DISCORD_ORCHESTRATION_ENABLED: "false"
@@ -142,7 +143,7 @@ jobs:
           cat backend-e2e.out.log || true
           cat backend-e2e.err.log || true
           exit 1
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox
         working-directory: chrome_app
       - run: npm run build:chrome
         working-directory: chrome_app

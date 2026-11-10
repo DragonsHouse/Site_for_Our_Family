@@ -14,6 +14,7 @@ export default async function globalSetup() {
     E2E_TEST_MODE: 'true',
     E2E_DATABASE_NAME: databaseName,
     DATABASE_URL: databaseUrl,
+    FAMILY_ASSET_STORAGE_PATH: resolve(backendDir, 'data', 'family-assets-e2e'),
     LOG_LEVEL: 'silent',
     DISCORD_SYNC_AUTO_ENABLED: 'false',
     DISCORD_ORCHESTRATION_ENABLED: 'false',
