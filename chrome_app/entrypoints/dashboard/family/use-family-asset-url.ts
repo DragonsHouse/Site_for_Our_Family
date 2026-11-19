@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { FAMILY_ASSET_DEFINITIONS, FAMILY_ASSETS_UPDATED_EVENT } from '../../../lib/family-assets';
-import { readFamilyAssetBlob, readFamilyAssetUrl } from '../../../lib/family-repositories';
+import {
+  readFamilyAssetBlob,
+  readFamilyAssetUrl
+} from '../../../lib/family-local-assets';
 import type { FamilyAssetSlot } from '../../../lib/family-types';
 import { getSharedAssetBlob, getSharedPilotAsset, SHARED_ASSET_PILOT_SLOT, SHARED_ASSET_UPDATED_EVENT } from '../../../lib/family-shared-assets-backend-client';
 

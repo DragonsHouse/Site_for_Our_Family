@@ -1,3 +1,4 @@
+import { readQuestTemplateAssetUrl } from '../../../lib/family-local-assets';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FAMILY_ASSET_DEFINITIONS, getQuestTemplateAssetSlot } from '../../../lib/family-assets';
 import {
@@ -36,7 +37,6 @@ import {
   readFamilyQuestReports,
   readFamilyQuests,
   readFamilyQuestTemplates,
-  readQuestTemplateAssetUrl,
   removeQuestPerson,
   saveFamilyQuestReports,
   saveFamilyQuests,

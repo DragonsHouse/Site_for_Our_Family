@@ -4,13 +4,11 @@ import {
   FAMILY_ROLE_LABELS,
   ROLE_PERMISSIONS
 } from './family-data';
-import { addFamilyNotificationOnce } from './family-notifications';
 import { ALL_FAMILY_PERMISSIONS } from './family-permissions';
 import { getFamilyRank } from './family-ranks';
 import { sanitizeFamilyTextDeep } from './text-sanitizer';
 import type {
   FamilyPermission,
-  FamilyResource,
   FamilyRole,
   FamilyStatus,
   FamilyTask,
@@ -377,103 +375,6 @@ export function updateFamilyUserAvatar(nickname: string, avatarDataUrl: string |
   return nextUser;
 }
 
-function updateFamilyUserAccess(
-  nickname: string,
-  updates: {
-    role: FamilyRole;
-    rank: string;
-    rankLevel: number;
-    permissions: FamilyPermission[];
-  }
-): FamilyUser {
-  const users = readUsers();
-  const user = users.find((item) => item.nickname === nickname);
-  if (!user) {
-    throw new Error('User not found');
-  }
-
-  const role = nickname === 'Anastasia_Dragons' ? 'owner' : updates.role;
-  const previousPermissions = normalizePermissions(user.permissions, user.role);
-  const nextPermissions = normalizePermissions(updates.permissions, role);
-  const changedAt = new Date().toISOString();
-  const nextUser: FamilyUser = {
-    ...user,
-    role,
-    rank: updates.rank,
-    rankLevel: updates.rankLevel,
-    permissions: nextPermissions,
-    promotionUpdatedAt: changedAt
-  };
-
-  writeUsers(users.map((item) => (item.nickname === nickname ? nextUser : item)));
-
-  if (user.rank !== nextUser.rank || user.rankLevel !== nextUser.rankLevel) {
-    void addFamilyNotificationOnce({
-      eventKey: `rank-changed:${user.id}:${changedAt}`,
-      userId: user.id,
-      staticId: user.staticId,
-      type: 'rank_changed',
-      title: 'Ранг змінено',
-      message: `Тобі змінено ранг на "${nextUser.rank}"`,
-      createdAt: changedAt,
-      relatedEntityType: 'member',
-      relatedEntityId: user.id
-    });
-  }
-
-  if (user.role !== nextUser.role) {
-    void addFamilyNotificationOnce({
-      eventKey: `role-changed:${user.id}:${changedAt}`,
-      userId: user.id,
-      staticId: user.staticId,
-      type: nextUser.role === 'moderator' ? 'moderator_assigned' : 'role_changed',
-      title: nextUser.role === 'moderator' ? 'Тебе призначено модератором' : 'Роль змінено',
-      message:
-        nextUser.role === 'moderator'
-          ? 'Тебе призначено модератором Dragon House'
-          : `Тобі змінено роль на "${FAMILY_ROLE_LABELS[nextUser.role]}"`,
-      createdAt: changedAt,
-      relatedEntityType: 'member',
-      relatedEntityId: user.id
-    });
-  }
-
-  const previousPermissionSet = new Set(previousPermissions);
-  const nextPermissionSet = new Set(nextPermissions);
-  for (const permission of nextPermissions) {
-    if (!previousPermissionSet.has(permission)) {
-      void addFamilyNotificationOnce({
-        eventKey: `permission-granted:${user.id}:${permission}:${changedAt}`,
-        userId: user.id,
-        staticId: user.staticId,
-        type: 'permission_granted',
-        title: 'Новий доступ',
-        message: `Тобі видано новий permission: ${permission}`,
-        createdAt: changedAt,
-        relatedEntityType: 'member',
-        relatedEntityId: user.id
-      });
-    }
-  }
-  for (const permission of previousPermissions) {
-    if (!nextPermissionSet.has(permission)) {
-      void addFamilyNotificationOnce({
-        eventKey: `permission-revoked:${user.id}:${permission}:${changedAt}`,
-        userId: user.id,
-        staticId: user.staticId,
-        type: 'permission_revoked',
-        title: 'Доступ змінено',
-        message: `У тебе забрано permission: ${permission}`,
-        createdAt: changedAt,
-        relatedEntityType: 'member',
-        relatedEntityId: user.id
-      });
-    }
-  }
-
-  return nextUser;
-}
-
 export async function createFamilyUser(input: {
   nickname: string;
   staticId: string;
@@ -585,7 +486,6 @@ export async function updateFamilyUserProfile(
 
   const role = originalNickname === 'Anastasia_Dragons' ? 'owner' : normalizeRole(updates.role, 'member');
   const rank = getFamilyRank(updates.rankLevel);
-  const staticIdChanged = user.staticId !== staticId;
   const now = new Date().toISOString();
   const nextUser: FamilyUser = {
     ...user,

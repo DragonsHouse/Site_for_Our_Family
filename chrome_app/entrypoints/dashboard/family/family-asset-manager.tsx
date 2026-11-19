@@ -5,7 +5,7 @@ import {
   readFamilyAssetBlob,
   resetFamilyCustomAsset,
   saveFamilyCustomAsset
-} from '../../../lib/family-repositories';
+} from '../../../lib/family-local-assets';
 import type { FamilyAssetDefinition, FamilyUser } from '../../../lib/family-types';
 import { DragonBadge, DragonButton, DragonCard, DragonDialog, DragonEmptyState, DragonHero, DragonPanel } from '../dragon-ui/dragon-ui';
 import { useFamilyAssetUrl } from './use-family-asset-url';

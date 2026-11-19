@@ -1,21 +1,13 @@
-import {
-  FAMILY_ASSETS_UPDATED_EVENT,
-  getFamilyAssetDefaultUrl,
-  getQuestTemplateAssetSlot
-} from './family-assets';
-import { FAMILY_ECONOMY_ENTRIES } from './family-data';
+/** Legacy quest/dev compatibility only. Production reads and writes use backend domain APIs. */
+import { readJson, writeJson } from './family-local-storage';
 import { DEFAULT_FAMILY_QUEST_TEMPLATES } from './family-quest-data';
-import { assertNoMojibakeSeed, sanitizeFamilyTextDeep } from './text-sanitizer';
 import type {
   FamilyAccountingAuditEntry,
   FamilyAccountingMonth,
   FamilyBonus,
   FamilyBonusStatus,
   FamilyLedgerEntry,
-  FamilyAssetSlot,
-  FamilyCustomAsset,
   FamilyEditableContentBlock,
-  FamilyEconomyEntry,
   FamilyMapReference,
   FamilyPremiumRules,
   FamilyQuest,
@@ -29,97 +21,11 @@ import type {
   FamilyQuestStatus,
   FamilyQuestTemplate
 } from './family-types';
-
-const ECONOMY_KEY = 'dragon_house_family_economy_v1';
 const QUEST_TEMPLATES_KEY = 'dragon_house_family_quest_templates_v1';
 const QUESTS_KEY = 'dragon_house_family_quests_v1';
 const QUEST_REPORTS_KEY = 'dragon_house_family_quest_reports_v1';
 const ACCOUNTING_KEY = 'dragon_house_family_accounting_v1';
-const PREMIUM_RULES_KEY = 'dragon_house_family_premium_rules_v1';
 const NOTIFIED_NEWS_KEY = 'dragon_house_family_notified_news_v1';
-const FAMILY_ASSETS_KEY = 'dragon_house_family_assets_v1';
-const FAMILY_CONTENT_BLOCKS_KEY = 'dragon_house_family_content_blocks_v1';
-const FAMILY_ASSETS_DB_NAME = 'dragon_house_family_assets_db';
-const FAMILY_ASSETS_DB_VERSION = 1;
-const FAMILY_ASSET_BLOBS_STORE = 'asset_blobs';
-
-function readJson<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) {
-      const seed = sanitizeFamilyTextDeep(fallback);
-      assertNoMojibakeSeed(key, seed);
-      window.localStorage.setItem(key, JSON.stringify(seed));
-      return seed;
-    }
-    const parsed = JSON.parse(raw) as T;
-    const sanitized = sanitizeFamilyTextDeep(parsed);
-    if (JSON.stringify(sanitized) !== raw) writeJson(key, sanitized);
-    return sanitized;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJson<T>(key: string, value: T) {
-  window.localStorage.setItem(key, JSON.stringify(sanitizeFamilyTextDeep(value)));
-}
-
-function notifyFamilyAssetsUpdated() {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(FAMILY_ASSETS_UPDATED_EVENT));
-}
-
-function openFamilyAssetsDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB is not available'));
-      return;
-    }
-
-    const request = indexedDB.open(FAMILY_ASSETS_DB_NAME, FAMILY_ASSETS_DB_VERSION);
-    request.addEventListener('upgradeneeded', () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(FAMILY_ASSET_BLOBS_STORE)) {
-        db.createObjectStore(FAMILY_ASSET_BLOBS_STORE);
-      }
-    });
-    request.addEventListener('success', () => resolve(request.result));
-    request.addEventListener('error', () => reject(request.error ?? new Error('Cannot open IndexedDB')));
-    request.addEventListener('blocked', () => reject(new Error('IndexedDB upgrade is blocked')));
-  });
-}
-
-async function withFamilyAssetStore<T>(
-  mode: IDBTransactionMode,
-  action: (store: IDBObjectStore) => IDBRequest<T>
-): Promise<T> {
-  const db = await openFamilyAssetsDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(FAMILY_ASSET_BLOBS_STORE, mode);
-    const store = transaction.objectStore(FAMILY_ASSET_BLOBS_STORE);
-    const request = action(store);
-    let result: T;
-
-    request.addEventListener('success', () => {
-      result = request.result;
-    });
-    request.addEventListener('error', () => reject(request.error ?? new Error('IndexedDB request failed')));
-    transaction.addEventListener('complete', () => {
-      db.close();
-      resolve(result);
-    });
-    transaction.addEventListener('abort', () => {
-      db.close();
-      reject(transaction.error ?? new Error('IndexedDB transaction aborted'));
-    });
-    transaction.addEventListener('error', () => {
-      db.close();
-      reject(transaction.error ?? new Error('IndexedDB transaction failed'));
-    });
-  });
-}
 
 export const FAMILY_MAP_REFERENCES: FamilyMapReference[] = [
   {
@@ -605,42 +511,8 @@ function normalizeQuest(quest: FamilyQuest): FamilyQuest {
   };
 }
 
-function ledgerSignedAmount(entry: FamilyLedgerEntry) {
-  if (entry.type === 'income' || entry.type === 'adjustment') return entry.amount;
-  return -entry.amount;
-}
-
-export function calculateFamilyCapital(months = readFamilyAccountingMonths()) {
-  return months.flatMap((month) => month.ledger ?? []).reduce((total, entry) => total + ledgerSignedAmount(entry), 0);
-}
-
-export function calculateMonthlyEarning(month: FamilyAccountingMonth, userId: string) {
-  return month.bonuses
-    .filter((bonus) => bonus.userId === userId && bonus.source === 'quest_report' && bonus.status === 'paid')
-    .reduce((total, bonus) => total + (bonus.amount ?? 0), 0);
-}
-
-export function calculatePremiumAmount(monthlyEarning: number, rules = readFamilyPremiumRules()) {
-  const tier = [...rules.tiers]
-    .sort((a, b) => b.minMonthlyEarning - a.minMonthlyEarning)
-    .find((item) => monthlyEarning >= item.minMonthlyEarning);
-  return tier ? { amount: tier.premiumAmount, title: tier.title } : { amount: 0, title: 'Премія не набрана' };
-}
-
-function premiumBonusId(year: number, month: number, userId: string) {
-  return `premium-${year}-${month}-${userId}`;
-}
-
 function isSeedDemoBonus(bonus: FamilyBonus) {
   return ['bonus-anastasia-2026-7', 'bonus-marcel-2026-7', 'bonus-nazar-2026-7'].includes(bonus.id);
-}
-
-export function readFamilyEconomyEntries(): FamilyEconomyEntry[] {
-  return readJson(ECONOMY_KEY, FAMILY_ECONOMY_ENTRIES);
-}
-
-export function saveFamilyEconomyEntries(entries: FamilyEconomyEntry[]) {
-  writeJson(ECONOMY_KEY, entries);
 }
 
 export function readFamilyQuestTemplates(): FamilyQuestTemplate[] {
@@ -660,61 +532,6 @@ export function readFamilyQuestTemplates(): FamilyQuestTemplate[] {
 
 export function saveFamilyQuestTemplates(templates: FamilyQuestTemplate[]) {
   writeJson(QUEST_TEMPLATES_KEY, templates);
-}
-
-export function readFamilyCustomAssets(): Partial<Record<FamilyAssetSlot, FamilyCustomAsset>> {
-  const stored = readJson<Partial<Record<FamilyAssetSlot, FamilyCustomAsset>>>(FAMILY_ASSETS_KEY, {});
-  let changed = false;
-  const sanitized: Partial<Record<FamilyAssetSlot, FamilyCustomAsset>> = {};
-
-  for (const [slot, asset] of Object.entries(stored) as Array<[FamilyAssetSlot, FamilyCustomAsset]>) {
-    if (!asset?.blobKey) {
-      changed = true;
-      continue;
-    }
-    if (asset.dataUrl) changed = true;
-    sanitized[slot] = { ...asset, dataUrl: undefined };
-  }
-
-  if (changed) writeJson(FAMILY_ASSETS_KEY, sanitized);
-  return sanitized;
-}
-
-export function readFamilyAssetUrl(slot: FamilyAssetSlot): string {
-  return getFamilyAssetDefaultUrl(slot);
-}
-
-export async function readFamilyAssetBlob(slot: FamilyAssetSlot): Promise<Blob | null> {
-  const asset = readFamilyCustomAssets()[slot];
-  if (!asset?.blobKey) return null;
-  const blob = await withFamilyAssetStore<Blob | undefined>('readonly', (store) => store.get(asset.blobKey));
-  return blob ?? null;
-}
-
-export function readQuestTemplateAssetUrl(template: Pick<FamilyQuestTemplate, 'id' | 'imageSlot' | 'imageUrl'>): string {
-  const slot = template.imageSlot ?? getQuestTemplateAssetSlot(template.id);
-  return slot ? readFamilyAssetUrl(slot) : template.imageUrl;
-}
-
-export async function saveFamilyCustomAsset(asset: FamilyCustomAsset, blob: Blob) {
-  await withFamilyAssetStore<IDBValidKey>('readwrite', (store) => store.put(blob, asset.blobKey));
-  const metadata: FamilyCustomAsset = { ...asset, dataUrl: undefined };
-  writeJson(FAMILY_ASSETS_KEY, {
-    ...readFamilyCustomAssets(),
-    [asset.slot]: metadata
-  });
-  notifyFamilyAssetsUpdated();
-}
-
-export async function resetFamilyCustomAsset(slot: FamilyAssetSlot) {
-  const assets = { ...readFamilyCustomAssets() };
-  const blobKey = assets[slot]?.blobKey;
-  if (blobKey) {
-    await withFamilyAssetStore<undefined>('readwrite', (store) => store.delete(blobKey));
-  }
-  delete assets[slot];
-  writeJson(FAMILY_ASSETS_KEY, assets);
-  notifyFamilyAssetsUpdated();
 }
 
 export function readFamilyQuests(): FamilyQuest[] {
@@ -786,110 +603,6 @@ export function saveFamilyAccountingMonths(months: FamilyAccountingMonth[]) {
   writeJson(ACCOUNTING_KEY, months);
 }
 
-export function readFamilyPremiumRules(): FamilyPremiumRules {
-  return readJson(PREMIUM_RULES_KEY, DEFAULT_PREMIUM_RULES);
-}
-
-export function saveFamilyPremiumRules(rules: FamilyPremiumRules, actorId: string) {
-  const now = new Date().toISOString();
-  writeJson(PREMIUM_RULES_KEY, { ...rules, updatedBy: actorId, updatedAt: now });
-}
-
-export function readFamilyContentBlocks(): FamilyEditableContentBlock[] {
-  const stored = readJson<FamilyEditableContentBlock[]>(FAMILY_CONTENT_BLOCKS_KEY, DEFAULT_FAMILY_CONTENT_BLOCKS);
-  const byId = new Map(stored.map((block) => [block.id, block]));
-  let changed = false;
-
-  for (const fallback of DEFAULT_FAMILY_CONTENT_BLOCKS) {
-    if (!byId.has(fallback.id)) {
-      byId.set(fallback.id, fallback);
-      changed = true;
-    }
-  }
-
-  const merged = DEFAULT_FAMILY_CONTENT_BLOCKS.map((fallback) => ({
-    ...fallback,
-    ...byId.get(fallback.id)
-  })).map((block) => {
-    const refreshed = refreshDefaultContentBlock(block);
-    if (refreshed !== block) changed = true;
-    return refreshed;
-  });
-  if (changed) writeJson(FAMILY_CONTENT_BLOCKS_KEY, merged);
-  return merged;
-}
-
-function refreshDefaultContentBlock(block: FamilyEditableContentBlock): FamilyEditableContentBlock {
-  const fallback = DEFAULT_FAMILY_CONTENT_BLOCKS.find((item) => item.id === block.id);
-  if (!fallback) return block;
-  const isKnownOldRecruitment =
-    block.id === 'recruitment-info' &&
-    block.body === 'Dragon House приймає активних гравців, які поважають сім’ю, дисципліну та внутрішні правила лігва.';
-  const isKnownOldHomeIntro =
-    block.id === 'home-intro' &&
-    block.body === 'Лігво, новини, квести, скарбниця і доступи.';
-  const isKnownOldHomeAlert =
-    block.id === 'home-alert' &&
-    block.body === 'Важливе: сімейні квести тепер мають набір, учасників і звіти для бухгалтерії.';
-  const isUneditedSystemBlock = block.updatedBy === 'system' && block.body !== fallback.body;
-
-  if (isKnownOldRecruitment || isKnownOldHomeIntro || isKnownOldHomeAlert || isUneditedSystemBlock) {
-    return {
-      ...block,
-      title: fallback.title,
-      body: fallback.body,
-      contact: fallback.contact,
-      updatedBy: fallback.updatedBy,
-      updatedAt: fallback.updatedAt
-    };
-  }
-
-  return block;
-}
-
-export function saveFamilyContentBlocks(blocks: FamilyEditableContentBlock[]) {
-  writeJson(FAMILY_CONTENT_BLOCKS_KEY, blocks);
-}
-
-export function saveFamilyContentBlock(
-  block: FamilyEditableContentBlock,
-  actorId: string
-): FamilyEditableContentBlock[] {
-  const nextBlock: FamilyEditableContentBlock = {
-    ...block,
-    title: block.title.trim(),
-    body: block.body.trim(),
-    contact: block.contact?.trim() || null,
-    updatedBy: actorId,
-    updatedAt: block.updatedAt || new Date().toISOString()
-  };
-  const blocks = readFamilyContentBlocks();
-  const nextBlocks = blocks.some((item) => item.id === nextBlock.id)
-    ? blocks.map((item) => (item.id === nextBlock.id ? nextBlock : item))
-    : [...blocks, nextBlock];
-  saveFamilyContentBlocks(nextBlocks);
-  return nextBlocks;
-}
-
-export function getUserPremiumArchive(userId: string) {
-  return readFamilyAccountingMonths().map((month) => {
-    const earning = calculateMonthlyEarning(month, userId);
-    const deserved = calculatePremiumAmount(earning);
-    const premium =
-      month.bonuses.find((bonus) => bonus.id === premiumBonusId(month.year, month.month, userId)) ??
-      month.bonuses.find((bonus) => bonus.userId === userId && bonus.source === 'premium') ??
-      null;
-    return {
-      month,
-      earning,
-      deservedAmount: premium?.amount ?? deserved.amount,
-      deservedTitle: premium?.rewardLabel ?? deserved.title,
-      bonus: premium,
-      status: premium?.status ?? (deserved.amount > 0 ? 'calculated' : 'not_eligible')
-    };
-  });
-}
-
 export function getCurrentAccountingMonth(now = new Date()): FamilyAccountingMonth {
   const months = readFamilyAccountingMonths();
   const month = now.getMonth() + 1;
@@ -911,69 +624,6 @@ export function getCurrentAccountingMonth(now = new Date()): FamilyAccountingMon
   };
   saveFamilyAccountingMonths([created, ...months]);
   return created;
-}
-
-export function getCurrentUserBonus(userId: string, now = new Date()): FamilyBonus | null {
-  const month = getCurrentAccountingMonth(now);
-  const archive = getUserPremiumArchive(userId).find((item) => item.month.id === month.id);
-  if (archive?.bonus) return archive.bonus;
-  if (!archive || archive.deservedAmount <= 0) return null;
-  return {
-    id: premiumBonusId(month.year, month.month, userId),
-    userId,
-    month: month.month,
-    year: month.year,
-    amount: archive.deservedAmount,
-    rewardLabel: archive.deservedTitle,
-    reason: `Премія за місячний заробіток ${archive.earning.toLocaleString('uk-UA')} $ із сімейних квестів`,
-    status: 'calculated',
-    approvedBy: null,
-    paidBy: null,
-    paidAt: null,
-    comment: null,
-    source: 'premium',
-    questReportId: null,
-    createdAt: month.createdAt,
-    updatedAt: month.updatedAt
-  };
-}
-
-export function ensurePremiumBonus(userId: string, actorId: string, comment: string | null = null) {
-  const now = new Date().toISOString();
-  const current = getCurrentAccountingMonth(new Date());
-  const months = readFamilyAccountingMonths();
-  const month = months.find((item) => item.id === current.id) ?? current;
-  const earning = calculateMonthlyEarning(month, userId);
-  const premium = calculatePremiumAmount(earning);
-  const id = premiumBonusId(month.year, month.month, userId);
-  const existing = month.bonuses.find((bonus) => bonus.id === id);
-  const nextBonus: FamilyBonus = {
-    id,
-    userId,
-    month: month.month,
-    year: month.year,
-    amount: premium.amount > 0 ? premium.amount : null,
-    rewardLabel: premium.title,
-    reason: `Премія за місячний заробіток ${earning.toLocaleString('uk-UA')} $ із сімейних квестів`,
-    status: premium.amount > 0 ? existing?.status ?? 'calculated' : 'not_eligible',
-    approvedBy: actorId,
-    paidBy: existing?.paidBy ?? null,
-    paidAt: existing?.paidAt ?? null,
-    comment: comment ?? existing?.comment ?? null,
-    source: 'premium',
-    questReportId: null,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now
-  };
-  const updatedMonth = {
-    ...month,
-    bonuses: existing
-      ? month.bonuses.map((bonus) => (bonus.id === id ? nextBonus : bonus))
-      : [nextBonus, ...month.bonuses],
-    updatedAt: now
-  };
-  saveFamilyAccountingMonths(months.map((item) => (item.id === updatedMonth.id ? updatedMonth : item)));
-  return nextBonus;
 }
 
 function auditValue(value: string | number | null | undefined) {
@@ -998,53 +648,6 @@ function createLedgerEntry(input: Omit<FamilyLedgerEntry, 'id' | 'createdAt'>, n
 
 function hasLedgerEntry(month: FamilyAccountingMonth, type: FamilyLedgerEntry['type'], relatedEntityId: string) {
   return (month.ledger ?? []).some((entry) => entry.type === type && entry.relatedEntityId === relatedEntityId);
-}
-
-export function addManualLedgerExpense(input: {
-  amount: number;
-  title: string;
-  comment: string | null;
-  createdBy: string;
-}) {
-  const now = new Date().toISOString();
-  const months = readFamilyAccountingMonths();
-  const current = getCurrentAccountingMonth(new Date());
-  const ledgerEntry = createLedgerEntry(
-    {
-      amount: Math.max(0, input.amount),
-      type: 'expense',
-      title: input.title,
-      comment: input.comment,
-      createdBy: input.createdBy,
-      relatedEntityType: 'manual',
-      relatedEntityId: null
-    },
-    now
-  );
-  const auditEntry = createAccountingAuditEntry(
-    {
-      actorId: input.createdBy,
-      action: 'ledger_entry_created',
-      entityType: 'ledger_entry',
-      entityId: ledgerEntry.id,
-      field: 'expense',
-      before: null,
-      after: ledgerEntry.amount
-    },
-    now
-  );
-  const updatedMonth: FamilyAccountingMonth = {
-    ...current,
-    ledger: [ledgerEntry, ...(current.ledger ?? [])],
-    auditTrail: [auditEntry, ...(current.auditTrail ?? [])],
-    updatedAt: now
-  };
-  saveFamilyAccountingMonths(
-    months.some((month) => month.id === updatedMonth.id)
-      ? months.map((month) => (month.id === updatedMonth.id ? updatedMonth : month))
-      : [updatedMonth, ...months]
-  );
-  return ledgerEntry;
 }
 
 export function updateFamilyBonus(

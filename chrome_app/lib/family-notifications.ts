@@ -147,33 +147,6 @@ export async function notifyBonusPaid(bonus: FamilyBonus) {
   });
 }
 
-export async function notifyBonusStatusChanged(bonus: FamilyBonus) {
-  await addFamilyNotificationOnce({
-    eventKey: `bonus-status:${bonus.id}:${bonus.status}:${bonus.updatedAt}`,
-    userId: bonus.userId,
-    type: 'bonus_status_changed',
-    title: 'Статус премії змінено',
-    message: `Статус твоєї премії: ${bonus.status}`,
-    createdAt: bonus.updatedAt,
-    relatedEntityType: 'accounting',
-    relatedEntityId: bonus.id
-  });
-}
-
-export async function notifyQuestPayoutUpdated(bonus: FamilyBonus) {
-  if (!bonus.questReportId) return;
-  await addFamilyNotificationOnce({
-    eventKey: `quest-payout:${bonus.questReportId}:${bonus.userId}:${bonus.updatedAt}`,
-    userId: bonus.userId,
-    type: 'quest_payout_updated',
-    title: 'Винагороду за квест оновлено',
-    message: `Винагороду за квест оновлено: ${bonusTitle(bonus)}`,
-    createdAt: bonus.updatedAt,
-    relatedEntityType: 'accounting',
-    relatedEntityId: bonus.id
-  });
-}
-
 export async function notifyQuestReportAccepted(report: FamilyQuestReport) {
   await Promise.all(
     report.participants.map((userId) =>

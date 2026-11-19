@@ -1,21 +1,15 @@
 import { QUANTFUN_BASE_URL } from './constants';
-import { assertNoMojibakeSeed, sanitizeFamilyTextDeep } from './text-sanitizer';
 import type {
-  FamilyAccountingMonth,
-  FamilyBonus,
   FamilyEconomyEntry,
-  FamilyMapReference,
   FamilyMapZone,
   FamilyPermission,
   FamilyPost,
-  FamilyQuest,
   FamilyResource,
   FamilyRole,
   FamilyTask,
   FamilyUser,
   FamilyUserStats,
   QuantNewsItem,
-  QuantNewsAdapter,
   RecruitmentSettings,
   ResourceCategory,
   ResourceLink
@@ -497,30 +491,6 @@ export const DEFAULT_FAMILY_POSTS: FamilyPost[] = [
     isReadBy: []
   }
 ];
-
-export function readFamilyPosts(): FamilyPost[] {
-  if (typeof window === 'undefined') return DEFAULT_FAMILY_POSTS;
-  try {
-    const raw = window.localStorage.getItem(FAMILY_POSTS_KEY);
-    if (!raw) {
-      const seed = sanitizeFamilyTextDeep(DEFAULT_FAMILY_POSTS);
-      assertNoMojibakeSeed('DEFAULT_FAMILY_POSTS', seed);
-      window.localStorage.setItem(FAMILY_POSTS_KEY, JSON.stringify(seed));
-      return seed;
-    }
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return DEFAULT_FAMILY_POSTS;
-    const sanitized = sanitizeFamilyTextDeep(parsed as FamilyPost[]);
-    if (JSON.stringify(sanitized) !== raw) saveFamilyPosts(sanitized);
-    return sanitized;
-  } catch {
-    return DEFAULT_FAMILY_POSTS;
-  }
-}
-
-export function saveFamilyPosts(posts: FamilyPost[]) {
-  window.localStorage.setItem(FAMILY_POSTS_KEY, JSON.stringify(sanitizeFamilyTextDeep(posts)));
-}
 
 export const FAMILY_ECONOMY_ENTRIES: FamilyEconomyEntry[] = [
   {
