@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
-const accountingUiSource = readFileSync(new URL('../entrypoints/dashboard/family/family-accounting.tsx', import.meta.url), 'utf8');
+// Follow the presentation split; retain every existing positive and negative assertion.
+const accountingUiSource = ['family-accounting.tsx', 'accounting-summary-panels.tsx', 'accounting-display.tsx']
+  .map((file) => readFileSync(new URL(`../entrypoints/dashboard/family/${file}`, import.meta.url), 'utf8')).join('\n');
 const accountingClientSource = readFileSync(new URL('../lib/family-accounting-backend-client.ts', import.meta.url), 'utf8');
 const personalAccountingPanelSource = readFileSync(new URL('../entrypoints/dashboard/family/family-personal-accounting-panel.tsx', import.meta.url), 'utf8');
 const profileSource = readFileSync(new URL('../entrypoints/dashboard/family/dragon-profile.tsx', import.meta.url), 'utf8');
