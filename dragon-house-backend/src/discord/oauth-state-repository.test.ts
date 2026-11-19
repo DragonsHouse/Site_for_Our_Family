@@ -46,6 +46,31 @@ describePg('PgDiscordOAuthStateRepository', () => {
 
     await firstRepository.create(state);
 
+    expect(await secondRepository.getByStateId(state.stateId)).toEqual({
+      ...state,
+      clientType: null,
+      redirectTarget: null,
+      codeVerifier: null,
+      environment: null,
+      metadata: {},
+    });
+  });
+
+  it('persists Discord login OAuth fields across repository instances', async () => {
+    const firstRepository = new PgDiscordOAuthStateRepository(pool);
+    const secondRepository = new PgDiscordOAuthStateRepository(pool);
+    const state: DiscordOAuthState = {
+      ...createState(runId, `${runId}-login`),
+      purpose: 'login',
+      clientType: 'chrome_extension',
+      redirectTarget: 'https://extension.example/login-complete',
+      codeVerifier: 'test-code-verifier',
+      environment: 'test',
+      metadata: { source: 'repository-test' },
+    };
+
+    await firstRepository.create(state);
+
     expect(await secondRepository.getByStateId(state.stateId)).toEqual(state);
   });
 
