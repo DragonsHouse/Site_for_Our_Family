@@ -1,3 +1,4 @@
+import { positiveInt } from '../http/query-params.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { FamilyAuthService } from '../auth/auth-service.js';
@@ -380,9 +381,4 @@ function respondFinanceError(response: import('express').Response, error: unknow
     message: FINANCE_ERROR_MESSAGES.VALIDATION_ERROR,
     details: {},
   });
-}
-
-function positiveInt(value: unknown, fallback: number, min: number, max: number) {
-  const number = Number(value);
-  return Number.isInteger(number) && number >= min && number <= max ? number : fallback;
 }

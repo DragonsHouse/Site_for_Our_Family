@@ -1,3 +1,4 @@
+import { positiveInt, stringQuery } from '../http/query-params.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { AppConfig } from '../config/env.js';
@@ -166,19 +167,10 @@ export function createFamilyMembersRouter(
   return router;
 }
 
-function positiveInt(value: unknown, fallback: number, min: number, max: number) {
-  const number = Number(value);
-  return Number.isInteger(number) && number >= min && number <= max ? number : fallback;
-}
-
 function optionalInt(value: unknown, min: number, max: number) {
   if (value === undefined) return null;
   const number = Number(value);
   return Number.isInteger(number) && number >= min && number <= max ? number : null;
-}
-
-function stringQuery(value: unknown) {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function enumQuery<T extends readonly string[]>(value: unknown, options: T): T[number] | null {

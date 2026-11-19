@@ -1,3 +1,4 @@
+import { positiveInt, stringQuery } from '../http/query-params.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { FamilyAuthService } from '../auth/auth-service.js';
@@ -373,15 +374,6 @@ const confirmPaidSchema = z.object({
     dataBase64: z.string().trim().min(1),
   }).strict(),
 }).strict();
-
-function positiveInt(value: unknown, fallback: number, min: number, max: number) {
-  const number = Number(value);
-  return Number.isInteger(number) && number >= min && number <= max ? number : fallback;
-}
-
-function stringQuery(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
 
 function respondServiceUnavailable(response: import('express').Response) {
   response.status(503).json({

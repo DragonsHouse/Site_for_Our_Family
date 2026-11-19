@@ -1,3 +1,4 @@
+import { stringQuery } from '../http/query-params.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { FamilyAuthService } from '../auth/auth-service.js';
@@ -359,10 +360,6 @@ async function syncTowerDiscordProjection(
   } catch {
     // Discord projection failures are recoverable through the orchestration retry/sync state.
   }
-}
-
-function stringQuery(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function respondServiceUnavailable(response: import('express').Response) {
