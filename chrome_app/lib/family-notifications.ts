@@ -1,3 +1,4 @@
+import { isFamilyQuestLocalFallbackAllowed } from './family-quest-read-adapter';
 import { readFamilyAccountingMonths, readFamilyQuestReports } from './family-repositories';
 import { sanitizeFamilyTextDeep } from './text-sanitizer';
 import type {
@@ -165,6 +166,8 @@ export async function notifyQuestReportAccepted(report: FamilyQuestReport) {
 }
 
 export async function syncFamilyNotificationsFromLocalState() {
+  // Old local payouts are not authoritative notifications in a production Hub.
+  if (!isFamilyQuestLocalFallbackAllowed()) return;
   const months = readFamilyAccountingMonths();
   const reports = readFamilyQuestReports();
   const bonusTasks = months.flatMap((month) =>

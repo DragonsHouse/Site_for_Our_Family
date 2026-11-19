@@ -1,5 +1,6 @@
 import { authenticatedFetch } from './family-backend-auth-client.ts';
 import {
+  assertBackendQuestMutationSucceeded,
   parseBackendQuestDetailResponse,
   parseBackendQuestListResponse,
   parseBackendQuestTemplateResponse,
@@ -124,14 +125,14 @@ export async function updateBackendFamilyQuest(questId: string, input: Partial<B
 }
 
 export async function joinBackendFamilyQuest(questId: string, role: 'participant' | 'helper' = 'participant'): Promise<void> {
-  await authenticatedFetch(`/api/family/quests/${encodeURIComponent(questId)}/join`, {
+  await assertBackendQuestMutationSucceeded(await authenticatedFetch(`/api/family/quests/${encodeURIComponent(questId)}/join`, {
     method: 'POST',
     body: JSON.stringify({ role }),
-  });
+  }));
 }
 
 export async function withdrawBackendFamilyQuest(questId: string): Promise<void> {
-  await authenticatedFetch(`/api/family/quests/${encodeURIComponent(questId)}/withdraw`, { method: 'POST' });
+  await assertBackendQuestMutationSucceeded(await authenticatedFetch(`/api/family/quests/${encodeURIComponent(questId)}/withdraw`, { method: 'POST' }));
 }
 
 export async function completeBackendFamilyQuest(questId: string, comment?: string | null): Promise<BackendFamilyQuestDto> {

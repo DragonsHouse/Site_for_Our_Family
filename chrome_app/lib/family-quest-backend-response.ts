@@ -156,6 +156,11 @@ export async function parseBackendQuestTemplateResponse(response: Response): Pro
   return assertTemplate(await parseBackendJson(response));
 }
 
+/** For mutations whose response body is not a quest: success must still be proven. */
+export async function assertBackendQuestMutationSucceeded(response: Response): Promise<void> {
+  await parseBackendJson(response);
+}
+
 async function parseBackendJson(response: Response): Promise<unknown> {
   let body: unknown = null;
   try {

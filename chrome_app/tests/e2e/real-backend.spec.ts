@@ -208,6 +208,22 @@ test('MAP: shared backend snapshot, cross-account read, conflict and permission 
   expect(stale.status).toBe(409);
 });
 
+test('QUEST: backend read failure blocks writes and never touches legacy browser storage', async ({ page }) => {
+  await loginAs(page, 'owner');
+  const questReads = /\/api\/family\/(quest-templates|quests)(\?|$)/u;
+  await page.route(questReads, (route) => route.abort());
+  await page.goto(`${dashboardUrl}?tab=family&section=quests`);
+  await expect(page.getByTestId('quest-read-retry')).toBeVisible();
+  await expect(page.getByTestId('quest-create-template')).toBeDisabled();
+  const legacyKeys = await page.evaluate(() => Object.keys(window.localStorage).filter((key) => key.startsWith('dragon_house_family_quest')));
+  expect(legacyKeys).toEqual([]);
+
+  await page.unroute(questReads);
+  await page.getByTestId('quest-read-retry').click();
+  await expect(page.getByTestId('quest-create-template')).toBeEnabled();
+  await expect(page.getByTestId('quest-read-retry')).toHaveCount(0);
+});
+
 test('SHARED ASSET: quest cleanup image persists, crosses accounts, replaces and resets', async ({ browser, page }) => {
   const first = [...Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwnwGM/zMwAAAf7gP9qS/A4gAAAABJRU5ErkJggg==', 'base64')];
   const replacement = [...Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAD0lEQVQImWNgYPgPRmAKABf2A/38FIMyAAAAAElFTkSuQmCC', 'base64')];

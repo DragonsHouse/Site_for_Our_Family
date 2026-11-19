@@ -24,10 +24,17 @@ import {
 } from '../../../lib/family-quest-backend-client';
 import {
   mapBackendQuest,
-  mapBackendQuestReport,
   mapBackendQuestTemplate
 } from '../../../lib/family-quest-backend-mapper';
-import { loadFamilyQuestReadState, type FamilyQuestReadSource } from '../../../lib/family-quest-read-adapter';
+import {
+  loadFamilyQuestReadState,
+  type FamilyQuestReadSource,
+  type FamilyQuestReadState
+} from '../../../lib/family-quest-read-adapter';
+import {
+  resolveFamilyQuestWriteTarget,
+  shouldReplaceFamilyQuestData
+} from '../../../lib/family-quest-write-policy';
 import {
   applyQuestRewardPlan,
   calculateQuestRewardPlan,
@@ -36,7 +43,6 @@ import {
   issueFamilyQuestPayouts,
   readFamilyQuestReports,
   readFamilyQuests,
-  readFamilyQuestTemplates,
   removeQuestPerson,
   saveFamilyQuestReports,
   saveFamilyQuests,
@@ -78,6 +84,8 @@ type OperationMessage = {
 
 const BACKEND_WRITE_ERROR_MESSAGE = 'Не вдалося зберегти зміни квесту.';
 const QUEST_CONFLICT_MESSAGE = 'Цей квест уже змінив інший користувач. Оновіть дані й повторіть зміни.';
+const QUEST_WRITE_BLOCKED_MESSAGE = 'Зміни не збережено: офіційний сервіс квестів зараз недоступний. Оновіть дані й спробуйте ще раз.';
+const BACKEND_PEOPLE_READ_ONLY_MESSAGE = 'Склад учасників і особисті нагороди цього квесту тут лише для перегляду: сервіс поки не приймає таких змін.';
 
 const STATUS_LABELS: Record<FamilyQuestStatus, string> = {
   draft: 'Чернетка',
@@ -460,6 +468,7 @@ function RewardManager({
   const [itemText, setItemText] = useState<Record<string, string>>({});
   const activeUsers = users.filter((user) => user.accountStatus !== 'inactive');
   const hasBackendPayouts = plan.payouts.some((payout) => Boolean(resolveBackendPayoutTarget(quest, payout)));
+  const peopleEditable = quest.source !== 'backend';
 
   function updatePerson(userId: string, updates: Partial<FamilyQuestParticipant>) {
     const mapPerson = (person: FamilyQuestParticipant) => (person.userId === userId ? { ...person, ...updates } : person);
@@ -512,6 +521,12 @@ function RewardManager({
           </div>
         ) : null}
 
+        {peopleEditable ? null : (
+          <div data-testid="quest-people-read-only" className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+            {BACKEND_PEOPLE_READ_ONLY_MESSAGE}
+          </div>
+        )}
+
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           <div className="dh-card rounded-2xl p-3 text-sm"><span className="text-slate-500">Усього</span><div className="text-lg font-semibold text-white">{money(quest.totalReward)}</div></div>
           <div className="dh-card rounded-2xl p-3 text-sm"><span className="text-slate-500">Людям</span><div className="text-lg font-semibold text-amber-100">{money(quest.memberRewardPool)}</div></div>
@@ -546,8 +561,8 @@ function RewardManager({
               </div>
             ) : null}
             <div className="mt-4 flex flex-col gap-2">
-              <button type="button" onClick={() => addManualPerson('participant')} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Додати учасника</button>
-              <button type="button" onClick={() => addManualPerson('helper')} className="rounded-xl border border-orange-500/40 px-3 py-2 text-sm text-orange-100">Додати помічника</button>
+              <button type="button" disabled={!peopleEditable} onClick={() => addManualPerson('participant')} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100 disabled:cursor-not-allowed disabled:opacity-50">Додати учасника</button>
+              <button type="button" disabled={!peopleEditable} onClick={() => addManualPerson('helper')} className="rounded-xl border border-orange-500/40 px-3 py-2 text-sm text-orange-100 disabled:cursor-not-allowed disabled:opacity-50">Додати помічника</button>
               <button type="button" onClick={() => onIssueAll(quest.id)} disabled={hasBackendPayouts || !plan.isComplete || plan.errors.length > 0} className="dh-fire-button rounded-xl px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Видати все</button>
             </div>
           </section>
@@ -564,6 +579,7 @@ function RewardManager({
               const isIssuing = feedback?.status === 'issuing';
               return (
                 <div key={person.userId} className="grid grid-cols-[1.1fr_0.7fr_0.7fr_0.8fr_0.7fr_1fr_0.8fr] gap-2 border-t border-white/10 px-3 py-3 text-sm">
+                  <fieldset disabled={!peopleEditable} className="contents">
                   <div>
                     <div className="font-medium text-white">{person.userId}</div>
                     <label className="mt-2 flex items-center gap-2 text-xs text-slate-300">
@@ -600,6 +616,7 @@ function RewardManager({
                     </div>
                     <textarea value={person.participationNote ?? ''} onChange={(event) => updatePerson(person.userId, { participationNote: event.target.value })} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-xs text-slate-100" placeholder="коментар" />
                   </div>
+                  </fieldset>
                   <div>
                     <div className="text-amber-100">{money(payout?.amount ?? 0)}</div>
                     <div className="text-xs text-slate-400">{payoutStatusLabel(payout?.status)}</div>
@@ -650,6 +667,8 @@ function ManagerPanel({
 }) {
   const people = getFamilyQuestPeople(quest);
   const plan = calculateQuestRewardPlan(quest);
+  const peopleEditable = quest.source !== 'backend';
+  const peopleEditTitle = peopleEditable ? undefined : BACKEND_PEOPLE_READ_ONLY_MESSAGE;
 
   function addPerson(type: 'participant' | 'helper') {
     const fallback = users.find((user) => !people.some((person) => person.userId === user.id))?.nickname ?? '';
@@ -738,10 +757,10 @@ function ManagerPanel({
         <button type="button" onClick={() => onReminder(quest)} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Нагадати</button>
         <button type="button" onClick={() => onShowMessage(`Учасники:\n${quest.participants.map((item) => item.userId).join('\n') || '-'}`)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Переглянути учасників</button>
         <button type="button" onClick={() => onShowMessage(`Помічники:\n${(quest.helpers ?? []).map((item) => item.userId).join('\n') || '-'}`)} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Переглянути помічників</button>
-        <button type="button" onClick={() => addPerson('participant')} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Додати учасника</button>
-        <button type="button" onClick={() => addPerson('helper')} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200">Додати помічника</button>
+        <button type="button" disabled={!peopleEditable} title={peopleEditTitle} onClick={() => addPerson('participant')} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:cursor-not-allowed disabled:opacity-50">Додати учасника</button>
+        <button type="button" disabled={!peopleEditable} title={peopleEditTitle} onClick={() => addPerson('helper')} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:cursor-not-allowed disabled:opacity-50">Додати помічника</button>
         <button type="button" onClick={addRewardMoney} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Додати гроші</button>
-        <button type="button" onClick={addRewardItem} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100">Додати предмет</button>
+        <button type="button" disabled={!peopleEditable} title={peopleEditTitle} onClick={addRewardItem} className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100 disabled:cursor-not-allowed disabled:opacity-50">Додати предмет</button>
         <button type="button" onClick={() => onCreateReport(quest.id)} disabled={!plan.isComplete || plan.errors.length > 0} className="rounded-xl border border-orange-500/40 px-3 py-2 text-sm text-orange-100 disabled:opacity-50">Створити звіт</button>
         {report ? <button type="button" onClick={() => onTransferReport(report.id)} className="rounded-xl border border-emerald-500/40 px-3 py-2 text-sm text-emerald-100">Передати звіт у бухгалтерію</button> : null}
         <button type="button" onClick={() => onIssueAll(quest.id)} disabled={!plan.isComplete || plan.errors.length > 0} className="dh-fire-button rounded-xl px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Видати всі підготовлені</button>
@@ -892,9 +911,9 @@ function QuestCard({
 }
 
 export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; users: FamilyUser[] }) {
-  const [templates, setTemplates] = useState<FamilyQuestTemplate[]>(() => readFamilyQuestTemplates());
-  const [quests, setQuests] = useState<FamilyQuest[]>(() => readFamilyQuests());
-  const [reports, setReports] = useState<FamilyQuestReport[]>(() => readFamilyQuestReports());
+  const [templates, setTemplates] = useState<FamilyQuestTemplate[]>([]);
+  const [quests, setQuests] = useState<FamilyQuest[]>([]);
+  const [reports, setReports] = useState<FamilyQuestReport[]>([]);
   const [category, setCategory] = useState<FamilyQuestCategory | 'all'>('all');
   const [editingTemplate, setEditingTemplate] = useState<FamilyQuestTemplate | null>(null);
   const [editingQuest, setEditingQuest] = useState<FamilyQuest | null>(null);
@@ -906,17 +925,24 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   const [questReadError, setQuestReadError] = useState<Error | null>(null);
   const [creating, setCreating] = useState(false);
   const canManage = canManageFamilyQuests(currentUser);
+  const canCreateQuestData = resolveFamilyQuestWriteTarget(questReadSource) !== 'blocked';
+
+  function applyQuestReadState(state: FamilyQuestReadState) {
+    if (shouldReplaceFamilyQuestData(state.source)) {
+      setTemplates(state.templates);
+      setQuests(state.quests);
+      setReports(state.reports);
+    }
+    setQuestReadSource(state.source);
+    setQuestReadError(state.error);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
     void loadFamilyQuestReadState(controller.signal).then((state) => {
       if (cancelled) return;
-      setTemplates(state.templates);
-      setQuests(state.quests);
-      setReports(state.reports);
-      setQuestReadSource(state.source);
-      setQuestReadError(state.error);
+      applyQuestReadState(state);
     });
     return () => {
       cancelled = true;
@@ -931,21 +957,24 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   );
 
   async function reloadBackendQuests() {
-    const state = await loadFamilyQuestReadState();
-    setTemplates(state.templates);
-    setQuests(state.quests);
-    setReports(state.reports);
-    setQuestReadSource(state.source);
-    setQuestReadError(state.error);
+    applyQuestReadState(await loadFamilyQuestReadState());
   }
 
   function refresh() {
-    if (questReadSource === 'backend') {
+    if (questReadSource !== 'dev_local_fallback') {
       void reloadBackendQuests();
       return;
     }
     setQuests(readFamilyQuests());
     setReports(readFamilyQuestReports());
+  }
+
+  function questWriteTarget(entity?: { source?: 'backend' | 'local' } | null) {
+    return resolveFamilyQuestWriteTarget(questReadSource, entity?.source);
+  }
+
+  function showQuestWriteBlocked() {
+    showOperationMessage(QUEST_WRITE_BLOCKED_MESSAGE, 'error', { actionLabel: 'Оновити дані', onAction: () => void reloadBackendQuests() });
   }
 
   function persistQuests(next: FamilyQuest[]) {
@@ -970,10 +999,6 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   function findReport(quest: FamilyQuest | null) {
     if (!quest) return null;
     return reports.find((report) => report.questId === quest.id) ?? null;
-  }
-
-  function isBackendQuest(quest: FamilyQuest | null | undefined) {
-    return quest?.source === 'backend';
   }
 
   function isBackendTemplate(template: FamilyQuestTemplate | null | undefined) {
@@ -1012,7 +1037,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   }
 
   async function saveTemplate(template: FamilyQuestTemplate) {
-    if (questReadSource === 'backend' || isBackendTemplate(template)) {
+    const writeTarget = questWriteTarget(template);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       const payload = {
         title: template.title,
         category: template.category,
@@ -1054,7 +1084,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   async function deleteTemplate(templateId: string) {
     const template = templates.find((item) => item.id === templateId);
     if (!window.confirm('Архівувати цей шаблон квесту?')) return;
-    if (questReadSource === 'backend' || isBackendTemplate(template)) {
+    const writeTarget = questWriteTarget(template);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       try {
         await archiveBackendFamilyQuestTemplate(templateId, template?.version ?? 1);
         await reloadBackendQuests();
@@ -1069,7 +1104,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
 
   async function openRecruiting(template: FamilyQuestTemplate) {
     if (formatCooldown(template.cooldownUntil)) return;
-    if (questReadSource === 'backend' || isBackendTemplate(template)) {
+    const writeTarget = questWriteTarget(template);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       try {
         const created = await createBackendFamilyQuest({
           templateId: template.backendTemplateId ?? template.id,
@@ -1096,7 +1136,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   }
 
   async function updateQuest(nextQuest: FamilyQuest): Promise<boolean> {
-    if (questReadSource === 'backend' || isBackendQuest(nextQuest)) {
+    const writeTarget = questWriteTarget(nextQuest);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return false;
+    }
+    if (writeTarget === 'backend') {
       try {
         const updated = await updateBackendFamilyQuest(nextQuest.id, {
           title: nextQuest.title,
@@ -1128,16 +1173,7 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
 
   function persistBackendQuestUpdate(nextQuest: FamilyQuest) {
     const planned = applyQuestRewardPlan(nextQuest);
-    if (questReadSource === 'backend' || isBackendQuest(planned)) {
-      setQuests((current) => (current.some((quest) => quest.id === planned.id) ? current.map((quest) => (quest.id === planned.id ? planned : quest)) : [planned, ...current]));
-      if (rewardQuest?.id === planned.id) setRewardQuest(planned);
-      if (editingQuest?.id === planned.id) setEditingQuest(planned);
-      return;
-    }
-    const stored = readFamilyQuests();
-    const next = stored.some((quest) => quest.id === planned.id) ? stored.map((quest) => (quest.id === planned.id ? planned : quest)) : [planned, ...stored];
-    saveFamilyQuests(next);
-    setQuests(next);
+    setQuests((current) => (current.some((quest) => quest.id === planned.id) ? current.map((quest) => (quest.id === planned.id ? planned : quest)) : [planned, ...current]));
     if (rewardQuest?.id === planned.id) setRewardQuest(planned);
     if (editingQuest?.id === planned.id) setEditingQuest(planned);
   }
@@ -1145,7 +1181,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   async function changeState(questId: string, status: FamilyQuestStatus, comment: string | null = null) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest) return;
-    if (questReadSource === 'backend' || isBackendQuest(quest)) {
+    const writeTarget = questWriteTarget(quest);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       try {
         const updated = status === 'completed'
           ? await completeBackendFamilyQuest(questId, comment)
@@ -1173,7 +1214,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   async function joinQuest(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest || quest.status !== 'recruiting') return;
-    if (questReadSource === 'backend' || isBackendQuest(quest)) {
+    const writeTarget = questWriteTarget(quest);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       try {
         await joinBackendFamilyQuest(questId, 'participant');
         await reloadBackendQuests();
@@ -1201,7 +1247,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   async function leaveQuest(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest || quest.status !== 'recruiting') return;
-    if (questReadSource === 'backend' || isBackendQuest(quest)) {
+    const writeTarget = questWriteTarget(quest);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       try {
         await withdrawBackendFamilyQuest(questId);
         await reloadBackendQuests();
@@ -1225,7 +1276,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   async function createReport(questId: string) {
     const quest = quests.find((item) => item.id === questId);
     if (!quest) return;
-    if (isBackendQuest(quest)) {
+    const writeTarget = questWriteTarget(quest);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       try {
         await createBackendFamilyQuestReport(quest.id, 'Звіт створено в Hub.');
         await reloadBackendQuests();
@@ -1249,7 +1305,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
     if (!report) return;
     const quest = quests.find((item) => item.id === report.questId);
     if (!quest) return;
-    if (isBackendQuest(quest)) {
+    const writeTarget = questWriteTarget(quest);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       try {
         await transferBackendFamilyQuestReportToAccounting(quest.id);
         await reloadBackendQuests();
@@ -1268,7 +1329,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
   }
 
   function remind(quest: FamilyQuest) {
-    if (isBackendQuest(quest)) {
+    const writeTarget = questWriteTarget(quest);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       showBackendWriteError(new Error('Нагадування для backend-квестів проходять через Discord-синхронізацію.'));
       return;
     }
@@ -1341,9 +1407,8 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
           payoutId: backendTarget.payoutId,
           idempotencyKey: backendTarget.idempotencyKey
         });
-        const storedQuest = readFamilyQuests().find((item) => item.id === questId) ?? planned;
-        if (!storedQuest) throw new Error('Квест не знайдено для оновлення виплати.');
-        persistBackendQuestUpdate(applyBackendPayoutResultToQuest(storedQuest, result));
+        if (!planned) throw new Error('Квест не знайдено для оновлення виплати.');
+        persistBackendQuestUpdate(applyBackendPayoutResultToQuest(planned, result));
         setPayoutFeedback((current) => ({
           ...current,
           [backendTarget.payoutKey]: {
@@ -1362,6 +1427,16 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
       return;
     }
 
+    const writeTarget = questWriteTarget(quest);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
+      showOperationMessage('Цю виплату ще не можна провести: її немає в офіційному сервісі.', 'error');
+      return;
+    }
+
     try {
       const result = issueFamilyQuestPayouts({ questId, actorId: currentUser.id, userIds: [userId] });
       refresh();
@@ -1373,7 +1448,12 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
 
   function issueAll(questId: string) {
     const quest = quests.find((item) => item.id === questId);
-    if (isBackendQuest(quest)) {
+    const writeTarget = questWriteTarget(quest);
+    if (writeTarget === 'blocked') {
+      showQuestWriteBlocked();
+      return;
+    }
+    if (writeTarget === 'backend') {
       showOperationMessage('Ці виплати потрібно видавати по одній через офіційний сервіс.', 'info');
       return;
     }
@@ -1405,13 +1485,22 @@ export function FamilyQuests({ currentUser, users }: { currentUser: FamilyUser; 
                 : questReadSource === 'dev_local_fallback'
                   ? 'Офіційний сервіс квестів недоступний. Показано режим розробки.'
                   : questReadError
-                    ? 'Не вдалося завантажити дані. Спробуй ще раз після відновлення сервісу.'
+                    ? templates.length || quests.length
+                      ? 'Не вдалося оновити дані. Показано останні завантажені квести.'
+                      : 'Не вдалося завантажити дані. Спробуй ще раз після відновлення сервісу.'
                     : 'Завантаження...'}
             </p>
+            {questReadSource === 'backend_error' ? (
+              <button type="button" data-testid="quest-read-retry" onClick={() => void reloadBackendQuests()} className="mt-2 rounded-lg border border-amber-200/40 px-2 py-1 text-xs font-semibold text-amber-50">
+                Спробувати ще раз
+              </button>
+            ) : null}
           </div>
           {canManage ? (
             <button
               type="button"
+              data-testid="quest-create-template"
+              disabled={!canCreateQuestData}
               onClick={startCreatingTemplate}
               className="dh-fire-button rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
