@@ -59,11 +59,6 @@ function MemberAvatar({ user }: { user: FamilyUser }) {
   );
 }
 
-function getEffectivePermissions(user: Pick<FamilyUser, 'role' | 'permissions'>) {
-  if (user.role === 'owner') return ROLE_PERMISSIONS.owner;
-  return ALL_FAMILY_PERMISSIONS.filter((permission) => user.permissions.includes(permission));
-}
-
 function statusSortValue(user: FamilyUser) {
   return (user.accountStatus ?? 'active') === 'inactive' ? 1 : 0;
 }

@@ -85,14 +85,6 @@ const RESPONSE_ORDER: Record<DragonGuardResponseStatus, number> = {
   'no-response': 1
 };
 
-const ATTENDANCE_ORDER: Record<DragonDefenseAttendanceStatus, number> = {
-  present: 5,
-  late: 4,
-  excused: 3,
-  absent: 2,
-  unconfirmed: 1
-};
-
 export function createDragonTowerDefense(input: DragonTowerDefenseCreateInput, now = new Date()): DragonTowerDefense {
   validateDragonTowerDefenseTimeRange(input.startsAt, input.endedAt);
 
