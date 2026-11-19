@@ -4,7 +4,7 @@ import {
   updateBackendFamilyContentBlock
 } from '../../../lib/family-content-backend-client';
 import { canManageFamilyContent, canManageFamilyNews, canViewAccounting } from '../../../lib/family-permissions';
-import { getCurrentAccountingMonth } from '../../../lib/family-repositories';
+import { FamilyMonthlyBalance } from './family-monthly-balance';
 import type { FamilyEditableContentBlock, FamilyPost, FamilySection, FamilyUser } from '../../../lib/family-types';
 import { FamilyContentEditor } from './family-content-editor';
 import { CreateFamilyPost } from './create-family-post';
@@ -40,7 +40,6 @@ export function FamilyHome({
     .filter((post) => post.type === 'family_news' || post.type === 'family' || post.type === 'announcement')
     .slice(0, 3);
   const onlineUsers = users.filter((user) => user.isOnline || user.status === 'online');
-  const accountingMonth = canViewAccounting(currentUser) ? getCurrentAccountingMonth() : null;
   const canEditContent = canManageFamilyContent(currentUser);
   const [contentBlocks, setContentBlocks] = useState<FamilyEditableContentBlock[]>([]);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -144,14 +143,7 @@ export function FamilyHome({
               </div>
             </div>
 
-            {accountingMonth ? (
-              <div className="mt-4 rounded-xl border border-red-900/60 bg-red-950/30 p-3 text-sm text-red-50">
-                Фонд поточного місяця:{' '}
-                <span className="font-semibold text-amber-100">
-                  {accountingMonth.totalFund.toLocaleString('uk-UA')} $
-                </span>
-              </div>
-            ) : null}
+            {canViewAccounting(currentUser) ? <FamilyMonthlyBalance key={currentUser.id} /> : null}
           </article>
 
           <div className="grid gap-4 lg:grid-cols-2">
