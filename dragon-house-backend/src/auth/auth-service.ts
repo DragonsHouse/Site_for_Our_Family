@@ -4,6 +4,7 @@ import type { FamilyMemberRepository } from '../members/member-repository.js';
 import { DuplicateFamilyAuthUserError, type FamilyAuthRepository } from './auth-repository.js';
 import { FamilyAuthError } from './auth-errors.js';
 import { createAuthenticatedMemberDto, type AuthenticatedMemberDto } from './authenticated-member-dto.js';
+import { isE2eAuthEnvironment } from './e2e-environment.js';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from './password.js';
 import { createSessionToken, hashSessionToken } from './tokens.js';
 import type {
@@ -113,55 +114,6 @@ export class FamilyAuthService {
     return { token, expiresAt, user: createAuthenticatedMemberDto(member, sessionShell(expiresAt, now, 'password'), user) };
   }
 
-  async loginWithNickname(nicknameInput: string, options: { rememberMe?: boolean } = {}): Promise<{
-    token: string;
-    expiresAt: string;
-    user: AuthenticatedMemberDto;
-  }> {
-    const nickname = nicknameInput.trim();
-    const rateKey = `nickname:${nickname.toLowerCase() || 'empty'}`;
-    this.assertLoginRateLimit(rateKey);
-
-    const member = nickname ? await this.members.findByNickname(nickname) : null;
-    if (!member) {
-      this.recordFailedLogin(rateKey);
-      throw new FamilyAuthError('invalid_credentials', 'Invalid credentials');
-    }
-    if (member.status !== 'active' || member.deletedAt) {
-      throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
-    }
-
-    const user = await this.repository.findUserByFamilyMemberId(member.id);
-    if (user && !user.isActive) {
-      throw new FamilyAuthError('account_disabled', 'Account disabled', 403);
-    }
-
-    this.loginAttempts.delete(rateKey);
-    const token = createSessionToken();
-    const now = new Date();
-    const ttlMs = options.rememberMe
-      ? this.config.authRememberMeTtlDays * 24 * 60 * 60 * 1000
-      : this.config.authSessionTtlHours * 60 * 60 * 1000;
-    const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
-    await this.repository.createSession({
-      sessionId: randomUUID(),
-      familyMemberId: member.id,
-      tokenHash: hashSessionToken(token),
-      createdAt: now.toISOString(),
-      expiresAt,
-      lastUsedAt: now.toISOString(),
-      revokedAt: null,
-      revokedReason: null,
-      loginProvider: 'nickname',
-    });
-
-    return {
-      token,
-      expiresAt,
-      user: createAuthenticatedMemberDto(member, sessionShell(expiresAt, now, 'nickname'), { mustChangePassword: false }),
-    };
-  }
-
   async authenticateToken(token: string, options: { allowPasswordChangeRequired?: boolean } = {}): Promise<{
     session: FamilySession;
     user: FamilyAuthUser;
@@ -172,6 +124,10 @@ export class FamilyAuthService {
 
     const session = await this.repository.findSessionByTokenHash(hashSessionToken(token));
     if (!session || session.revokedAt) throw new FamilyAuthError('session_invalid', 'Session invalid');
+    // Passwordless sessions are only valid as synthetic E2E sessions on the dedicated E2E database.
+    if (session.loginProvider === 'nickname' && !isE2eAuthEnvironment(this.config)) {
+      throw new FamilyAuthError('session_invalid', 'Session invalid');
+    }
 
     const now = new Date();
     if (new Date(session.expiresAt).getTime() <= now.getTime()) {

@@ -229,6 +229,7 @@ describe('Dragon Ember Gate entrance frame composition', () => {
       assert.doesNotMatch(emberGateSource, pattern),
     );
 
+    assert.doesNotMatch(authClientSource, /nickname-login|loginWithNickname/);
     assert.match(authClientSource, /export async function login\(loginOrStaticId: string, password: string/);
     assert.match(authClientSource, /\/api\/auth\/login/);
     assert.match(authClientSource, /export async function loginWithDiscord/);

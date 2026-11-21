@@ -73,6 +73,42 @@ async function createService() {
 }
 
 describe('FamilyAuthService', { timeout: 20_000 }, () => {
+  it('accepts synthetic E2E sessions only in the guarded E2E environment', async () => {
+    const { repository, members } = await createService();
+    const e2eConfig = createTestConfig({
+      bcryptCost: 10,
+      e2eTestMode: true,
+      e2eDatabaseName: 'dragon_house_e2e',
+      databaseUrl: 'postgresql://user:pass@127.0.0.1:5432/dragon_house_e2e',
+    });
+    const e2eService = new FamilyAuthService(e2eConfig, repository, members);
+    const session = await e2eService.createSessionForFamilyMember(ANASTASIA_MEMBER_ID, { loginProvider: 'nickname' });
+
+    await expect(e2eService.authenticateToken(session.token)).resolves.toMatchObject({ context: { familyMemberId: ANASTASIA_MEMBER_ID } });
+    await expect(e2eService.me(session.token)).resolves.toMatchObject({ session: { loginProvider: 'nickname' } });
+
+    for (const config of [
+      createTestConfig({ bcryptCost: 10 }),
+      createTestConfig({ bcryptCost: 10, nodeEnv: 'development', e2eTestMode: true, databaseUrl: e2eConfig.databaseUrl }),
+      createTestConfig({ bcryptCost: 10, nodeEnv: 'production', e2eTestMode: true, databaseUrl: e2eConfig.databaseUrl }),
+      createTestConfig({ bcryptCost: 10, e2eTestMode: true, databaseUrl: 'postgresql://user:pass@127.0.0.1:5432/dragon_house' }),
+    ]) {
+      const service = new FamilyAuthService(config, repository, members);
+      await expect(service.authenticateToken(session.token)).rejects.toMatchObject({ code: 'session_invalid' });
+      await expect(service.me(session.token)).rejects.toMatchObject({ code: 'session_invalid' });
+    }
+  });
+
+  it('still restores normal password sessions after the passwordless guard', async () => {
+    const { service, repository } = await createService();
+    const user = await repository.findUserByFamilyMemberId(ANASTASIA_MEMBER_ID);
+    if (!user) throw new Error('Missing user');
+    await repository.updatePassword(ANASTASIA_MEMBER_ID, user.passwordHash, false);
+    const login = await service.login('Anastasia_Dragons', '41384', { rememberMe: true });
+
+    await expect(service.me(login.token)).resolves.toMatchObject({ memberId: ANASTASIA_MEMBER_ID, session: { loginProvider: 'password' } });
+  });
+
   it('correct login creates a session and does not return passwordHash', async () => {
     const { service, repository } = await createService();
 

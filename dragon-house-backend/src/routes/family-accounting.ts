@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { FamilyAuthService } from '../auth/auth-service.js';
 import type { AppConfig } from '../config/env.js';
 import type { DiscordService } from '../discord/discord-service.js';
-import type { FamilyAccountingService } from '../accounting/accounting-service.js';
+import { canManageAccounting, type FamilyAccountingService } from '../accounting/accounting-service.js';
 import type { FamilyAccountingReadService } from '../accounting/accounting-read-service.js';
 import { FinanceError, FINANCE_ERROR_MESSAGES } from '../accounting/finance-errors.js';
 import { requireFamilyAuthContext } from '../middleware/family-auth-context.js';
@@ -71,6 +71,10 @@ export function createFamilyAccountingRouter(
 
   router.get('/family/accounting/discord-feed', async (request, response) => {
     if (!request.familyAuth) return respondServiceUnavailable(response);
+    // Private finance channel: same authority as every other accounting read, checked before Discord is touched.
+    if (!canManageAccounting(request.familyAuth)) {
+      return respondFinanceError(response, new FinanceError('ACCOUNTING_PERMISSION_DENIED', undefined, 403));
+    }
     if (!discordService) {
       return response.json({
         status: 'unavailable',
@@ -98,13 +102,13 @@ export function createFamilyAccountingRouter(
         items,
         error: null,
       });
-    } catch (error) {
+    } catch {
       response.json({
         status: 'error',
         channelId: config.discord.channels.accounting,
         lastSyncedAt: new Date().toISOString(),
         items: [],
-        error: error instanceof Error ? error.message : 'Discord accounting feed is unavailable',
+        error: 'Discord accounting feed is unavailable',
       });
     }
   });

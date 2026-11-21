@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import type { FamilyAuthService } from '../auth/auth-service.js';
+import { isE2eAuthEnvironment, isLoopbackAddress } from '../auth/e2e-environment.js';
 import type { AppConfig } from '../config/env.js';
 
 const actorIds = {
@@ -18,7 +19,7 @@ export function createE2eAuthRouter(config: AppConfig, authService: FamilyAuthSe
   const router = Router();
 
   router.post('/e2e/auth/login', async (request, response) => {
-    if (!isE2eAuthEnabled(config) || !authService) {
+    if (!isE2eAuthEnvironment(config) || !authService || !isLoopbackAddress(request.socket.remoteAddress)) {
       response.status(404).json({ error: 'not_found' });
       return;
     }
@@ -27,22 +28,16 @@ export function createE2eAuthRouter(config: AppConfig, authService: FamilyAuthSe
       response.status(400).json({ error: 'validation_error' });
       return;
     }
-    response.json(await authService.createSessionForFamilyMember(actorIds[parsed.data.actor], {
-      loginProvider: 'nickname',
-      rememberMe: parsed.data.rememberMe,
-    }));
+    try {
+      // 'nickname' is the stored provider for synthetic E2E sessions; authenticateToken rejects it outside E2E.
+      response.json(await authService.createSessionForFamilyMember(actorIds[parsed.data.actor], {
+        loginProvider: 'nickname',
+        rememberMe: parsed.data.rememberMe,
+      }));
+    } catch {
+      response.status(404).json({ error: 'not_found' });
+    }
   });
 
   return router;
-}
-
-function isE2eAuthEnabled(config: AppConfig): boolean {
-  if (config.nodeEnv !== 'test' || !config.e2eTestMode) return false;
-  if (!config.databaseUrl) return false;
-  try {
-    const databaseName = new URL(config.databaseUrl).pathname.replace(/^\/+/u, '');
-    return databaseName === config.e2eDatabaseName && databaseName.includes('e2e');
-  } catch {
-    return false;
-  }
 }

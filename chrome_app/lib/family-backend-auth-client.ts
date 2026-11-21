@@ -311,18 +311,6 @@ export async function login(loginOrStaticId: string, password: string, rememberM
   return result;
 }
 
-export async function loginWithNickname(nickname: string, rememberMe = true): Promise<LoginResponse> {
-  const response = await fetch(`${getBackendApiBaseUrl().replace(/\/+$/u, '')}/api/auth/nickname-login`, {
-    method: 'POST',
-    credentials: 'omit',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ nickname, rememberMe }),
-  });
-  const result = await parseLoginResponse(response);
-  await setSessionToken(result.token, rememberMe ? 'persistent' : 'session');
-  return result;
-}
-
 export function getDiscordLoginCompletionRedirectUrl(): string | null {
   if (typeof chrome !== 'undefined' && chrome.identity?.getRedirectURL) {
     return chrome.identity.getRedirectURL(DISCORD_LOGIN_REDIRECT_PATH);

@@ -56,6 +56,10 @@ npm run dev
 
 Use `dragon-house-backend/.env.example` as a template for local configuration.
 
+`NODE_ENV` is required and must be `development`, `test` or `production`. The backend refuses to start without it instead of silently defaulting to development. Production also refuses `E2E_TEST_MODE=true`.
+
+There is no passwordless login. Sign in with login or Static ID plus password, or with Discord OAuth. The synthetic E2E login exists only for `NODE_ENV=test` with `E2E_TEST_MODE=true`, the dedicated E2E database and a loopback client.
+
 Never commit real `.env` files, database credentials, Discord secrets, bearer tokens, API keys, private keys, cookies, or production credentials.
 
 Production deployment is not configured yet.

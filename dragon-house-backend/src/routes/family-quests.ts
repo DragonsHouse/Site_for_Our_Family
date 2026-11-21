@@ -8,7 +8,9 @@ import { requireFamilyAuthContext } from '../middleware/family-auth-context.js';
 import { FinanceError, FINANCE_ERROR_MESSAGES } from '../accounting/finance-errors.js';
 import type { FamilyQuestPayoutService } from '../accounting/quest-payout-service.js';
 import { FamilyQuestError, QUEST_ERROR_MESSAGES } from '../quests/quest-errors.js';
-import type { FamilyQuestService } from '../quests/quest-service.js';
+import { canManageFamilyQuests, type FamilyQuestService } from '../quests/quest-service.js';
+import { canManageAccounting } from '../accounting/accounting-service.js';
+import { toDiscordQuestFeedItems } from '../discord/quest-feed-dto.js';
 
 const questStatusSchema = z.enum([
   'recruiting',
@@ -203,7 +205,10 @@ export function createFamilyQuestsRouter(
       });
     }
     try {
-      const items = await discordService.fetchQuestMessages(positiveInt(request.query.limit, 200, 1, 500));
+      // Managers see parsed admin-log and reward details; members only see public announcement fields.
+      const privileged = canManageFamilyQuests(request.familyAuth) || canManageAccounting(request.familyAuth);
+      const quests = await discordService.fetchQuestMessages(positiveInt(request.query.limit, privileged ? 200 : 50, 1, privileged ? 500 : 50));
+      const items = toDiscordQuestFeedItems(quests, { privileged });
       response.json({
         status: 'synced',
         channelId: config.discord.channels.questAnnouncements,
@@ -211,13 +216,13 @@ export function createFamilyQuestsRouter(
         items,
         error: null,
       });
-    } catch (error) {
+    } catch {
       response.json({
         status: 'error',
         channelId: config.discord.channels.questAnnouncements,
         lastSyncedAt: new Date().toISOString(),
         items: [],
-        error: error instanceof Error ? error.message : 'Discord quest feed is unavailable',
+        error: 'Discord quest feed is unavailable',
       });
     }
   });
