@@ -9,7 +9,8 @@ const EnvBoolean = z.preprocess((value) => {
 }, z.boolean());
 
 const EnvSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  // Required on purpose: a missing NODE_ENV must never silently select development behaviour.
+  NODE_ENV: z.enum(['development', 'test', 'production']),
   PORT: z.coerce.number().int().positive().default(8787),
   DATABASE_URL: z.string().trim().optional().default(''),
   AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(10),
@@ -347,6 +348,7 @@ export function validateProductionConfig(config: AppConfig): string[] {
   if (config.nodeEnv !== 'production') return [];
   const missing: string[] = [];
   if (!config.databaseUrl) missing.push('DATABASE_URL');
+  if (config.e2eTestMode) missing.push('E2E_TEST_MODE must be false in production');
   if (!config.frontendExtensionId && config.frontendAllowedOrigins.length === 0) missing.push('FRONTEND_EXTENSION_ID or FRONTEND_ALLOWED_ORIGINS');
   if (!config.discord.sync.protectedOwnerMemberId) missing.push('DISCORD_SYNC_PROTECTED_OWNER_MEMBER_ID');
   if (!config.discord.sync.protectedOwnerDiscordUserId) missing.push('DISCORD_SYNC_PROTECTED_OWNER_USER_ID');

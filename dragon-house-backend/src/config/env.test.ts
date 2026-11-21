@@ -74,6 +74,18 @@ describe('env config', () => {
     expect(config.discord.trustedWebhookId).toBe('webhook-1');
   });
 
+  it('refuses to load without an explicit NODE_ENV instead of defaulting to development', () => {
+    expect(() => loadConfig({ PORT: '8787' })).toThrow(/NODE_ENV/);
+    expect(() => loadConfig({ NODE_ENV: 'staging', PORT: '8787' })).toThrow(/NODE_ENV/);
+  });
+
+  it('rejects E2E test mode in production', () => {
+    const config = loadConfig({ NODE_ENV: 'production', PORT: '8787', E2E_TEST_MODE: 'true' });
+
+    expect(validateProductionConfig(config)).toContain('E2E_TEST_MODE must be false in production');
+    expect(validateProductionConfig(loadConfig({ NODE_ENV: 'production', PORT: '8787' }))).not.toContain('E2E_TEST_MODE must be false in production');
+  });
+
   it('fails production validation when sync safety configuration is missing', () => {
     const config = loadConfig({ NODE_ENV: 'production', PORT: '8787' });
 

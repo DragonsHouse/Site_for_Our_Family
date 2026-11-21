@@ -13,11 +13,6 @@ const LoginSchema = z.object({
   rememberMe: z.boolean().optional().default(false),
 });
 
-const NicknameLoginSchema = z.object({
-  nickname: z.string().trim().min(1).max(120),
-  rememberMe: z.boolean().optional().default(false),
-});
-
 const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(256),
   newPassword: z.string().min(1).max(256),
@@ -66,25 +61,9 @@ export function createAuthRouter(config: AppConfig, authService: FamilyAuthServi
     }
   });
 
-  router.post('/auth/nickname-login', async (request, response) => {
-    if (config.nodeEnv !== 'development') {
-      sendAuthOutcome(response, 404, 'auth_unavailable', 'Authentication is unavailable.', 'auth_unavailable');
-      return;
-    }
-    if (!authService) {
-      sendFamilyAuthOutcome(response, 503, 'database_unavailable');
-      return;
-    }
-    const parsed = NicknameLoginSchema.safeParse(request.body);
-    if (!parsed.success) {
-      sendFamilyAuthOutcome(response, 400, 'invalid_credentials');
-      return;
-    }
-    try {
-      response.json(await authService.loginWithNickname(parsed.data.nickname, { rememberMe: parsed.data.rememberMe }));
-    } catch (error) {
-      respondWithAuthError(response, normalizeLoginError(error));
-    }
+  // Passwordless nickname login was removed. Keep an explicit 404 in every environment.
+  router.post('/auth/nickname-login', (_request, response) => {
+    sendAuthOutcome(response, 404, 'auth_unavailable', 'Authentication is unavailable.', 'auth_unavailable');
   });
 
   router.get('/auth/me', async (request, response) => {

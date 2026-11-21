@@ -111,57 +111,68 @@ describe('auth routes', { timeout: 20_000 }, () => {
     expect(meBody).not.toHaveProperty('member');
   });
 
-  it('development-only nickname login creates a persistent bearer session and me restores it without password requirements', async () => {
-    const { baseUrl, authRepository } = await createServerHarness({ nodeEnv: 'development' });
-    const existing = await authRepository.findUserByFamilyMemberId(ANASTASIA_MEMBER_ID);
-    if (!existing) throw new Error('Missing auth user');
-    await authRepository.updatePassword(ANASTASIA_MEMBER_ID, existing.passwordHash, true);
+  it('rejects passwordless nickname login in every environment without creating a session', async () => {
+    for (const nodeEnv of ['development', 'test', 'production'] as const) {
+      const { baseUrl, authRepository } = await createServerHarness({ nodeEnv });
+      const createdSessions: string[] = [];
+      const createSession = authRepository.createSession.bind(authRepository);
+      authRepository.createSession = async (session) => {
+        createdSessions.push(session.sessionId);
+        return createSession(session);
+      };
+      const login = await fetch(`${baseUrl}/api/auth/nickname-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: 'Anastasia_Dragons', rememberMe: true }),
+      });
+      const loginBody = (await login.json()) as Record<string, unknown>;
 
-    const login = await fetch(`${baseUrl}/api/auth/nickname-login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nickname: '  Anastasia_Dragons  ', rememberMe: true }),
-    });
-    const loginBody = (await login.json()) as { token: string; expiresAt: string; user: Record<string, unknown> };
-
-    expect(login.status).toBe(200);
-    expect(loginBody.token).toBeTruthy();
-    expect(loginBody.user).toMatchObject({
-      memberId: ANASTASIA_MEMBER_ID,
-      nickname: 'Anastasia_Dragons',
-      session: { loginProvider: 'nickname', mustChangePassword: false },
-    });
-
-    const me = await fetch(`${baseUrl}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${loginBody.token}` },
-    });
-    const meBody = (await me.json()) as Record<string, unknown>;
-
-    expect(me.status).toBe(200);
-    expect(meBody).toMatchObject({
-      memberId: ANASTASIA_MEMBER_ID,
-      session: { loginProvider: 'nickname', mustChangePassword: false },
-    });
+      expect(login.status, nodeEnv).toBe(404);
+      expect(loginBody).toMatchObject({ error: 'auth_unavailable', outcome: { code: 'auth_unavailable' } });
+      expect(loginBody).not.toHaveProperty('token');
+      expect(JSON.stringify(loginBody)).not.toContain('Anastasia_Dragons');
+      expect(JSON.stringify(loginBody)).not.toContain(ANASTASIA_MEMBER_ID);
+      expect(createdSessions).toEqual([]);
+    }
   });
 
-  it('blocks nickname login outside explicit development mode without session or enumeration data', async () => {
-    const { baseUrl } = await createServerHarness({ nodeEnv: 'production' });
+  it('rejects stored passwordless sessions outside the dedicated E2E environment', async () => {
+    for (const nodeEnv of ['development', 'test', 'production'] as const) {
+      const { baseUrl, authRepository } = await createServerHarness({ nodeEnv });
+      const token = `legacy-nickname-session-${nodeEnv}`;
+      const now = new Date();
+      await authRepository.createSession({
+        sessionId: `legacy-${nodeEnv}`,
+        familyMemberId: ANASTASIA_MEMBER_ID,
+        tokenHash: hashSessionToken(token),
+        loginProvider: 'nickname',
+        createdAt: now.toISOString(),
+        expiresAt: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+        lastUsedAt: now.toISOString(),
+        revokedAt: null,
+        revokedReason: null,
+      });
 
-    const login = await fetch(`${baseUrl}/api/auth/nickname-login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nickname: 'Anastasia_Dragons', rememberMe: true }),
-    });
-    const loginBody = (await login.json()) as Record<string, unknown>;
+      const me = await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+      expect(me.status, nodeEnv).toBe(401);
+      expect(await me.json()).toMatchObject({ error: 'session_invalid', outcome: { code: 'session_invalid' } });
 
-    expect(login.status).toBe(404);
-    expect(loginBody).toMatchObject({
-      error: 'auth_unavailable',
-      outcome: { code: 'auth_unavailable' },
-    });
-    expect(loginBody).not.toHaveProperty('token');
-    expect(JSON.stringify(loginBody)).not.toContain('Anastasia_Dragons');
-    expect(JSON.stringify(loginBody)).not.toContain(ANASTASIA_MEMBER_ID);
+      const protectedRead = await fetch(`${baseUrl}/api/family/members`, { headers: { Authorization: `Bearer ${token}` } });
+      expect(protectedRead.status, nodeEnv).toBe(401);
+    }
+  });
+
+  it('keeps the synthetic E2E login unavailable outside the guarded E2E environment', async () => {
+    for (const overrides of [{ nodeEnv: 'development' as const, e2eTestMode: true }, { nodeEnv: 'production' as const, e2eTestMode: true }, { nodeEnv: 'test' as const, e2eTestMode: false }]) {
+      const { baseUrl } = await createServerHarness(overrides);
+      const login = await fetch(`${baseUrl}/api/e2e/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actor: 'owner' }),
+      });
+      expect(login.status, JSON.stringify(overrides)).toBe(404);
+      expect(await login.json()).not.toHaveProperty('token');
+    }
   });
 
   it('keeps successful password login response shape unchanged while exposing mustChangePassword', async () => {
