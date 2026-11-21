@@ -326,7 +326,7 @@ export class FamilyQuestService {
   }
 
   private assertCanManage(auth: FamilyAuthContext): void {
-    if (auth.role === 'owner' || auth.rank >= 8 || auth.permissions.includes('manage_family_quests')) return;
+    if (canManageFamilyQuests(auth)) return;
     throw new FamilyQuestError('QUEST_PERMISSION_DENIED', 'Permission denied.', 403);
   }
 }
@@ -555,4 +555,8 @@ function toAuditDto(audit: FamilyQuestRecord['auditTrail'][number]): FamilyQuest
     relatedFamilyMemberId: audit.relatedFamilyMemberId,
     createdAt: audit.createdAt,
   };
+}
+
+export function canManageFamilyQuests(auth: FamilyAuthContext): boolean {
+  return auth.role === 'owner' || auth.rank >= 8 || auth.permissions.includes('manage_family_quests');
 }

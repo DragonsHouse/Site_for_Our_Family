@@ -1986,7 +1986,7 @@ function requireAccountingManager(auth: FamilyAuthContext): void {
   if (!canManageAccounting(auth)) throw new FinanceError('ACCOUNTING_PERMISSION_DENIED', undefined, 403);
 }
 
-function canManageAccounting(auth: FamilyAuthContext): boolean {
+export function canManageAccounting(auth: FamilyAuthContext): boolean {
   return auth.role === 'owner' || auth.rank >= 8 || auth.permissions.includes('manage_accounting') || auth.permissions.includes('manage_treasury');
 }
 
