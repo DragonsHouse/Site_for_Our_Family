@@ -3,8 +3,8 @@ import type pg from 'pg';
 import { z } from 'zod';
 import type { FamilyAuthService } from '../auth/auth-service.js';
 import type { AppConfig } from '../config/env.js';
+import { auditScopePredicate, canViewPrivateMemberAuditFields, redactAuditPayload, resolveAuditScope } from '../audit/audit-access.js';
 import { requireFamilyAuthContext } from '../middleware/family-auth-context.js';
-import type { FamilyAuthContext } from '../types.js';
 
 const querySchema = z.object({
   entityType: z.string().trim().min(1).max(80).optional(),
@@ -40,7 +40,8 @@ export function createFamilyAuditLogRouter(config: AppConfig, authService: Famil
       response.status(503).json({ error: 'service_unavailable', message: 'Audit log is unavailable.' });
       return;
     }
-    if (!canViewAudit(request.familyAuth)) {
+    const scope = resolveAuditScope(request.familyAuth);
+    if (scope.kind === 'none') {
       response.status(403).json({ error: 'permission_denied', message: 'Недостатньо прав для перегляду історії змін.' });
       return;
     }
@@ -52,6 +53,8 @@ export function createFamilyAuditLogRouter(config: AppConfig, authService: Famil
 
     const where: string[] = [];
     const values: unknown[] = [];
+    const scopePredicate = auditScopePredicate(scope, values);
+    if (scopePredicate) where.push(scopePredicate);
     if (parsed.data.entityType) {
       values.push(parsed.data.entityType);
       where.push(`a.entity_type = $${values.length}`);
@@ -84,8 +87,9 @@ export function createFamilyAuditLogRouter(config: AppConfig, authService: Famil
       values,
     );
     const rows = result.rows.slice(0, parsed.data.limit);
+    const redaction = { includePrivateMemberFields: canViewPrivateMemberAuditFields(request.familyAuth) };
     response.json({
-      items: rows.map(mapAuditRow),
+      items: rows.map((row) => mapAuditRow(row, redaction)),
       page: {
         limit: parsed.data.limit,
         offset: parsed.data.offset,
@@ -97,20 +101,7 @@ export function createFamilyAuditLogRouter(config: AppConfig, authService: Famil
   return router;
 }
 
-function canViewAudit(auth: FamilyAuthContext): boolean {
-  return auth.role === 'owner' ||
-    auth.permissions.includes('manage_members') ||
-    auth.permissions.includes('manage_member_roles') ||
-    auth.permissions.includes('manage_family_quests') ||
-    auth.permissions.includes('manage_events') ||
-    auth.permissions.includes('manage_treasury') ||
-    auth.permissions.includes('manage_family_economy') ||
-    auth.permissions.includes('manage_family_map') ||
-    auth.permissions.includes('manage_accounting') ||
-    auth.permissions.includes('manage_discord_integration');
-}
-
-function mapAuditRow(row: AuditRow) {
+function mapAuditRow(row: AuditRow, redaction: { includePrivateMemberFields: boolean }) {
   return {
     id: row.id,
     actorFamilyMemberId: row.actor_family_member_id,
@@ -119,9 +110,9 @@ function mapAuditRow(row: AuditRow) {
     action: row.action,
     entityType: row.entity_type,
     entityId: row.entity_id,
-    beforeData: row.before_data,
-    afterData: row.after_data,
-    metadata: row.metadata,
+    beforeData: redactAuditPayload(row.before_data, redaction),
+    afterData: redactAuditPayload(row.after_data, redaction),
+    metadata: redactAuditPayload(row.metadata, redaction),
     createdAt: row.created_at.toISOString(),
   };
 }

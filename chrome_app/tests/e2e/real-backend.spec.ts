@@ -476,6 +476,36 @@ test('AUDIT: manager actions appear, filters work, pagination loads more', async
   expect(second.items[0].id).not.toBe(first.items[0].id);
 });
 
+test('SECURITY: passwordless login is gone and private feeds and audit history are permission-scoped', async ({ page }) => {
+  const nickname = await page.request.post(`${apiBaseUrl}/api/auth/nickname-login`, { data: { nickname: 'E2E_Owner', rememberMe: true } });
+  expect(nickname.status()).toBe(404);
+  expect(JSON.stringify(await nickname.json())).not.toContain('token');
+
+  await loginAs(page, 'member');
+  expect((await rawApi(page, '/api/family/audit-log')).status).toBe(403);
+  const memberFeed = await rawApi(page, '/api/family/accounting/discord-feed');
+  expect(memberFeed.status).toBe(403);
+  const memberQuestFeed = await rawApi(page, '/api/family/quests/discord-feed');
+  expect(memberQuestFeed.status).toBe(200);
+  expect(JSON.stringify(memberQuestFeed.body)).not.toMatch(/rewardLines|totalReward|discordUserId|"raw"/u);
+
+  await loginAs(page, 'owner');
+  const member = await api(page, '/api/family/members/e2e-member');
+  await api(page, '/api/family/members/e2e-member', {
+    method: 'PATCH',
+    body: JSON.stringify({ notes: `private audit note ${Date.now()}`, version: member.version }),
+  });
+  const ownerAudit = await api(page, '/api/family/audit-log?entityType=family_member&limit=5');
+  expect(ownerAudit.items.length).toBeGreaterThan(0);
+
+  await loginAs(page, 'deputy');
+  const deputyAudit = await api(page, '/api/family/audit-log?limit=50');
+  expect(deputyAudit.items.every((item: any) => ['family_tower', 'family_treasury_entry'].includes(item.entityType))).toBe(true);
+  const deputyMemberAudit = await api(page, '/api/family/audit-log?entityType=family_member&limit=5');
+  expect(deputyMemberAudit.items).toEqual([]);
+  expect(JSON.stringify(deputyAudit)).not.toMatch(/private audit note|dateOfBirth|date_of_birth/u);
+});
+
 async function expectStaleConflict(browser: Browser, path: string, method: string, staleBody: Record<string, unknown>) {
   const contextA = await browser.newContext();
   const contextB = await browser.newContext();
